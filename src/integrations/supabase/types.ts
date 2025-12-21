@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       lab_pcs: {
         Row: {
+          cpu_uptime: number
           created_at: string
           hostname: string
           id: string
@@ -29,6 +30,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cpu_uptime?: number
           created_at?: string
           hostname: string
           id?: string
@@ -42,6 +44,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cpu_uptime?: number
           created_at?: string
           hostname?: string
           id?: string
@@ -55,6 +58,47 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      pc_disks: {
+        Row: {
+          created_at: string
+          disk_label: string | null
+          disk_name: string
+          id: string
+          pc_id: string
+          total_gb: number
+          updated_at: string
+          used_gb: number
+        }
+        Insert: {
+          created_at?: string
+          disk_label?: string | null
+          disk_name: string
+          id?: string
+          pc_id: string
+          total_gb?: number
+          updated_at?: string
+          used_gb?: number
+        }
+        Update: {
+          created_at?: string
+          disk_label?: string | null
+          disk_name?: string
+          id?: string
+          pc_id?: string
+          total_gb?: number
+          updated_at?: string
+          used_gb?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pc_disks_pc_id_fkey"
+            columns: ["pc_id"]
+            isOneToOne: false
+            referencedRelation: "lab_pcs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pc_sessions: {
         Row: {

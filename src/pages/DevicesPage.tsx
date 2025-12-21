@@ -35,7 +35,7 @@ export default function DevicesPage() {
               <TableHead className="text-muted-foreground">Status</TableHead>
               <TableHead className="text-muted-foreground">Hostname</TableHead>
               <TableHead className="text-muted-foreground">MAC Address</TableHead>
-              <TableHead className="text-muted-foreground">Score</TableHead>
+              <TableHead className="text-muted-foreground">Uptime</TableHead>
               <TableHead className="text-muted-foreground">RAM</TableHead>
               <TableHead className="text-muted-foreground">Storage</TableHead>
               <TableHead className="text-muted-foreground">Last Seen</TableHead>
@@ -43,9 +43,8 @@ export default function DevicesPage() {
           </TableHeader>
           <TableBody>
             {devices.map(device => {
-              const isOnline = device.is_online_local;
+              const isOnline = device.status === 'online';
               const sessionStartTime = activeSessions.get(device.id);
-              const cpuScore = (device as any).cpu_score || 0;
               const ramPct = device.ram_total > 0 ? (device.ram_used / device.ram_total) * 100 : 0;
               const storagePct = device.storage_total > 0 ? (device.storage_used / device.storage_total) * 100 : 0;
 
@@ -67,13 +66,12 @@ export default function DevicesPage() {
                   </TableCell>
                   <TableCell className="font-medium">{device.hostname}</TableCell>
                   <TableCell className="font-mono text-sm text-muted-foreground">{device.mac_address}</TableCell>
-                  <TableCell>
-                    <div className="w-24">
-                      <div className="flex justify-between text-xs mb-1 font-bold text-primary">
-                        <span>{cpuScore}</span>
-                      </div>
-                      <Progress value={cpuScore % 100} className="h-1.5" />
-                    </div>
+                  <TableCell className="font-mono text-sm">
+                    {isOnline && sessionStartTime ? (
+                      <span className="text-success">{formatDistanceToNow(new Date(sessionStartTime))}</span>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <div className="w-24">

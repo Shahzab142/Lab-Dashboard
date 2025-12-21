@@ -1,33 +1,37 @@
 import { cn } from '@/lib/utils';
-import { Progress } from '@/components/ui/progress';
 import { Tables } from '@/integrations/supabase/types';
-import { DeviceWithMetrics } from '@/hooks/useLabPCs';
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 interface DeviceCardProps {
-  device: DeviceWithMetrics;
+  device: Tables<'lab_pcs'>;
   sessionStartTime?: string | null;
+  disks?: Tables<'pc_disks'>[];
 }
 
 function formatDuration(startTime: string) {
   const start = new Date(startTime);
   const now = new Date();
   const diff = Math.floor((now.getTime() - start.getTime()) / 1000);
-
+  
   const hours = Math.floor(diff / 3600);
   const minutes = Math.floor((diff % 3600) / 60);
-
+  
   if (hours > 0) {
     return `${hours}h ${minutes}m`;
   }
   return `${minutes}m`;
 }
 
-export function DeviceCard({ device, sessionStartTime }: DeviceCardProps) {
+export function DeviceCard({ device, sessionStartTime, disks = [] }: DeviceCardProps) {
+  const navigate = useNavigate();
   const [duration, setDuration] = useState<string>('');
-  const isOnline = device.is_online_local;
-  const ramPercentage = device.ram_total > 0 ? (device.ram_used / device.ram_total) * 100 : 0;
-  const storagePercentage = device.storage_total > 0 ? (device.storage_used / device.storage_total) * 100 : 0;
+  const isOnline = device.status === 'online';
+  
+  // Calculate total storage from disks or fallback to device storage
+  const totalStorageFromDisks = disks.reduce((sum, d) => sum + d.total_gb, 0);
+  const hasDisks = disks.length > 0;
+  const totalStorage = hasDisks ? totalStorageFromDisks : device.storage_total;
 
   useEffect(() => {
     if (isOnline && sessionStartTime) {
@@ -39,11 +43,18 @@ export function DeviceCard({ device, sessionStartTime }: DeviceCardProps) {
     }
   }, [isOnline, sessionStartTime]);
 
+  const handleClick = () => {
+    navigate(`/dashboard/pc/${device.id}`);
+  };
+
   return (
-    <div className={cn(
-      'glass-card rounded-xl p-5 transition-all hover:scale-[1.01]',
-      isOnline ? 'glow-success' : ''
-    )}>
+    <div 
+      onClick={handleClick}
+      className={cn(
+        'glass-card rounded-xl p-5 transition-all hover:scale-[1.02] cursor-pointer',
+        isOnline ? 'glow-success' : ''
+      )}
+    >
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
           <div className={cn(
@@ -69,28 +80,21 @@ export function DeviceCard({ device, sessionStartTime }: DeviceCardProps) {
         </div>
       )}
 
-      <div className="space-y-3">
-        <div>
-          <div className="flex justify-between text-xs mb-1">
-            <span className="text-muted-foreground">System Score</span>
-            <span className="font-mono text-primary font-bold">{(device as any).cpu_score || 0}</span>
-          </div>
-          <Progress value={Math.min(((device as any).cpu_score || 0) % 100, 100)} className="h-2" />
+      <div className="space-y-2 text-sm">
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">RAM</span>
+          <span className="font-mono font-medium">{device.ram_total}GB</span>
         </div>
-        <div>
-          <div className="flex justify-between text-xs mb-1">
-            <span className="text-muted-foreground">RAM</span>
-            <span className="font-mono">{device.ram_used}GB / {device.ram_total}GB</span>
-          </div>
-          <Progress value={ramPercentage} className="h-2" />
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Storage</span>
+          <span className="font-mono font-medium">{totalStorage}GB</span>
         </div>
-        <div>
-          <div className="flex justify-between text-xs mb-1">
-            <span className="text-muted-foreground">Storage</span>
-            <span className="font-mono">{device.storage_used}GB / {device.storage_total}GB</span>
+        {hasDisks && (
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Disks</span>
+            <span className="font-mono font-medium">{disks.length}</span>
           </div>
-          <Progress value={storagePercentage} className="h-2" />
-        </div>
+        )}
       </div>
     </div>
   );

@@ -20,27 +20,15 @@ export function usePCSessions() {
           .select('*, lab_pcs(*)')
           .order('start_time', { ascending: false })
           .limit(100);
-
+        
         if (error) throw error;
-
-        // Map duration_seconds to duration_minutes if needed
-        const mappedData = (data || []).map((session: any) => ({
-          ...session,
-          duration_minutes: session.duration_minutes || (session.duration_seconds ? Math.floor(session.duration_seconds / 60) : null)
-        }));
-
-        setSessions(mappedData);
+        setSessions(data || []);
 
         // Build active sessions map (sessions without end_time)
-        // Only keep the most recent session per device
         const activeMap = new Map<string, string>();
-        const processedDevices = new Set<string>();
-
-        mappedData.forEach(session => {
-          const deviceId = session.pc_id || session.mac_address;
-          if (deviceId && !session.end_time && !processedDevices.has(deviceId)) {
-            activeMap.set(deviceId, session.start_time);
-            processedDevices.add(deviceId);
+        (data || []).forEach(session => {
+          if (!session.end_time) {
+            activeMap.set(session.pc_id, session.start_time);
           }
         });
         setActiveSessions(activeMap);
@@ -53,8 +41,6 @@ export function usePCSessions() {
 
     fetchSessions();
 
-    const pollingTimer = setInterval(fetchSessions, 30000);
-
     // Set up realtime subscription
     const channel = supabase
       .channel('pc_sessions_changes')
@@ -65,16 +51,30 @@ export function usePCSessions() {
           schema: 'public',
           table: 'pc_sessions'
         },
-        () => {
-          console.log('Realtime Session update received');
-          fetchSessions();
+        async (payload) => {
+          // Refetch to get the joined data
+          const { data } = await supabase
+            .from('pc_sessions')
+            .select('*, lab_pcs(*)')
+            .order('start_time', { ascending: false })
+            .limit(100);
+          
+          if (data) {
+            setSessions(data);
+            const activeMap = new Map<string, string>();
+            data.forEach(session => {
+              if (!session.end_time) {
+                activeMap.set(session.pc_id, session.start_time);
+              }
+            });
+            setActiveSessions(activeMap);
+          }
         }
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
-      clearInterval(pollingTimer);
     };
   }, []);
 
