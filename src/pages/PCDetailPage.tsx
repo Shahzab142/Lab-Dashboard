@@ -1,12 +1,9 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Monitor, HardDrive, MemoryStick, Wifi, WifiOff, Cpu, Clock } from 'lucide-react';
 import { useQuery } from "@tanstack/react-query";
-import { apiFetch } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { useLabPCs } from '@/hooks/useLabPCs';
-import { usePCSessions } from '@/hooks/usePCSessions';
-import { usePCDisks } from '@/hooks/usePCDisks';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { format, formatDistanceToNow } from 'date-fns';
@@ -38,7 +35,22 @@ export default function PCDetailPage() {
   const navigate = useNavigate();
   const { data: device, isLoading: loading } = useQuery({
     queryKey: ["device", id],
-    queryFn: () => apiFetch(`/devices/${id}`),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("devices")
+        .select(`
+          *,
+          disks(*),
+          sessions(*)
+        `)
+        .eq("id", id)
+        .single();
+
+      if (error) throw error;
+
+      const current_session = data.sessions?.find((s: any) => !s.end_time);
+      return { ...data, current_session };
+    },
     enabled: !!id,
     refetchInterval: 5000,
   });
@@ -51,13 +63,18 @@ export default function PCDetailPage() {
 
   const isOnline = device?.status === 'online';
 
+  // Calculate storage stats from disks
   const totalStorage = disks.length > 0
-    ? disks.reduce((sum, d) => sum + d.total_gb, 0)
+    ? disks.reduce((sum: number, d: any) => sum + (d.total || 0), 0)
     : (device?.storage_total || 0);
   const usedStorage = disks.length > 0
-    ? disks.reduce((sum, d) => sum + d.used_gb, 0)
+    ? disks.reduce((sum: number, d: any) => sum + (d.used || 0), 0)
     : (device?.storage_used || 0);
   const storagePercentage = totalStorage > 0 ? (usedStorage / totalStorage) * 100 : 0;
+
+  const ramTotal = device?.ram_total || 0;
+  const ramUsed = device?.ram_used || 0;
+  const ramPercent = ramTotal > 0 ? ((ramUsed / ramTotal) * 100).toFixed(1) : 0;
 
   if (loading) {
     return (
@@ -123,16 +140,27 @@ export default function PCDetailPage() {
             System Resources
           </h2>
           <div className="space-y-4">
-            <div>
-              <div className="flex justify-between text-sm mb-2">
-                <span className="text-muted-foreground">Total RAM</span>
-                <span className="font-mono">{device.ram_total}GB</span>
+            <div className="space-y-4">
+              <div>
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-muted-foreground">Total RAM</span>
+                  <span className="font-mono">{ramTotal}GB</span>
+                </div>
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-muted-foreground">Used RAM</span>
+                  <span className="font-mono">{ramUsed.toFixed(1)}GB</span>
+                </div>
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-muted-foreground">RAM Usage</span>
+                  <span className="font-mono text-primary font-bold">{ramPercent}%</span>
+                </div>
+                <Progress value={Number(ramPercent)} className="h-2 bg-secondary" />
               </div>
             </div>
             <div>
               <div className="flex justify-between text-sm mb-2">
                 <span className="text-muted-foreground">Total Storage</span>
-                <span className="font-mono">{usedStorage}GB / {totalStorage}GB</span>
+                <span className="font-mono">{usedStorage.toFixed(1)}GB / {totalStorage.toFixed(1)}GB</span>
               </div>
               <Progress value={storagePercentage} className="h-3" />
             </div>
@@ -174,19 +202,21 @@ export default function PCDetailPage() {
         <div className="glass-card rounded-xl p-4 md:p-6">
           <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
             <HardDrive className="w-5 h-5" />
-            Storage Disks ({disks.length || 1})
+            Storage Disks ({disks.length || (device?.storage_total ? 1 : 0)})
           </h2>
           {disks.length > 0 ? (
             <div className="space-y-4">
-              {disks.map((disk) => {
-                const diskPercentage = disk.total_gb > 0 ? (disk.used_gb / disk.total_gb) * 100 : 0;
+              {disks.map((disk: any) => {
+                const dTotal = disk.total || 0;
+                const dUsed = disk.used || 0;
+                const diskPercentage = dTotal > 0 ? (dUsed / dTotal) * 100 : 0;
                 return (
                   <div key={disk.id}>
                     <div className="flex justify-between text-sm mb-2">
                       <span className="text-muted-foreground font-mono truncate mr-2">
-                        {disk.disk_name}{disk.disk_label ? ` (${disk.disk_label})` : ''}
+                        {disk.mount || disk.disk_name}{disk.disk_label ? ` (${disk.disk_label})` : ''}
                       </span>
-                      <span className="font-mono shrink-0">{disk.used_gb}GB / {disk.total_gb}GB</span>
+                      <span className="font-mono shrink-0">{dUsed.toFixed(1)}GB / {dTotal.toFixed(1)}GB</span>
                     </div>
                     <Progress
                       value={diskPercentage}
@@ -225,7 +255,7 @@ export default function PCDetailPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {pcSessions.map((session) => (
+                {pcSessions.map((session: any) => (
                   <TableRow key={session.id}>
                     <TableCell className="font-mono text-sm whitespace-nowrap">
                       {format(new Date(session.start_time), 'MMM dd, yyyy HH:mm')}
@@ -237,8 +267,8 @@ export default function PCDetailPage() {
                       }
                     </TableCell>
                     <TableCell className="font-mono text-sm whitespace-nowrap">
-                      {session.duration_minutes
-                        ? `${Math.floor(session.duration_minutes / 60)}h ${session.duration_minutes % 60}m`
+                      {(session.duration_seconds || session.duration_minutes * 60)
+                        ? `${Math.floor((session.duration_seconds || session.duration_minutes * 60) / 3600)}h ${Math.floor(((session.duration_seconds || session.duration_minutes * 60) % 3600) / 60)}m`
                         : '—'
                       }
                     </TableCell>

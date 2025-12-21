@@ -1,12 +1,13 @@
 import { useLabPCs } from '@/hooks/useLabPCs';
-import { usePCSessions } from '@/hooks/usePCSessions';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 
 export default function DevicesPage() {
+  const navigate = useNavigate();
   const { data: devicesData, isLoading: loading } = useLabPCs();
   const devices = devicesData || [];
 
@@ -40,14 +41,25 @@ export default function DevicesPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {devices.map(device => {
+            {devices.map((device: any) => {
               const isOnline = device.status === 'online';
-              const ramPct = device.ram_total > 0 ? (device.ram_used / device.ram_total) * 100 : 0;
-              const storagePct = device.storage_total > 0 ? (device.storage_used / device.storage_total) * 100 : 0;
+
+              const ramTotal = device.ram_total || 0;
+              const ramUsed = device.ram_used || 0;
+              const ramPct = ramTotal > 0 ? (ramUsed / ramTotal) * 100 : 0;
+
+              const storageTotal = device.storage_total || 0;
+              const storageUsed = device.storage_used || 0;
+              const storagePct = storageTotal > 0 ? (storageUsed / storageTotal) * 100 : 0;
+
               const sessionStart = device.current_session?.start_time;
 
               return (
-                <TableRow key={device.id} className="border-border">
+                <TableRow
+                  key={device.id}
+                  className="border-border cursor-pointer hover:bg-muted/30 transition-colors"
+                  onClick={() => navigate(`/dashboard/pc/${device.id}`)}
+                >
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <div className={cn(
@@ -65,24 +77,24 @@ export default function DevicesPage() {
                   <TableCell className="font-medium">{device.hostname}</TableCell>
                   <TableCell className="font-mono text-sm text-muted-foreground">{device.mac_address}</TableCell>
                   <TableCell className="font-mono text-sm">
-                    {isOnline && device.current_session?.start_time ? (
-                      <span className="text-success">{formatDistanceToNow(new Date(device.current_session.start_time))}</span>
+                    {isOnline && sessionStart ? (
+                      <span className="text-success">{formatDistanceToNow(new Date(sessionStart))}</span>
                     ) : (
                       <span className="text-muted-foreground">-</span>
                     )}
                   </TableCell>
                   <TableCell>
                     <div className="w-24">
-                      <div className="flex justify-between text-xs mb-1">
-                        <span>{device.ram_used}/{device.ram_total}GB</span>
+                      <div className="flex justify-between text-[10px] mb-1">
+                        <span>{ramUsed.toFixed(1)}/{ramTotal.toFixed(1)}GB</span>
                       </div>
                       <Progress value={ramPct} className="h-1.5" />
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="w-24">
-                      <div className="flex justify-between text-xs mb-1">
-                        <span>{device.storage_used}/{device.storage_total}GB</span>
+                      <div className="flex justify-between text-[10px] mb-1">
+                        <span>{storageUsed.toFixed(1)}/{storageTotal.toFixed(1)}GB</span>
                       </div>
                       <Progress value={storagePct} className="h-1.5" />
                     </div>

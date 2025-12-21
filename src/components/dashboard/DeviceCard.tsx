@@ -1,22 +1,21 @@
 import { cn } from '@/lib/utils';
-import { Tables } from '@/integrations/supabase/types';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 interface DeviceCardProps {
-  device: Tables<'lab_pcs'>;
+  device: any; // Using any to handle transitioning schema
   sessionStartTime?: string | null;
-  disks?: Tables<'pc_disks'>[];
+  disks?: any[];
 }
 
 function formatDuration(startTime: string) {
   const start = new Date(startTime);
   const now = new Date();
   const diff = Math.floor((now.getTime() - start.getTime()) / 1000);
-  
+
   const hours = Math.floor(diff / 3600);
   const minutes = Math.floor((diff % 3600) / 60);
-  
+
   if (hours > 0) {
     return `${hours}h ${minutes}m`;
   }
@@ -27,11 +26,11 @@ export function DeviceCard({ device, sessionStartTime, disks = [] }: DeviceCardP
   const navigate = useNavigate();
   const [duration, setDuration] = useState<string>('');
   const isOnline = device.status === 'online';
-  
-  // Calculate total storage from disks or fallback to device storage
-  const totalStorageFromDisks = disks.reduce((sum, d) => sum + d.total_gb, 0);
+
+  // Support both old (total_gb) and new (total) field names
+  const totalStorageFromDisks = disks.reduce((sum, d) => sum + (d.total || d.total_gb || 0), 0);
   const hasDisks = disks.length > 0;
-  const totalStorage = hasDisks ? totalStorageFromDisks : device.storage_total;
+  const totalStorage = hasDisks ? totalStorageFromDisks : (device.storage_total || 0);
 
   useEffect(() => {
     if (isOnline && sessionStartTime) {
@@ -48,7 +47,7 @@ export function DeviceCard({ device, sessionStartTime, disks = [] }: DeviceCardP
   };
 
   return (
-    <div 
+    <div
       onClick={handleClick}
       className={cn(
         'glass-card rounded-xl p-5 transition-all hover:scale-[1.02] cursor-pointer',
@@ -83,11 +82,11 @@ export function DeviceCard({ device, sessionStartTime, disks = [] }: DeviceCardP
       <div className="space-y-2 text-sm">
         <div className="flex justify-between">
           <span className="text-muted-foreground">RAM</span>
-          <span className="font-mono font-medium">{device.ram_total}GB</span>
+          <span className="font-mono font-medium">{device.ram_total || 0}GB</span>
         </div>
         <div className="flex justify-between">
           <span className="text-muted-foreground">Storage</span>
-          <span className="font-mono font-medium">{totalStorage}GB</span>
+          <span className="font-mono font-medium">{totalStorage.toFixed(1)}GB</span>
         </div>
         {hasDisks && (
           <div className="flex justify-between">

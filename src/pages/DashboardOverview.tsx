@@ -8,21 +8,35 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useNavigate } from 'react-router-dom';
 
 import { useQuery } from "@tanstack/react-query";
-import { apiFetch } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 
 export default function DashboardOverview() {
   const navigate = useNavigate();
 
-  const { data: stats, isLoading: statsLoading } = useQuery({
-    queryKey: ["overview"],
-    queryFn: () => apiFetch("/stats/overview"),
+  const { data: devices = [], isLoading: devicesLoading } = useLabPCs();
+  const { data: sessionsTodayCount = 0, isLoading: statsLoading } = useQuery({
+    queryKey: ["sessions-today"],
+    queryFn: async () => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const { count, error } = await supabase
+        .from("sessions")
+        .select("*", { count: 'exact', head: true })
+        .gte("start_time", today.toISOString());
+
+      if (error) throw error;
+      return count || 0;
+    },
     refetchInterval: 5000,
   });
 
-  const { data: devices, isLoading: devicesLoading } = useLabPCs('online');
+  const loading = devicesLoading || statsLoading;
 
-  const loading = statsLoading || devicesLoading;
-  const onlineDevices = devices || [];
+  const totalDevices = devices.length;
+  const onlineDevicesCount = devices.filter(d => d.status === "online").length;
+  const offlineDevicesCount = devices.filter(d => d.status === "offline").length;
+  const onlineDevices = devices.filter(d => d.status === "online");
 
   return (
     <div className="p-4 md:p-8">
@@ -42,15 +56,15 @@ export default function DashboardOverview() {
         ) : (
           <>
             <div onClick={() => navigate('/dashboard/devices/all')} className="cursor-pointer">
-              <StatsCard title="Total Devices" value={stats?.total_devices || 0} icon={Monitor} />
+              <StatsCard title="Total Devices" value={totalDevices} icon={Monitor} />
             </div>
             <div onClick={() => navigate('/dashboard/devices/online')} className="cursor-pointer">
-              <StatsCard title="Online Now" value={stats?.online_devices || 0} icon={Wifi} variant="success" />
+              <StatsCard title="Online Now" value={onlineDevicesCount} icon={Wifi} variant="success" />
             </div>
             <div onClick={() => navigate('/dashboard/devices/offline')} className="cursor-pointer">
-              <StatsCard title="Offline" value={stats?.offline_devices || 0} icon={WifiOff} variant="offline" />
+              <StatsCard title="Offline" value={offlineDevicesCount} icon={WifiOff} variant="offline" />
             </div>
-            <StatsCard title="Sessions Today" value={stats?.sessions_today || 0} icon={Activity} variant="warning" />
+            <StatsCard title="Sessions Today" value={sessionsTodayCount} icon={Activity} variant="warning" />
           </>
         )}
       </div>
