@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { Monitor, Loader2, ArrowLeft, Mail, Lock, Eye, EyeOff } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 
 type AuthMode = 'login' | 'forgot' | 'reset';
 
@@ -39,7 +39,7 @@ export default function Login() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!email || !password) {
       toast.error('Please fill in all fields');
       return;
@@ -74,7 +74,7 @@ export default function Login() {
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!email) {
       toast.error('Please enter your email');
       return;
@@ -102,7 +102,7 @@ export default function Login() {
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!newPassword) {
       toast.error('Please enter a new password');
       return;
@@ -141,7 +141,7 @@ export default function Login() {
         <div className="absolute bottom-0 -right-40 w-80 h-80 bg-offline/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-success/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
       </div>
-      
+
       <Card className="w-full max-w-md glass-card relative z-10 animate-in fade-in-0 slide-in-from-bottom-4 duration-500">
         <CardHeader className="text-center space-y-4">
           <div className="mx-auto w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center glow-success animate-in zoom-in-50 duration-500">
@@ -196,9 +196,9 @@ export default function Login() {
                   </button>
                 </div>
               </div>
-              <Button 
-                type="submit" 
-                className="w-full transition-all hover:scale-[1.02] active:scale-[0.98]" 
+              <Button
+                type="submit"
+                className="w-full transition-all hover:scale-[1.02] active:scale-[0.98]"
                 disabled={isLoading}
               >
                 {isLoading ? (
@@ -225,9 +225,9 @@ export default function Login() {
                   className="bg-secondary/50 transition-all focus:scale-[1.01]"
                 />
               </div>
-              <Button 
-                type="submit" 
-                className="w-full transition-all hover:scale-[1.02] active:scale-[0.98]" 
+              <Button
+                type="submit"
+                className="w-full transition-all hover:scale-[1.02] active:scale-[0.98]"
                 disabled={isLoading}
               >
                 {isLoading ? (
@@ -263,9 +263,9 @@ export default function Login() {
                   </button>
                 </div>
               </div>
-              <Button 
-                type="submit" 
-                className="w-full transition-all hover:scale-[1.02] active:scale-[0.98]" 
+              <Button
+                type="submit"
+                className="w-full transition-all hover:scale-[1.02] active:scale-[0.98]"
                 disabled={isLoading}
               >
                 {isLoading ? (
@@ -275,7 +275,7 @@ export default function Login() {
               </Button>
             </form>
           )}
-          
+
           <div className="mt-6 text-center">
             {mode === 'login' && (
               <button

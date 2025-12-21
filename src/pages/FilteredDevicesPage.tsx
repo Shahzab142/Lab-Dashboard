@@ -18,10 +18,8 @@ import {
 export default function FilteredDevicesPage() {
   const { filter } = useParams<{ filter: 'online' | 'offline' | 'all' }>();
   const navigate = useNavigate();
-  const { devices, loading: devicesLoading } = useLabPCs();
-  const { activeSessions, loading: sessionsLoading } = usePCSessions();
-
-  const loading = devicesLoading || sessionsLoading;
+  const { data: devicesData, isLoading: loading } = useLabPCs();
+  const devices = devicesData || [];
 
   const filteredDevices = devices.filter(device => {
     if (filter === 'online') return device.status === 'online';
@@ -97,10 +95,10 @@ export default function FilteredDevicesPage() {
               </TableHeader>
               <TableBody>
                 {filteredDevices.map((device) => {
-                  const sessionStart = activeSessions.get(device.id);
+                  const sessionStart = device.current_session?.start_time;
                   return (
-                    <TableRow 
-                      key={device.id} 
+                    <TableRow
+                      key={device.id}
                       className="cursor-pointer hover:bg-muted/50 transition-colors"
                       onClick={() => navigate(`/dashboard/pc/${device.id}`)}
                     >

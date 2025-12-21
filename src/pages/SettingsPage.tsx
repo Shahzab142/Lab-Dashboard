@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { User, Shield, Lock, Loader2, Eye, EyeOff } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 
 export default function SettingsPage() {
@@ -109,7 +109,7 @@ export default function SettingsPage() {
             <div>
               <label className="text-sm text-muted-foreground">Last Sign In</label>
               <p className="font-medium">
-                {user?.last_sign_in_at 
+                {user?.last_sign_in_at
                   ? new Date(user.last_sign_in_at).toLocaleString()
                   : 'N/A'
                 }
@@ -173,8 +173,8 @@ export default function SettingsPage() {
                 />
               </div>
 
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 className="w-full transition-all hover:scale-[1.02] active:scale-[0.98]"
                 disabled={isLoading}
               >

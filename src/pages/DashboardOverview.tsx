@@ -7,16 +7,22 @@ import { usePCDisks } from '@/hooks/usePCDisks';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useNavigate } from 'react-router-dom';
 
+import { useQuery } from "@tanstack/react-query";
+import { apiFetch } from "@/lib/api";
+
 export default function DashboardOverview() {
   const navigate = useNavigate();
-  const { devices, loading: devicesLoading, onlineCount, offlineCount, totalCount } = useLabPCs();
-  const { activeSessions, loading: sessionsLoading, todaySessionsCount } = usePCSessions();
-  const { getDisksByPCId, loading: disksLoading } = usePCDisks();
 
-  const loading = devicesLoading || sessionsLoading || disksLoading;
-  
-  // Filter only online devices for live section
-  const onlineDevices = devices.filter(d => d.status === 'online');
+  const { data: stats, isLoading: statsLoading } = useQuery({
+    queryKey: ["overview"],
+    queryFn: () => apiFetch("/stats/overview"),
+    refetchInterval: 5000,
+  });
+
+  const { data: devices, isLoading: devicesLoading } = useLabPCs('online');
+
+  const loading = statsLoading || devicesLoading;
+  const onlineDevices = devices || [];
 
   return (
     <div className="p-4 md:p-8">
@@ -36,15 +42,15 @@ export default function DashboardOverview() {
         ) : (
           <>
             <div onClick={() => navigate('/dashboard/devices/all')} className="cursor-pointer">
-              <StatsCard title="Total Devices" value={totalCount} icon={Monitor} />
+              <StatsCard title="Total Devices" value={stats?.total_devices || 0} icon={Monitor} />
             </div>
             <div onClick={() => navigate('/dashboard/devices/online')} className="cursor-pointer">
-              <StatsCard title="Online Now" value={onlineCount} icon={Wifi} variant="success" />
+              <StatsCard title="Online Now" value={stats?.online_devices || 0} icon={Wifi} variant="success" />
             </div>
             <div onClick={() => navigate('/dashboard/devices/offline')} className="cursor-pointer">
-              <StatsCard title="Offline" value={offlineCount} icon={WifiOff} variant="offline" />
+              <StatsCard title="Offline" value={stats?.offline_devices || 0} icon={WifiOff} variant="offline" />
             </div>
-            <StatsCard title="Sessions Today" value={todaySessionsCount} icon={Activity} variant="warning" />
+            <StatsCard title="Sessions Today" value={stats?.sessions_today || 0} icon={Activity} variant="warning" />
           </>
         )}
       </div>
@@ -53,7 +59,7 @@ export default function DashboardOverview() {
       <div className="mb-6">
         <h2 className="text-lg font-semibold text-foreground mb-4">Live Devices</h2>
       </div>
-      
+
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           {[...Array(6)].map((_, i) => (
@@ -69,11 +75,11 @@ export default function DashboardOverview() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           {onlineDevices.map(device => (
-            <DeviceCard 
-              key={device.id} 
-              device={device} 
-              sessionStartTime={activeSessions.get(device.id)}
-              disks={getDisksByPCId(device.id)}
+            <DeviceCard
+              key={device.id}
+              device={device}
+              sessionStartTime={device.current_session?.start_time}
+              disks={device.disks || []}
             />
           ))}
         </div>

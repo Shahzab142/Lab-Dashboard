@@ -1,5 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Monitor, HardDrive, MemoryStick, Wifi, WifiOff, Cpu, Clock } from 'lucide-react';
+import { useQuery } from "@tanstack/react-query";
+import { apiFetch } from "@/lib/api";
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useLabPCs } from '@/hooks/useLabPCs';
@@ -21,7 +23,7 @@ function formatUptime(minutes: number) {
   const days = Math.floor(minutes / 1440);
   const hours = Math.floor((minutes % 1440) / 60);
   const mins = minutes % 60;
-  
+
   if (days > 0) {
     return `${days}d ${hours}h ${mins}m`;
   }
@@ -34,25 +36,26 @@ function formatUptime(minutes: number) {
 export default function PCDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { devices, loading: devicesLoading } = useLabPCs();
-  const { sessions, activeSessions, loading: sessionsLoading } = usePCSessions();
-  const { getDisksByPCId, loading: disksLoading } = usePCDisks();
+  const { data: device, isLoading: loading } = useQuery({
+    queryKey: ["device", id],
+    queryFn: () => apiFetch(`/devices/${id}`),
+    enabled: !!id,
+    refetchInterval: 5000,
+  });
 
-  const loading = devicesLoading || sessionsLoading || disksLoading;
-  const device = devices.find(d => d.id === id);
-  const disks = id ? getDisksByPCId(id) : [];
-  const pcSessions = sessions.filter(s => s.pc_id === id).sort((a, b) => 
+  const disks = device?.disks || [];
+  const pcSessions = (device?.sessions || []).sort((a: any, b: any) =>
     new Date(b.start_time).getTime() - new Date(a.start_time).getTime()
   );
-  const sessionStartTime = id ? activeSessions.get(id) : null;
+  const sessionStartTime = device?.current_session?.start_time;
 
   const isOnline = device?.status === 'online';
-  
-  const totalStorage = disks.length > 0 
-    ? disks.reduce((sum, d) => sum + d.total_gb, 0) 
+
+  const totalStorage = disks.length > 0
+    ? disks.reduce((sum, d) => sum + d.total_gb, 0)
     : (device?.storage_total || 0);
-  const usedStorage = disks.length > 0 
-    ? disks.reduce((sum, d) => sum + d.used_gb, 0) 
+  const usedStorage = disks.length > 0
+    ? disks.reduce((sum, d) => sum + d.used_gb, 0)
     : (device?.storage_used || 0);
   const storagePercentage = totalStorage > 0 ? (usedStorage / totalStorage) * 100 : 0;
 
@@ -133,7 +136,7 @@ export default function PCDetailPage() {
               </div>
               <Progress value={storagePercentage} className="h-3" />
             </div>
-            
+
             {/* CPU Uptime */}
             <div className="pt-2 border-t border-border/50">
               <div className="flex items-center gap-2 mb-2">
@@ -185,9 +188,9 @@ export default function PCDetailPage() {
                       </span>
                       <span className="font-mono shrink-0">{disk.used_gb}GB / {disk.total_gb}GB</span>
                     </div>
-                    <Progress 
-                      value={diskPercentage} 
-                      className={cn("h-3", diskPercentage > 90 ? "[&>div]:bg-destructive" : "")} 
+                    <Progress
+                      value={diskPercentage}
+                      className={cn("h-3", diskPercentage > 90 ? "[&>div]:bg-destructive" : "")}
                     />
                   </div>
                 );
@@ -228,13 +231,13 @@ export default function PCDetailPage() {
                       {format(new Date(session.start_time), 'MMM dd, yyyy HH:mm')}
                     </TableCell>
                     <TableCell className="font-mono text-sm whitespace-nowrap">
-                      {session.end_time 
+                      {session.end_time
                         ? format(new Date(session.end_time), 'MMM dd, yyyy HH:mm')
                         : '—'
                       }
                     </TableCell>
                     <TableCell className="font-mono text-sm whitespace-nowrap">
-                      {session.duration_minutes 
+                      {session.duration_minutes
                         ? `${Math.floor(session.duration_minutes / 60)}h ${session.duration_minutes % 60}m`
                         : '—'
                       }
@@ -242,8 +245,8 @@ export default function PCDetailPage() {
                     <TableCell>
                       <span className={cn(
                         'text-xs font-medium px-2 py-1 rounded-full whitespace-nowrap',
-                        session.end_time 
-                          ? 'bg-muted text-muted-foreground' 
+                        session.end_time
+                          ? 'bg-muted text-muted-foreground'
                           : 'bg-success/20 text-success'
                       )}>
                         {session.end_time ? 'Completed' : 'Active'}

@@ -7,10 +7,8 @@ import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 
 export default function DevicesPage() {
-  const { devices, loading: devicesLoading } = useLabPCs();
-  const { activeSessions, loading: sessionsLoading } = usePCSessions();
-
-  const loading = devicesLoading || sessionsLoading;
+  const { data: devicesData, isLoading: loading } = useLabPCs();
+  const devices = devicesData || [];
 
   if (loading) {
     return (
@@ -44,9 +42,9 @@ export default function DevicesPage() {
           <TableBody>
             {devices.map(device => {
               const isOnline = device.status === 'online';
-              const sessionStartTime = activeSessions.get(device.id);
               const ramPct = device.ram_total > 0 ? (device.ram_used / device.ram_total) * 100 : 0;
               const storagePct = device.storage_total > 0 ? (device.storage_used / device.storage_total) * 100 : 0;
+              const sessionStart = device.current_session?.start_time;
 
               return (
                 <TableRow key={device.id} className="border-border">
@@ -67,8 +65,8 @@ export default function DevicesPage() {
                   <TableCell className="font-medium">{device.hostname}</TableCell>
                   <TableCell className="font-mono text-sm text-muted-foreground">{device.mac_address}</TableCell>
                   <TableCell className="font-mono text-sm">
-                    {isOnline && sessionStartTime ? (
-                      <span className="text-success">{formatDistanceToNow(new Date(sessionStartTime))}</span>
+                    {isOnline && device.current_session?.start_time ? (
+                      <span className="text-success">{formatDistanceToNow(new Date(device.current_session.start_time))}</span>
                     ) : (
                       <span className="text-muted-foreground">-</span>
                     )}
