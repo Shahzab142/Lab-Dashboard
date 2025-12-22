@@ -2,8 +2,7 @@ import { useLabPCs } from '@/hooks/useLabPCs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
-import { cn } from '@/lib/utils';
-import { formatDistanceToNow } from 'date-fns';
+import { cn, formatUptime, formatRelativeTime } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 
 export default function DevicesPage() {
@@ -78,7 +77,7 @@ export default function DevicesPage() {
                   <TableCell className="font-mono text-sm text-muted-foreground">{device.mac_address}</TableCell>
                   <TableCell className="font-mono text-sm">
                     {isOnline && sessionStart ? (
-                      <span className="text-success">{formatDistanceToNow(new Date(sessionStart))}</span>
+                      <span className="text-success">{formatUptime(device.duration_seconds || 0)}</span>
                     ) : (
                       <span className="text-muted-foreground">-</span>
                     )}
@@ -100,7 +99,7 @@ export default function DevicesPage() {
                     </div>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {device.last_seen ? formatDistanceToNow(new Date(device.last_seen), { addSuffix: true }) : '-'}
+                    {formatRelativeTime(device.last_seen, device.server_time)}
                   </TableCell>
                 </TableRow>
               );

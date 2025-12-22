@@ -1,4 +1,4 @@
-import { cn } from '@/lib/utils';
+import { cn, formatDetailedDuration } from '@/lib/utils';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -8,39 +8,32 @@ interface DeviceCardProps {
   disks?: any[];
 }
 
-function formatDuration(startTime: string) {
-  const start = new Date(startTime);
-  const now = new Date();
-  const diff = Math.floor((now.getTime() - start.getTime()) / 1000);
-
-  const hours = Math.floor(diff / 3600);
-  const minutes = Math.floor((diff % 3600) / 60);
-
-  if (hours > 0) {
-    return `${hours}h ${minutes}m`;
-  }
-  return `${minutes}m`;
-}
 
 export function DeviceCard({ device, sessionStartTime, disks = [] }: DeviceCardProps) {
   const navigate = useNavigate();
   const [duration, setDuration] = useState<string>('');
   const isOnline = device.status === 'online';
 
-  // Support both old (total_gb) and new (total) field names
-  const totalStorageFromDisks = disks.reduce((sum, d) => sum + (d.total || d.total_gb || 0), 0);
+  // Calculate storage stats
+  const storageTotal = disks.length > 0
+    ? disks.reduce((sum, d) => sum + (d.total || 0), 0)
+    : (device.storage_total || 0);
+  const storageUsed = disks.length > 0
+    ? disks.reduce((sum, d) => sum + (d.used || 0), 0)
+    : (device.storage_used || 0);
+
+  const hasStorage = storageTotal > 0;
   const hasDisks = disks.length > 0;
-  const totalStorage = hasDisks ? totalStorageFromDisks : (device.storage_total || 0);
 
   useEffect(() => {
     if (isOnline && sessionStartTime) {
-      setDuration(formatDuration(sessionStartTime));
+      setDuration(formatDetailedDuration(sessionStartTime, device.server_time));
       const interval = setInterval(() => {
-        setDuration(formatDuration(sessionStartTime));
-      }, 60000);
+        setDuration(formatDetailedDuration(sessionStartTime, device.server_time));
+      }, 10000); // 10s for better precision
       return () => clearInterval(interval);
     }
-  }, [isOnline, sessionStartTime]);
+  }, [isOnline, sessionStartTime, device.server_time]);
 
   const handleClick = () => {
     navigate(`/dashboard/pc/${device.id}`);
@@ -86,7 +79,7 @@ export function DeviceCard({ device, sessionStartTime, disks = [] }: DeviceCardP
         </div>
         <div className="flex justify-between">
           <span className="text-muted-foreground">Storage</span>
-          <span className="font-mono font-medium">{totalStorage.toFixed(1)}GB</span>
+          <span className="font-mono font-medium">{storageUsed.toFixed(1)}/{storageTotal.toFixed(1)}GB</span>
         </div>
         {hasDisks && (
           <div className="flex justify-between">

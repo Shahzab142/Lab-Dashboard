@@ -2,11 +2,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Monitor, HardDrive, MemoryStick, Wifi, WifiOff, Cpu, Clock } from 'lucide-react';
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { apiFetch } from "@/lib/api";
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
-import { format, formatDistanceToNow } from 'date-fns';
+import { cn, parseUTC, formatUptime, formatRelativeTime, formatDetailedDuration } from '@/lib/utils';
+import { format } from 'date-fns';
 import {
   Table,
   TableBody,
@@ -15,49 +16,35 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-
-function formatUptime(minutes: number) {
-  const days = Math.floor(minutes / 1440);
-  const hours = Math.floor((minutes % 1440) / 60);
-  const mins = minutes % 60;
-
-  if (days > 0) {
-    return `${days}d ${hours}h ${mins}m`;
-  }
-  if (hours > 0) {
-    return `${hours}h ${mins}m`;
-  }
-  return `${mins}m`;
-}
+import { ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, AreaChart, Area } from 'recharts';
 
 export default function PCDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { data: device, isLoading: loading } = useQuery({
+  const { data, isLoading: loading } = useQuery({
     queryKey: ["device", id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("devices")
-        .select(`
-          *,
-          disks(*),
-          sessions(*)
-        `)
-        .eq("id", id)
-        .single();
+      const resp = await apiFetch(`/devices/${id}`);
+      if (!resp || !resp.device) return null;
 
-      if (error) throw error;
-
-      const current_session = data.sessions?.find((s: any) => !s.end_time);
-      return { ...data, current_session };
+      return {
+        ...resp.device,
+        current_session: resp.sessions?.find((s: any) => !s.end_time),
+        sessions: resp.sessions || [],
+        disks: resp.disks || [],
+        heartbeats: resp.heartbeats || [],
+        server_time: resp.server_time
+      };
     },
     enabled: !!id,
     refetchInterval: 5000,
   });
 
+  const device = data;
+
   const disks = device?.disks || [];
   const pcSessions = (device?.sessions || []).sort((a: any, b: any) =>
-    new Date(b.start_time).getTime() - new Date(a.start_time).getTime()
+    parseUTC(b.start_time).getTime() - parseUTC(a.start_time).getTime()
   );
   const sessionStartTime = device?.current_session?.start_time;
 
@@ -131,7 +118,7 @@ export default function PCDetailPage() {
         </span>
       </div>
 
-      {/* Device Stats */}
+      {/* Device Stats Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* RAM & Storage Overview */}
         <div className="glass-card rounded-xl p-4 md:p-6">
@@ -140,23 +127,22 @@ export default function PCDetailPage() {
             System Resources
           </h2>
           <div className="space-y-4">
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between text-sm mb-2">
-                  <span className="text-muted-foreground">Total RAM</span>
-                  <span className="font-mono">{ramTotal}GB</span>
-                </div>
-                <div className="flex justify-between text-sm mb-2">
-                  <span className="text-muted-foreground">Used RAM</span>
-                  <span className="font-mono">{ramUsed.toFixed(1)}GB</span>
-                </div>
-                <div className="flex justify-between text-sm mb-2">
-                  <span className="text-muted-foreground">RAM Usage</span>
-                  <span className="font-mono text-primary font-bold">{ramPercent}%</span>
-                </div>
-                <Progress value={Number(ramPercent)} className="h-2 bg-secondary" />
+            <div>
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-muted-foreground">Total RAM</span>
+                <span className="font-mono">{ramTotal}GB</span>
               </div>
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-muted-foreground">Used RAM</span>
+                <span className="font-mono">{ramUsed.toFixed(1)}GB</span>
+              </div>
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-muted-foreground">RAM Usage</span>
+                <span className="font-mono text-primary font-bold">{ramPercent}%</span>
+              </div>
+              <Progress value={Number(ramPercent)} className="h-2 bg-secondary" />
             </div>
+
             <div>
               <div className="flex justify-between text-sm mb-2">
                 <span className="text-muted-foreground">Total Storage</span>
@@ -165,15 +151,15 @@ export default function PCDetailPage() {
               <Progress value={storagePercentage} className="h-3" />
             </div>
 
-            {/* CPU Uptime */}
+            {/* System Uptime */}
             <div className="pt-2 border-t border-border/50">
               <div className="flex items-center gap-2 mb-2">
                 <Cpu className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">CPU Uptime</span>
+                <span className="text-sm text-muted-foreground">System Uptime</span>
               </div>
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-primary" />
-                <span className="font-mono text-lg text-foreground">
+                <span className="font-mono text-lg text-foreground font-bold">
                   {formatUptime(device.cpu_uptime || 0)}
                 </span>
               </div>
@@ -182,9 +168,9 @@ export default function PCDetailPage() {
             {sessionStartTime && (
               <div className="pt-2 border-t border-border/50">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Current Session</span>
-                  <span className="text-success font-mono">
-                    Started {format(new Date(sessionStartTime), 'HH:mm')}
+                  <span className="text-muted-foreground">Active Session</span>
+                  <span className="text-success font-mono font-bold">
+                    {formatDetailedDuration(sessionStartTime, device.server_time)}
                   </span>
                 </div>
               </div>
@@ -192,7 +178,7 @@ export default function PCDetailPage() {
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Last Seen</span>
               <span className={cn("font-mono", isOnline ? "text-success" : "")}>
-                {isOnline ? 'Online' : (device.last_seen ? formatDistanceToNow(new Date(device.last_seen), { addSuffix: true }) : 'Never')}
+                {isOnline ? 'Online now' : formatRelativeTime(device.last_seen, device.server_time)}
               </span>
             </div>
           </div>
@@ -235,6 +221,67 @@ export default function PCDetailPage() {
         </div>
       </div>
 
+      {/* Usage Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div className="glass-card rounded-xl p-4 md:p-6">
+          <h2 className="text-lg font-semibold text-foreground mb-4">CPU Usage Over Time (%)</h2>
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={device?.heartbeats || []}>
+                <defs>
+                  <linearGradient id="colorCpu" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                <XAxis
+                  dataKey="created_at"
+                  hide
+                />
+                <YAxis domain={[0, 100]} stroke="#666" fontSize={12} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333' }}
+                  labelStyle={{ color: '#999' }}
+                  itemStyle={{ color: '#3b82f6' }}
+                  labelFormatter={(val) => format(parseUTC(val), 'HH:mm:ss')}
+                />
+                <Area type="monotone" dataKey="cpu_usage" stroke="#3b82f6" fillOpacity={1} fill="url(#colorCpu)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="glass-card rounded-xl p-4 md:p-6">
+          <h2 className="text-lg font-semibold text-foreground mb-4">RAM Usage Over Time (%)</h2>
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={device?.heartbeats || []}>
+                <defs>
+                  <linearGradient id="colorRam" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                <XAxis
+                  dataKey="created_at"
+                  hide
+                />
+                <YAxis domain={[0, 100]} stroke="#666" fontSize={12} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333' }}
+                  labelStyle={{ color: '#999' }}
+                  itemStyle={{ color: '#10b981' }}
+                  labelFormatter={(val) => format(parseUTC(val), 'HH:mm:ss')}
+                />
+                <Area type="monotone" dataKey="ram_usage_pct" stroke="#10b981" fillOpacity={1} fill="url(#colorRam)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
       {/* Session History */}
       <div className="glass-card rounded-xl p-4 md:p-6">
         <h2 className="text-lg font-semibold text-foreground mb-4">Session History</h2>
@@ -258,17 +305,17 @@ export default function PCDetailPage() {
                 {pcSessions.map((session: any) => (
                   <TableRow key={session.id}>
                     <TableCell className="font-mono text-sm whitespace-nowrap">
-                      {format(new Date(session.start_time), 'MMM dd, yyyy HH:mm')}
+                      {format(parseUTC(session.start_time), 'MMM dd, yyyy HH:mm')}
                     </TableCell>
                     <TableCell className="font-mono text-sm whitespace-nowrap">
                       {session.end_time
-                        ? format(new Date(session.end_time), 'MMM dd, yyyy HH:mm')
+                        ? format(parseUTC(session.end_time), 'MMM dd, yyyy HH:mm')
                         : '—'
                       }
                     </TableCell>
                     <TableCell className="font-mono text-sm whitespace-nowrap">
-                      {(session.duration_seconds || session.duration_minutes * 60)
-                        ? `${Math.floor((session.duration_seconds || session.duration_minutes * 60) / 3600)}h ${Math.floor(((session.duration_seconds || session.duration_minutes * 60) % 3600) / 60)}m`
+                      {(session.duration_seconds || 0)
+                        ? formatUptime(session.duration_seconds)
                         : '—'
                       }
                     </TableCell>

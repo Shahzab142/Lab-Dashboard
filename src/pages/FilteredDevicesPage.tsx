@@ -4,8 +4,7 @@ import { Button } from '@/components/ui/button';
 import { useLabPCs } from '@/hooks/useLabPCs';
 import { usePCSessions } from '@/hooks/usePCSessions';
 import { Skeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
-import { formatDistanceToNow } from 'date-fns';
+import { cn, parseUTC, formatDetailedDuration } from '@/lib/utils';
 import {
   Table,
   TableBody,
@@ -43,9 +42,6 @@ export default function FilteredDevicesPage() {
     }
   };
 
-  const formatOnlineTime = (sessionStart: string) => {
-    return formatDistanceToNow(new Date(sessionStart), { addSuffix: false });
-  };
 
   if (loading) {
     return (
@@ -114,7 +110,7 @@ export default function FilteredDevicesPage() {
                       </TableCell>
                       {filter === 'online' && (
                         <TableCell className="font-mono text-sm text-success">
-                          {sessionStart ? formatOnlineTime(sessionStart) : '—'}
+                          {sessionStart ? formatDetailedDuration(sessionStart, device.server_time) : '—'}
                         </TableCell>
                       )}
                     </TableRow>

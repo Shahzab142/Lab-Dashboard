@@ -45,14 +45,14 @@ export function DashboardSidebar({ isOpen, setIsOpen, isMobile }: DashboardSideb
 
       {/* Backdrop for mobile */}
       {isMobile && isOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-background/80 backdrop-blur-sm z-30 animate-in fade-in duration-200"
           onClick={() => setIsOpen(false)}
         />
       )}
 
       {/* Sidebar - Fixed position */}
-      <aside 
+      <aside
         className={cn(
           'fixed top-0 left-0 h-screen bg-sidebar border-r border-sidebar-border flex flex-col z-40',
           'transition-all duration-300 ease-in-out',
@@ -107,22 +107,6 @@ export function DashboardSidebar({ isOpen, setIsOpen, isMobile }: DashboardSideb
           ))}
         </nav>
 
-        <div className={cn(
-          'p-3 mt-auto transition-opacity duration-200',
-          isOpen ? 'opacity-100' : 'opacity-0'
-        )}>
-          <button
-            onClick={signOut}
-            className={cn(
-              'flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium w-full',
-              'text-muted-foreground hover:bg-destructive/10 hover:text-destructive',
-              'transition-all hover:scale-[1.02] active:scale-[0.98]'
-            )}
-          >
-            <LogOut className="w-5 h-5 shrink-0" />
-            <span className="whitespace-nowrap">Sign Out</span>
-          </button>
-        </div>
       </aside>
     </>
   );

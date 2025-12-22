@@ -1,24 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
+import { apiFetch } from "@/lib/api";
 
 export function useLabPCs() {
   return useQuery({
     queryKey: ["devices"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("devices")
-        .select(`
-          *,
-          sessions(*)
-        `)
-        .order("last_seen", { ascending: false });
-
-      if (error) throw error;
-
-      // Attach current_session for components that expect it
-      return data.map((device: any) => ({
-        ...device,
-        current_session: device.sessions?.find((s: any) => !s.end_time)
+      const resp = await apiFetch("/devices");
+      // Inject server_time into each device for relative calculation
+      return (resp.devices || []).map((d: any) => ({
+        ...d,
+        server_time: resp.server_time
       }));
     },
     refetchInterval: 5000,

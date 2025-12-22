@@ -2,40 +2,32 @@ import { Monitor, Wifi, WifiOff, Activity } from 'lucide-react';
 import { StatsCard } from '@/components/dashboard/StatsCard';
 import { DeviceCard } from '@/components/dashboard/DeviceCard';
 import { useLabPCs } from '@/hooks/useLabPCs';
-import { usePCSessions } from '@/hooks/usePCSessions';
-import { usePCDisks } from '@/hooks/usePCDisks';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useNavigate } from 'react-router-dom';
-
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
+import { apiFetch } from "@/lib/api";
 
 export default function DashboardOverview() {
   const navigate = useNavigate();
 
   const { data: devices = [], isLoading: devicesLoading } = useLabPCs();
-  const { data: sessionsTodayCount = 0, isLoading: statsLoading } = useQuery({
-    queryKey: ["sessions-today"],
+  const { data: stats, isLoading: statsLoading } = useQuery({
+    queryKey: ["stats-overview"],
     queryFn: async () => {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      const { count, error } = await supabase
-        .from("sessions")
-        .select("*", { count: 'exact', head: true })
-        .gte("start_time", today.toISOString());
-
-      if (error) throw error;
-      return count || 0;
+      return await apiFetch("/stats/overview");
     },
     refetchInterval: 5000,
   });
 
   const loading = devicesLoading || statsLoading;
 
-  const totalDevices = devices.length;
-  const onlineDevicesCount = devices.filter(d => d.status === "online").length;
-  const offlineDevicesCount = devices.filter(d => d.status === "offline").length;
+  // Use values from stats API if available for consistency
+  const totalDevices = stats?.total_devices ?? devices.length;
+  const onlineDevicesCount = stats?.online_devices ?? devices.filter(d => d.status === "online").length;
+  const offlineDevicesCount = stats?.offline_devices ?? devices.filter(d => d.status === "offline").length;
+  const sessionsTodayCount = stats?.sessions_today ?? 0;
+
+  // For the grid, we only show devices that the main query returned as 'online'
   const onlineDevices = devices.filter(d => d.status === "online");
 
   return (
@@ -47,7 +39,7 @@ export default function DashboardOverview() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mb-8">
-        {loading ? (
+        {loading && !stats ? (
           <>
             {[...Array(4)].map((_, i) => (
               <Skeleton key={i} className="h-24 md:h-32 rounded-xl" />
@@ -74,7 +66,7 @@ export default function DashboardOverview() {
         <h2 className="text-lg font-semibold text-foreground mb-4">Live Devices</h2>
       </div>
 
-      {loading ? (
+      {loading && devices.length === 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           {[...Array(6)].map((_, i) => (
             <Skeleton key={i} className="h-40 md:h-48 rounded-xl" />
