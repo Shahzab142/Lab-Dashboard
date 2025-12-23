@@ -11,7 +11,6 @@ import DashboardOverview from "./pages/DashboardOverview";
 import DevicesPage from "./pages/DevicesPage";
 import PCDetailPage from "./pages/PCDetailPage";
 import FilteredDevicesPage from "./pages/FilteredDevicesPage";
-import SettingsPage from "./pages/SettingsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,7 +37,6 @@ const App = () => (
               <Route path="devices" element={<DevicesPage />} />
               <Route path="devices/:filter" element={<FilteredDevicesPage />} />
               <Route path="pc/:id" element={<PCDetailPage />} />
-              <Route path="settings" element={<SettingsPage />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
