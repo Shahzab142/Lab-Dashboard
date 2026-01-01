@@ -1,16 +1,10 @@
-import { supabase } from "./supabase";
-
 export async function apiFetch(path: string) {
-    const session = await supabase.auth.getSession();
-    const token = session.data.session?.access_token;
-
     try {
         const res = await fetch(
             `${import.meta.env.VITE_API_URL}${path}`,
             {
                 headers: {
                     "Content-Type": "application/json",
-                    Authorization: token ? `Bearer ${token}` : "",
                 },
             }
         );
@@ -26,3 +20,4 @@ export async function apiFetch(path: string) {
         throw error;
     }
 }
+

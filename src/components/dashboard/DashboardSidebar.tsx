@@ -60,7 +60,7 @@ export function DashboardSidebar({ isOpen, setIsOpen, isMobile }: DashboardSideb
       >
         <div className="p-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <NavLink to="/dashboard" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
               <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center shrink-0">
                 <Monitor className="w-5 h-5 text-primary" />
               </div>
@@ -68,13 +68,14 @@ export function DashboardSidebar({ isOpen, setIsOpen, isMobile }: DashboardSideb
                 <h1 className="font-bold text-lg text-sidebar-foreground whitespace-nowrap">Lab Monitor</h1>
                 <p className="text-xs text-muted-foreground whitespace-nowrap">IT Infrastructure</p>
               </div>
-            </div>
+            </NavLink>
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setIsOpen(false)}
               className="shrink-0 hover:bg-sidebar-accent"
             >
+
               <X className="w-5 h-5" />
             </Button>
           </div>
@@ -105,6 +106,20 @@ export function DashboardSidebar({ isOpen, setIsOpen, isMobile }: DashboardSideb
             </NavLink>
           ))}
         </nav>
+
+        {/* Bottom Logout Section */}
+        <div className={cn(
+          "p-4 border-t border-sidebar-border transition-opacity duration-200",
+          isOpen ? 'opacity-100' : 'opacity-0'
+        )}>
+          <button
+            onClick={() => signOut()}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 transition-all hover:scale-[1.02] active:scale-[0.98]"
+          >
+            <LogOut className="w-5 h-5 shrink-0" />
+            <span className="whitespace-nowrap">Logout</span>
+          </button>
+        </div>
 
       </aside>
     </>
