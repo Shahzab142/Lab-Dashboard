@@ -151,17 +151,24 @@ export default function PCDetailPage() {
               <Progress value={storagePercentage} className="h-3" />
             </div>
 
-            {/* System Uptime */}
             <div className="pt-2 border-t border-border/50">
-              <div className="flex items-center gap-2 mb-2">
-                <Cpu className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">System Uptime</span>
+              <div className="flex justify-between items-end mb-1">
+                <span className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground">Performance Engine</span>
+                <span className="text-[10px] text-primary font-bold animate-pulse">ACTIVE_SCORING</span>
               </div>
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-primary" />
-                <span className="font-mono text-lg text-foreground font-bold">
-                  {formatUptime(device.cpu_uptime || 0)}
-                </span>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="bg-secondary/30 p-2 rounded-lg border border-border/50">
+                  <p className="text-[9px] uppercase text-muted-foreground font-bold">Current</p>
+                  <p className="text-lg font-black text-primary italic leading-none">{device.current_score || 0}</p>
+                </div>
+                <div className="bg-secondary/30 p-2 rounded-lg border border-border/50">
+                  <p className="text-[9px] uppercase text-muted-foreground font-bold">Today</p>
+                  <p className="text-lg font-black text-foreground italic leading-none">{device.daily_score || 0}</p>
+                </div>
+                <div className="bg-secondary/30 p-2 rounded-lg border border-border/50">
+                  <p className="text-[9px] uppercase text-muted-foreground font-bold">Yesterday</p>
+                  <p className="text-lg font-black text-muted-foreground italic leading-none">{device.yesterday_score || 0}</p>
+                </div>
               </div>
             </div>
 
@@ -169,9 +176,14 @@ export default function PCDetailPage() {
               <div className="pt-2 border-t border-border/50">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Active Session</span>
-                  <span className="text-success font-mono font-bold">
-                    {formatDetailedDuration(sessionStartTime, device.server_time)}
-                  </span>
+                  <div className="text-right">
+                    <span className="text-success font-mono font-bold block leading-none">
+                      {formatDetailedDuration(sessionStartTime, device.server_time)}
+                    </span>
+                    <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-tighter">
+                      Session Pts: {device.current_session?.session_score || 0}
+                    </span>
+                  </div>
                 </div>
               </div>
             )}
@@ -183,6 +195,7 @@ export default function PCDetailPage() {
             </div>
           </div>
         </div>
+
 
         {/* Individual Disks */}
         <div className="glass-card rounded-xl p-4 md:p-6">

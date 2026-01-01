@@ -66,7 +66,20 @@ export function DeviceCard({ device, sessionStartTime, disks = [] }: DeviceCardP
         </span>
       </div>
 
+      {isOnline && (
+        <div className="flex items-center justify-between mb-4 p-2 rounded-lg bg-primary/5 border border-primary/10">
+          <div className="flex flex-col">
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Live Score</span>
+            <span className="text-xl font-black text-primary italic leading-none">{device.current_score || 0}</span>
+          </div>
+          <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
+            <div className="w-2 h-2 bg-primary rounded-full animate-ping" />
+          </div>
+        </div>
+      )}
+
       {isOnline && duration && (
+
         <div className="mb-4 text-sm text-muted-foreground">
           Online for: <span className="text-success font-mono font-medium">{duration}</span>
         </div>
