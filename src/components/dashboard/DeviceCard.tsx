@@ -1,106 +1,98 @@
-import { cn, formatDetailedDuration } from '@/lib/utils';
-import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { cn } from '@/lib/utils';
+import { Monitor, MapPin, Beaker, ShieldCheck, ArrowRight } from 'lucide-react';
+import { Card } from '@/components/ui/card';
 
 interface DeviceCardProps {
-  device: any; // Using any to handle transitioning schema
-  sessionStartTime?: string | null;
-  disks?: any[];
+  device: any;
 }
 
-
-export function DeviceCard({ device, sessionStartTime, disks = [] }: DeviceCardProps) {
+export function DeviceCard({ device }: DeviceCardProps) {
   const navigate = useNavigate();
-  const [duration, setDuration] = useState<string>('');
-  const isOnline = device.status === 'online';
 
-  // Calculate storage stats
-  const storageTotal = disks.length > 0
-    ? disks.reduce((sum, d) => sum + (d.total || 0), 0)
-    : (device.storage_total || 0);
-  const storageUsed = disks.length > 0
-    ? disks.reduce((sum, d) => sum + (d.used || 0), 0)
-    : (device.storage_used || 0);
+  // Robust Online Check: status must be 'online' AND last_seen must be within 5 minutes
+  const lastSeenDate = device.last_seen ? new Date(device.last_seen) : null;
+  const isOnline = device.status === 'online' &&
+    lastSeenDate &&
+    (new Date().getTime() - lastSeenDate.getTime() < 5 * 60 * 1000);
 
-  const hasStorage = storageTotal > 0;
-  const hasDisks = disks.length > 0;
-
-  useEffect(() => {
-    if (isOnline && sessionStartTime) {
-      setDuration(formatDetailedDuration(sessionStartTime, device.server_time));
-      const interval = setInterval(() => {
-        setDuration(formatDetailedDuration(sessionStartTime, device.server_time));
-      }, 10000); // 10s for better precision
-      return () => clearInterval(interval);
-    }
-  }, [isOnline, sessionStartTime, device.server_time]);
-
-  const handleClick = () => {
-    navigate(`/dashboard/pc/${device.id}`);
-  };
+  // Helper for Last Active Time
+  const lastActiveText = lastSeenDate ?
+    new Intl.DateTimeFormat('en-US', {
+      hour: '2-digit', minute: '2-digit', second: '2-digit'
+    }).format(lastSeenDate) : 'Never';
 
   return (
-    <div
-      onClick={handleClick}
+    <Card
+      onClick={() => navigate(`/dashboard/pc/${device.id}`)}
       className={cn(
-        'glass-card rounded-xl p-5 transition-all hover:scale-[1.02] cursor-pointer',
-        isOnline ? 'glow-success' : ''
+        "group relative overflow-hidden transition-all cursor-pointer border-white/5 bg-black/40 backdrop-blur-xl hover:border-primary/50 hover:scale-[1.02] shadow-xl",
+        isOnline ? "ring-1 ring-success/20" : ""
       )}
     >
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center gap-3">
+      {/* Status indicator line */}
+      <div className={cn(
+        "absolute top-0 left-0 w-1 h-full transition-colors",
+        isOnline ? "bg-success shadow-[0_0_10px_rgba(34,197,94,0.5)]" : "bg-muted-foreground/30"
+      )} />
+
+      <div className="p-5 space-y-4">
+        {/* Header: Name and Status */}
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-3">
+            <div className={cn(
+              "p-2 rounded-lg",
+              isOnline ? "bg-primary/10 text-primary" : "bg-muted/10 text-muted-foreground"
+            )}>
+              <Monitor size={18} />
+            </div>
+            <div>
+              <h3 className="font-black italic text-md tracking-tight group-hover:text-primary transition-colors">
+                {device.pc_name || "UNKNOWN_STATION"}
+              </h3>
+              <p className="text-[9px] text-muted-foreground font-mono uppercase tracking-tighter">
+                AUTH_HID: {device.id?.slice(0, 12)}...
+              </p>
+            </div>
+          </div>
           <div className={cn(
-            'w-3 h-3 rounded-full',
-            isOnline ? 'bg-success animate-pulse-online' : 'bg-muted-foreground'
-          )} />
-          <div>
-            <h3 className="font-semibold text-foreground">{device.hostname}</h3>
-            <p className="text-xs text-muted-foreground font-mono">{device.mac_address}</p>
+            "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
+            isOnline ? "bg-success/20 text-success" : "bg-red-500/10 text-red-500"
+          )}>
+            {isOnline ? "Live" : "Offline"}
           </div>
         </div>
-        <span className={cn(
-          'text-xs font-medium px-2 py-1 rounded-full',
-          isOnline ? 'bg-success/20 text-success' : 'bg-muted text-muted-foreground'
-        )}>
-          {isOnline ? 'Online' : 'Offline'}
-        </span>
-      </div>
 
-      {isOnline && (
-        <div className="flex items-center justify-between mb-4 p-2 rounded-lg bg-primary/5 border border-primary/10">
+        {/* Details List */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/5">
+            <MapPin size={12} className="text-primary" />
+            <span className="text-[10px] font-bold text-white uppercase truncate">
+              {device.city || 'N/A'} / {device.lab_name || 'N/A'}
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-widest text-muted-foreground px-1">
+            <span>Last Active</span>
+            <span className="text-white">{lastActiveText}</span>
+          </div>
+        </div>
+
+        {/* Score & Security Status */}
+        <div className="flex items-center justify-between pt-2">
           <div className="flex flex-col">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Live Score</span>
-            <span className="text-xl font-black text-primary italic leading-none">{device.current_score || 0}</span>
+            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Compute Units</span>
+            <span className={cn(
+              "text-lg font-black italic text-primary"
+            )}>
+              {device.cpu_score || 0}
+            </span>
           </div>
-          <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
-            <div className="w-2 h-2 bg-primary rounded-full animate-ping" />
+          <div className="flex items-center gap-1 text-[9px] font-bold text-primary italic opacity-0 group-hover:opacity-100 transition-opacity">
+            DEPLOY ANALYTICS <ArrowRight size={10} />
           </div>
         </div>
-      )}
-
-      {isOnline && duration && (
-
-        <div className="mb-4 text-sm text-muted-foreground">
-          Online for: <span className="text-success font-mono font-medium">{duration}</span>
-        </div>
-      )}
-
-      <div className="space-y-2 text-sm">
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">RAM</span>
-          <span className="font-mono font-medium">{device.ram_total || 0}GB</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Storage</span>
-          <span className="font-mono font-medium">{storageUsed.toFixed(1)}/{storageTotal.toFixed(1)}GB</span>
-        </div>
-        {hasDisks && (
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Disks</span>
-            <span className="font-mono font-medium">{disks.length}</span>
-          </div>
-        )}
       </div>
-    </div>
+    </Card>
   );
 }

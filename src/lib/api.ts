@@ -1,12 +1,23 @@
-export async function apiFetch(path: string) {
+export async function apiFetch(path: string, options: RequestInit = {}) {
+    const defaultOptions: RequestInit = {
+        headers: {
+            "Content-Type": "application/json",
+        },
+    };
+
+    const finalOptions = {
+        ...defaultOptions,
+        ...options,
+        headers: {
+            ...defaultOptions.headers,
+            ...options.headers,
+        },
+    };
+
     try {
         const res = await fetch(
             `${import.meta.env.VITE_API_URL}${path}`,
-            {
-                headers: {
-                    "Content-Type": "application/json",
-                },
-            }
+            finalOptions
         );
 
         if (!res.ok) {
@@ -20,4 +31,3 @@ export async function apiFetch(path: string) {
         throw error;
     }
 }
-

@@ -1,12 +1,13 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Monitor, LogOut, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Monitor, LogOut, Menu, X, Globe, MapPin } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/dashboard/devices', icon: Monitor, label: 'Devices' },
+  { to: '/dashboard/locations', icon: Globe, label: 'Locations' },
+  { to: '/dashboard/devices', icon: Monitor, label: 'Systems' },
 ];
 
 interface DashboardSidebarProps {

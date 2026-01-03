@@ -1,353 +1,328 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Monitor, HardDrive, MemoryStick, Wifi, WifiOff, Cpu, Clock } from 'lucide-react';
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
-import { apiFetch } from "@/lib/api";
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { Skeleton } from '@/components/ui/skeleton';
-import { cn, parseUTC, formatUptime, formatRelativeTime, formatDetailedDuration } from '@/lib/utils';
-import { format } from 'date-fns';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiFetch } from '@/lib/api';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, AreaChart, Area } from 'recharts';
+  ArrowLeft,
+  Monitor,
+  HardDrive,
+  Activity,
+  ShieldCheck,
+  Cpu,
+  MapPin,
+  Beaker,
+  Clock,
+  Calendar,
+  Sunrise,
+  Timer,
+  Save,
+  X,
+  Edit3,
+  Trash2,
+  Power,
+  PowerOff
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input';
+import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 export default function PCDetailPage() {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams();
   const navigate = useNavigate();
-  const { data, isLoading: loading } = useQuery({
-    queryKey: ["device", id],
-    queryFn: async () => {
-      const resp = await apiFetch(`/devices/${id}`);
-      if (!resp || !resp.device) return null;
+  const queryClient = useQueryClient();
+  const [isEditing, setIsEditing] = useState(false);
+  const [editData, setEditData] = useState({ pc_name: '', city: '', lab_name: '' });
 
-      return {
-        ...resp.device,
-        current_session: resp.sessions?.find((s: any) => !s.end_time),
-        sessions: resp.sessions || [],
-        disks: resp.disks || [],
-        heartbeats: resp.heartbeats || [],
-        server_time: resp.server_time
-      };
-    },
-    enabled: !!id,
-    refetchInterval: 5000,
+  const { data: detail, isLoading } = useQuery({
+    queryKey: ['pc-detail', id],
+    queryFn: () => apiFetch(`/devices/${id}`),
+    refetchInterval: isEditing ? false : 30000
   });
 
-  const device = data;
+  useEffect(() => {
+    if (detail?.device) {
+      setEditData({
+        pc_name: detail.device.pc_name,
+        city: detail.device.city,
+        lab_name: detail.device.lab_name
+      });
+    }
+  }, [detail]);
 
-  const disks = device?.disks || [];
-  const pcSessions = (device?.sessions || []).sort((a: any, b: any) =>
-    parseUTC(b.start_time).getTime() - parseUTC(a.start_time).getTime()
-  );
-  const sessionStartTime = device?.current_session?.start_time;
+  const deleteMutation = useMutation({
+    mutationFn: () => apiFetch(`/devices/manage?hid=${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      toast.success("System de-registered successfully");
+      navigate('/dashboard');
+    }
+  });
 
-  const isOnline = device?.status === 'online';
+  const updateMutation = useMutation({
+    mutationFn: (data: any) => apiFetch(`/devices/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data)
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pc-detail', id] });
+      setIsEditing(false);
+      toast.success("System identity updated");
+    }
+  });
 
-  // Calculate storage stats from disks
-  const totalStorage = disks.length > 0
-    ? disks.reduce((sum: number, d: any) => sum + (d.total || 0), 0)
-    : (device?.storage_total || 0);
-  const usedStorage = disks.length > 0
-    ? disks.reduce((sum: number, d: any) => sum + (d.used || 0), 0)
-    : (device?.storage_used || 0);
-  const storagePercentage = totalStorage > 0 ? (usedStorage / totalStorage) * 100 : 0;
+  if (isLoading) return <div className="p-8"><Skeleton className="h-screen rounded-3xl" /></div>;
+  if (!detail?.device) return <div className="p-8 text-center text-white">System Not Found</div>;
 
-  const ramTotal = device?.ram_total || 0;
-  const ramUsed = device?.ram_used || 0;
-  const ramPercent = ramTotal > 0 ? ((ramUsed / ramTotal) * 100).toFixed(1) : 0;
+  const { device, history } = detail;
 
-  if (loading) {
-    return (
-      <div className="p-4 md:p-8">
-        <Skeleton className="h-8 w-48 mb-8" />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          <Skeleton className="h-64 rounded-xl" />
-          <Skeleton className="h-64 rounded-xl" />
-        </div>
-        <Skeleton className="h-96 rounded-xl" />
-      </div>
-    );
-  }
-
-  if (!device) {
-    return (
-      <div className="p-4 md:p-8">
-        <Button variant="ghost" onClick={() => navigate('/dashboard')} className="mb-6">
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Dashboard
-        </Button>
-        <div className="glass-card rounded-xl p-12 text-center">
-          <Monitor className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-foreground mb-2">Device not found</h3>
-          <p className="text-muted-foreground">This device may have been removed.</p>
-        </div>
-      </div>
-    );
-  }
+  // Robust Online Check
+  const isOnline = (() => {
+    const lastSeenDate = device.last_seen ? new Date(device.last_seen) : null;
+    return device.status === 'online' &&
+      lastSeenDate &&
+      (new Date().getTime() - lastSeenDate.getTime() < 5 * 60 * 1000);
+  })();
 
   return (
-    <div className="p-4 md:p-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-8">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
-          <ArrowLeft className="w-5 h-5" />
-        </Button>
-        <div className="flex items-center gap-3 flex-1">
-          <div className={cn(
-            'w-4 h-4 rounded-full shrink-0',
-            isOnline ? 'bg-success animate-pulse-online' : 'bg-muted-foreground'
-          )} />
-          <div className="min-w-0">
-            <h1 className="text-xl md:text-2xl font-bold text-foreground truncate">{device.hostname}</h1>
-            <p className="text-muted-foreground font-mono text-xs md:text-sm truncate">{device.mac_address}</p>
-          </div>
-        </div>
-        <span className={cn(
-          'text-sm font-medium px-3 py-1.5 rounded-full self-start sm:self-auto',
-          isOnline ? 'bg-success/20 text-success' : 'bg-muted text-muted-foreground'
-        )}>
-          {isOnline ? <Wifi className="w-4 h-4 inline mr-1" /> : <WifiOff className="w-4 h-4 inline mr-1" />}
-          {isOnline ? 'Online' : 'Offline'}
-        </span>
-      </div>
-
-      {/* Device Stats Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* RAM & Storage Overview */}
-        <div className="glass-card rounded-xl p-4 md:p-6">
-          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-            <MemoryStick className="w-5 h-5" />
-            System Resources
-          </h2>
-          <div className="space-y-4">
-            <div>
-              <div className="flex justify-between text-sm mb-2">
-                <span className="text-muted-foreground">Total RAM</span>
-                <span className="font-mono">{ramTotal}GB</span>
-              </div>
-              <div className="flex justify-between text-sm mb-2">
-                <span className="text-muted-foreground">Used RAM</span>
-                <span className="font-mono">{ramUsed.toFixed(1)}GB</span>
-              </div>
-              <div className="flex justify-between text-sm mb-2">
-                <span className="text-muted-foreground">RAM Usage</span>
-                <span className="font-mono text-primary font-bold">{ramPercent}%</span>
-              </div>
-              <Progress value={Number(ramPercent)} className="h-2 bg-secondary" />
-            </div>
-
-            <div>
-              <div className="flex justify-between text-sm mb-2">
-                <span className="text-muted-foreground">Total Storage</span>
-                <span className="font-mono">{usedStorage.toFixed(1)}GB / {totalStorage.toFixed(1)}GB</span>
-              </div>
-              <Progress value={storagePercentage} className="h-3" />
-            </div>
-
-            <div className="pt-2 border-t border-border/50">
-              <div className="flex justify-between items-end mb-1">
-                <span className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground">Performance Engine</span>
-                <span className="text-[10px] text-primary font-bold animate-pulse">ACTIVE_SCORING</span>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                <div className="bg-secondary/30 p-2 rounded-lg border border-border/50">
-                  <p className="text-[9px] uppercase text-muted-foreground font-bold">Current</p>
-                  <p className="text-lg font-black text-primary italic leading-none">{device.current_score || 0}</p>
-                </div>
-                <div className="bg-secondary/30 p-2 rounded-lg border border-border/50">
-                  <p className="text-[9px] uppercase text-muted-foreground font-bold">Today</p>
-                  <p className="text-lg font-black text-foreground italic leading-none">{device.daily_score || 0}</p>
-                </div>
-                <div className="bg-secondary/30 p-2 rounded-lg border border-border/50">
-                  <p className="text-[9px] uppercase text-muted-foreground font-bold">Yesterday</p>
-                  <p className="text-lg font-black text-muted-foreground italic leading-none">{device.yesterday_score || 0}</p>
-                </div>
+    <div className="p-4 md:p-8 space-y-8 animate-in zoom-in-95 duration-700">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-white/5">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="rounded-full bg-white/5">
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div>
+            <div className="flex items-center gap-3">
+              {isEditing ? (
+                <Input
+                  className="text-2xl font-black italic tracking-tighter uppercase bg-black/40 border-primary text-white"
+                  value={editData.pc_name}
+                  onChange={(e) => setEditData({ ...editData, pc_name: e.target.value })}
+                />
+              ) : (
+                <h1 className="text-3xl font-black italic tracking-tighter uppercase text-white">{device.pc_name}</h1>
+              )}
+              <div className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${isOnline ? 'bg-green-500/20 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                {device.status}
               </div>
             </div>
-
-            {sessionStartTime && (
-              <div className="pt-2 border-t border-border/50">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Active Session</span>
-                  <div className="text-right">
-                    <span className="text-success font-mono font-bold block leading-none">
-                      {formatDetailedDuration(sessionStartTime, device.server_time)}
-                    </span>
-                    <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-tighter">
-                      Session Pts: {device.current_session?.session_score || 0}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Last Seen</span>
-              <span className={cn("font-mono", isOnline ? "text-success" : "")}>
-                {isOnline ? 'Online now' : formatRelativeTime(device.last_seen, device.server_time)}
-              </span>
-            </div>
+            <p className="text-muted-foreground font-mono text-xs mt-1 uppercase tracking-tighter">Hardware Auth ID: {device.id}</p>
           </div>
         </div>
 
-
-        {/* Individual Disks */}
-        <div className="glass-card rounded-xl p-4 md:p-6">
-          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-            <HardDrive className="w-5 h-5" />
-            Storage Disks ({disks.length || (device?.storage_total ? 1 : 0)})
-          </h2>
-          {disks.length > 0 ? (
-            <div className="space-y-4">
-              {disks.map((disk: any) => {
-                const dTotal = disk.total || 0;
-                const dUsed = disk.used || 0;
-                const diskPercentage = dTotal > 0 ? (dUsed / dTotal) * 100 : 0;
-                return (
-                  <div key={disk.id}>
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="text-muted-foreground font-mono truncate mr-2">
-                        {disk.mount || disk.disk_name}{disk.disk_label ? ` (${disk.disk_label})` : ''}
-                      </span>
-                      <span className="font-mono shrink-0">{dUsed.toFixed(1)}GB / {dTotal.toFixed(1)}GB</span>
-                    </div>
-                    <Progress
-                      value={diskPercentage}
-                      className={cn("h-3", diskPercentage > 90 ? "[&>div]:bg-destructive" : "")}
-                    />
-                  </div>
-                );
-              })}
-            </div>
+        <div className="flex items-center gap-3">
+          {isEditing ? (
+            <>
+              <Button variant="outline" size="sm" onClick={() => setIsEditing(false)} className="font-bold">
+                <X className="w-4 h-4 mr-2" /> CANCEL
+              </Button>
+              <Button variant="default" size="sm" onClick={() => updateMutation.mutate(editData)} className="bg-primary hover:bg-primary/80 text-white font-bold">
+                <Save className="w-4 h-4 mr-2" /> SAVE CHANGES
+              </Button>
+            </>
           ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              <HardDrive className="w-8 h-8 mx-auto mb-2 opacity-50" />
-              <p>No disk data available</p>
-            </div>
+            <>
+              <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="bg-white/5 border-white/10 hover:bg-white/10 font-bold">
+                <Edit3 className="w-4 h-4 mr-2" /> EDIT IDENTITY
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white transition-all font-bold"
+                onClick={() => {
+                  if (window.confirm("CRITICAL: De-register this hardware from the network?")) deleteMutation.mutate();
+                }}
+              >
+                <Trash2 className="w-4 h-4 mr-2" /> DELETE SYSTEM
+              </Button>
+            </>
           )}
         </div>
-      </div>
+      </header>
 
-      {/* Usage Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <div className="glass-card rounded-xl p-4 md:p-6">
-          <h2 className="text-lg font-semibold text-foreground mb-4">CPU Usage Over Time (%)</h2>
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={device?.heartbeats || []}>
-                <defs>
-                  <linearGradient id="colorCpu" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-                <XAxis
-                  dataKey="created_at"
-                  hide
-                />
-                <YAxis domain={[0, 100]} stroke="#666" fontSize={12} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333' }}
-                  labelStyle={{ color: '#999' }}
-                  itemStyle={{ color: '#3b82f6' }}
-                  labelFormatter={(val) => format(parseUTC(val), 'HH:mm:ss')}
-                />
-                <Area type="monotone" dataKey="cpu_usage" stroke="#3b82f6" fillOpacity={1} fill="url(#colorCpu)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Registry Sidecard */}
+        <div className="space-y-6">
+          <Card className="bg-black/40 border-white/5 backdrop-blur-3xl">
+            <CardHeader>
+              <CardTitle className="text-xs font-bold tracking-widest text-primary uppercase">Registry Intelligence</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/5 text-white">
+                <MapPin className="text-primary w-5 h-5 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-[10px] text-muted-foreground uppercase font-bold">Region</p>
+                  {isEditing ? (
+                    <Input className="mt-1 bg-black/40 border-primary text-xs" value={editData.city} onChange={(e) => setEditData({ ...editData, city: e.target.value })} />
+                  ) : (
+                    <p className="font-bold text-sm">{device.city}</p>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/5 text-white">
+                <Beaker className="text-purple-500 w-5 h-5 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-[10px] text-muted-foreground uppercase font-bold">Laboratory</p>
+                  {isEditing ? (
+                    <Input className="mt-1 bg-black/40 border-primary text-xs" value={editData.lab_name} onChange={(e) => setEditData({ ...editData, lab_name: e.target.value })} />
+                  ) : (
+                    <p className="font-bold text-sm">{device.lab_name}</p>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/5 text-white">
+                <Sunrise className="text-orange-500 w-5 h-5 flex-shrink-0" />
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase font-bold">First Boot (Today)</p>
+                  <p className="font-black text-2xl text-white">
+                    {device.today_start_time ? new Date(device.today_start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/5 text-white">
+                <Timer className="text-primary w-5 h-5 flex-shrink-0" />
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase font-bold">Daily Runtime</p>
+                  <p className="font-black text-2xl text-white">
+                    {(() => {
+                      if (!device.today_start_time || !device.today_last_active) return '0h 0m';
+                      const start = new Date(device.today_start_time).getTime();
+                      const end = new Date(device.today_last_active).getTime();
+                      const diffMs = end - start;
+                      if (diffMs < 0) return '0h 0m';
+                      const hours = Math.floor(diffMs / (1000 * 3600));
+                      const minutes = Math.floor((diffMs % (1000 * 3600)) / (1000 * 60));
+                      return `${hours}h ${minutes}m`;
+                    })()}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/5 text-white">
+                <Clock className="text-primary w-5 h-5 flex-shrink-0" />
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase font-bold">Last Active Signal</p>
+                  <p className="font-black text-2xl text-white">
+                    {device.last_seen ? new Date(device.last_seen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'N/A'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/5 text-white">
+                <Activity className="text-primary w-5 h-5 flex-shrink-0" />
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase font-bold">Total Compute Units</p>
+                  <p className="font-black text-2xl text-primary">{device.cpu_score}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className={cn(
+            "border-dashed",
+            isOnline ? "bg-green-500/5 border-green-500/20" : "bg-red-500/5 border-red-500/20"
+          )}>
+            <CardContent className="p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Session Status</p>
+                {isOnline ? <Power className="text-green-500 w-4 h-4" /> : <PowerOff className="text-red-500 w-4 h-4" />}
+              </div>
+
+              {isOnline ? (
+                <div className="space-y-1">
+                  <p className="text-2xl font-black italic text-green-500 uppercase">Active Now</p>
+                  <p className="text-xs text-muted-foreground font-bold">Started at {device.today_start_time ? new Date(device.today_start_time).toLocaleTimeString() : 'N/A'}</p>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <p className="text-2xl font-black italic text-red-500 uppercase">Offline</p>
+                  <p className="text-xs text-muted-foreground font-bold italic">Last active at {device.today_last_active ? new Date(device.today_last_active).toLocaleString() : 'N/A'}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
-        <div className="glass-card rounded-xl p-4 md:p-6">
-          <h2 className="text-lg font-semibold text-foreground mb-4">RAM Usage Over Time (%)</h2>
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={device?.heartbeats || []}>
-                <defs>
-                  <linearGradient id="colorRam" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-                <XAxis
-                  dataKey="created_at"
-                  hide
-                />
-                <YAxis domain={[0, 100]} stroke="#666" fontSize={12} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333' }}
-                  labelStyle={{ color: '#999' }}
-                  itemStyle={{ color: '#10b981' }}
-                  labelFormatter={(val) => format(parseUTC(val), 'HH:mm:ss')}
-                />
-                <Area type="monotone" dataKey="ram_usage_pct" stroke="#10b981" fillOpacity={1} fill="url(#colorRam)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
+        {/* History Main Section */}
+        <div className="lg:col-span-2 space-y-6">
+          <Card className="bg-black/40 border-white/5">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-sm font-bold tracking-widest text-white uppercase">System Session History</CardTitle>
+              <Calendar className="text-muted-foreground/30 w-5 h-5" />
+            </CardHeader>
+            <CardContent>
+              {history && history.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="border-b border-white/5 text-[10px] font-bold uppercase text-muted-foreground">
+                        <th className="pb-4">Date</th>
+                        <th className="pb-4">Login</th>
+                        <th className="pb-4">Logout</th>
+                        <th className="pb-4">Region/Lab</th>
+                        <th className="pb-4">Score</th>
+                        <th className="pb-4">Runtime</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {history.map((h: any) => {
+                        const start = new Date(h.start_time);
+                        const end = h.end_time ? new Date(h.end_time) : null;
+                        const runtime = end ? Math.floor((end.getTime() - start.getTime()) / 1000 / 60) : 0;
 
-      {/* Session History */}
-      <div className="glass-card rounded-xl p-4 md:p-6">
-        <h2 className="text-lg font-semibold text-foreground mb-4">Session History</h2>
-        {pcSessions.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <Monitor className="w-8 h-8 mx-auto mb-2 opacity-50" />
-            <p>No session history for this device</p>
-          </div>
-        ) : (
-          <div className="rounded-lg border border-border overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50">
-                  <TableHead className="whitespace-nowrap">Start Time</TableHead>
-                  <TableHead className="whitespace-nowrap">End Time</TableHead>
-                  <TableHead className="whitespace-nowrap">Duration</TableHead>
-                  <TableHead className="whitespace-nowrap">Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pcSessions.map((session: any) => (
-                  <TableRow key={session.id}>
-                    <TableCell className="font-mono text-sm whitespace-nowrap">
-                      {format(parseUTC(session.start_time), 'MMM dd, yyyy HH:mm')}
-                    </TableCell>
-                    <TableCell className="font-mono text-sm whitespace-nowrap">
-                      {session.end_time
-                        ? format(parseUTC(session.end_time), 'MMM dd, yyyy HH:mm')
-                        : '—'
-                      }
-                    </TableCell>
-                    <TableCell className="font-mono text-sm whitespace-nowrap">
-                      {(session.duration_seconds || 0)
-                        ? formatUptime(session.duration_seconds)
-                        : '—'
-                      }
-                    </TableCell>
-                    <TableCell>
-                      <span className={cn(
-                        'text-xs font-medium px-2 py-1 rounded-full whitespace-nowrap',
-                        session.end_time
-                          ? 'bg-muted text-muted-foreground'
-                          : 'bg-success/20 text-success'
-                      )}>
-                        {session.end_time ? 'Completed' : 'Active'}
-                      </span>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
+                        return (
+                          <tr key={h.id} className="text-xs text-white group">
+                            <td className="py-4 font-bold">{start.toLocaleDateString()}</td>
+                            <td className="py-4 text-muted-foreground">{start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+                            <td className="py-4 text-muted-foreground">
+                              {end ? end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) :
+                                <span className="text-green-500 animate-pulse font-black">ACTIVE</span>}
+                            </td>
+                            <td className="py-4">
+                              <div className="flex flex-col">
+                                <span className="text-primary font-bold">{h.city}</span>
+                                <span className="text-[10px] text-muted-foreground">{h.lab_name}</span>
+                              </div>
+                            </td>
+                            <td className="py-4">
+                              <span className={cn(
+                                "font-black italic px-2 py-0.5 rounded",
+                                h.avg_score > 80 ? "bg-green-500/20 text-green-500" : "bg-orange-500/20 text-orange-500"
+                              )}>
+                                {h.avg_score} UNITS
+                              </span>
+                            </td>
+                            <td className="py-4 font-mono text-primary font-bold">
+                              {runtime > 0 ? `${Math.floor(runtime / 60)}h ${runtime % 60}m` : "---"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="p-12 text-center border-2 border-dashed border-white/5 rounded-2xl">
+                  <Activity className="w-10 h-10 text-muted-foreground/20 mx-auto mb-4" />
+                  <p className="text-muted-foreground font-bold uppercase text-xs tracking-widest">Initial Session Gathering...</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="bg-primary/5 border-primary/20">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <ShieldCheck className="text-primary w-8 h-8" />
+                <div>
+                  <p className="text-[10px] font-bold text-primary uppercase tracking-widest">Network Compliance</p>
+                  <p className="text-xs text-white mt-1">This node is running on a secured local network with verified hardware authentication.</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
