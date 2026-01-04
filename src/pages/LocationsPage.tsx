@@ -2,15 +2,17 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '@/lib/api';
 import { Skeleton } from '@/components/ui/skeleton';
-import { MapPin, Monitor, Wifi, WifiOff, Globe, ArrowRight, Filter } from 'lucide-react';
+import { MapPin, Monitor, Wifi, WifiOff, Globe, ArrowRight, Filter, Search } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 export default function LocationsPage() {
     const navigate = useNavigate();
     const [filter, setFilter] = useState<'all' | 'online' | 'offline'>('all');
+    const [searchTerm, setSearchTerm] = useState('');
 
     const { data: locations = [], isLoading } = useQuery({
         queryKey: ['location-stats'],
@@ -19,9 +21,14 @@ export default function LocationsPage() {
     });
 
     const filteredLocations = locations.filter((loc: any) => {
-        if (filter === 'online') return loc.online > 0;
-        if (filter === 'offline') return loc.offline > 0;
-        return true;
+        const matchesFilter =
+            filter === 'all' ? true :
+                filter === 'online' ? loc.online > 0 :
+                    loc.offline > 0;
+
+        const matchesSearch = loc.city.toLowerCase().includes(searchTerm.toLowerCase());
+
+        return matchesFilter && matchesSearch;
     });
 
     return (
@@ -36,34 +43,46 @@ export default function LocationsPage() {
                     </p>
                 </div>
 
-                <div className="flex p-1 rounded-xl bg-black/40 border border-white/5">
-                    <button
-                        onClick={() => setFilter('all')}
-                        className={cn(
-                            "px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                            filter === 'all' ? "bg-primary text-black" : "text-muted-foreground hover:text-white"
-                        )}
-                    >
-                        All
-                    </button>
-                    <button
-                        onClick={() => setFilter('online')}
-                        className={cn(
-                            "px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                            filter === 'online' ? "bg-success text-white" : "text-muted-foreground hover:text-white"
-                        )}
-                    >
-                        Online
-                    </button>
-                    <button
-                        onClick={() => setFilter('offline')}
-                        className={cn(
-                            "px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                            filter === 'offline' ? "bg-red-500 text-white" : "text-muted-foreground hover:text-white"
-                        )}
-                    >
-                        Offline
-                    </button>
+                <div className="flex flex-col md:flex-row items-center gap-4">
+                    <div className="relative w-full md:w-80 group">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                        <Input
+                            placeholder="SEARCH REGIONS..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="pl-11 bg-black/40 border-white/5 focus:border-primary/50 text-[10px] font-bold uppercase tracking-widest h-11 rounded-xl"
+                        />
+                    </div>
+
+                    <div className="flex p-1 rounded-xl bg-black/40 border border-white/5 w-full md:w-auto">
+                        <button
+                            onClick={() => setFilter('all')}
+                            className={cn(
+                                "flex-1 md:flex-none px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                                filter === 'all' ? "bg-primary text-black" : "text-muted-foreground hover:text-white"
+                            )}
+                        >
+                            All
+                        </button>
+                        <button
+                            onClick={() => setFilter('online')}
+                            className={cn(
+                                "flex-1 md:flex-none px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                                filter === 'online' ? "bg-success text-white" : "text-muted-foreground hover:text-white"
+                            )}
+                        >
+                            Online
+                        </button>
+                        <button
+                            onClick={() => setFilter('offline')}
+                            className={cn(
+                                "flex-1 md:flex-none px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                                filter === 'offline' ? "bg-red-500 text-white" : "text-muted-foreground hover:text-white"
+                            )}
+                        >
+                            Offline
+                        </button>
+                    </div>
                 </div>
             </header>
 
