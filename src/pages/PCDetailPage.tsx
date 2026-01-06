@@ -77,12 +77,12 @@ export default function PCDetailPage() {
 
   const { device, history } = detail;
 
-  // Robust Online Check
+  // Robust Online Check: 40 second threshold
   const isOnline = (() => {
     const lastSeenDate = device.last_seen ? new Date(device.last_seen) : null;
     return device.status === 'online' &&
       lastSeenDate &&
-      (new Date().getTime() - lastSeenDate.getTime() < 5 * 60 * 1000);
+      (new Date().getTime() - lastSeenDate.getTime() < 40 * 1000);
   })();
 
   return (
@@ -103,8 +103,8 @@ export default function PCDetailPage() {
               ) : (
                 <h1 className="text-3xl font-black italic tracking-tighter uppercase text-white">{device.pc_name}</h1>
               )}
-              <div className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${isOnline ? 'bg-green-500/20 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
-                {device.status}
+              <div className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${isOnline ? 'bg-success/20 text-success' : 'bg-red-500/10 text-red-500'}`}>
+                {isOnline ? "Live" : "Offline"}
               </div>
             </div>
             <p className="text-muted-foreground font-mono text-xs mt-1 uppercase tracking-tighter">Hardware Auth ID: {device.id}</p>
@@ -203,9 +203,12 @@ export default function PCDetailPage() {
               <div className="flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/5 text-white">
                 <Clock className="text-primary w-5 h-5 flex-shrink-0" />
                 <div>
-                  <p className="text-[10px] text-muted-foreground uppercase font-bold">Last Active Signal</p>
-                  <p className="font-black text-2xl text-white">
-                    {device.last_seen ? new Date(device.last_seen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'N/A'}
+                  <p className="text-[10px] text-muted-foreground uppercase font-bold">Session Presence</p>
+                  <p className={cn(
+                    "font-black text-2xl uppercase italic",
+                    isOnline ? "text-success" : "text-white"
+                  )}>
+                    {isOnline ? "Active Now" : (device.last_seen ? new Date(device.last_seen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'N/A')}
                   </p>
                 </div>
               </div>
@@ -267,34 +270,36 @@ export default function PCDetailPage() {
                     </thead>
                     <tbody className="divide-y divide-white/5">
                       {history.map((h: any) => {
+                        const dateObj = h.history_date ? new Date(h.history_date) : new Date(h.start_time);
                         const start = new Date(h.start_time);
                         const end = h.end_time ? new Date(h.end_time) : null;
-                        const runtime = end ? Math.floor((end.getTime() - start.getTime()) / 1000 / 60) : 0;
+
+                        // Use runtime_minutes from DB if available, else calculate
+                        const runtimeTotalMins = h.runtime_minutes || (end ? Math.floor((end.getTime() - start.getTime()) / 1000 / 60) : 0);
 
                         return (
-                          <tr key={h.id} className="text-xs text-white group">
-                            <td className="py-4 font-bold">{start.toLocaleDateString()}</td>
+                          <tr key={h.id || h.history_date} className="text-xs text-white group">
+                            <td className="py-4 font-bold">{dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
                             <td className="py-4 text-muted-foreground">{start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
                             <td className="py-4 text-muted-foreground">
-                              {end ? end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) :
-                                <span className="text-green-500 animate-pulse font-black">ACTIVE</span>}
+                              {end ? end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '---'}
                             </td>
                             <td className="py-4">
                               <div className="flex flex-col">
-                                <span className="text-primary font-bold">{h.city}</span>
-                                <span className="text-[10px] text-muted-foreground">{h.lab_name}</span>
+                                <span className="text-primary font-bold">{h.city || 'N/A'}</span>
+                                <span className="text-[10px] text-muted-foreground">{h.lab_name || 'N/A'}</span>
                               </div>
                             </td>
                             <td className="py-4">
                               <span className={cn(
                                 "font-black italic px-2 py-0.5 rounded",
-                                h.avg_score > 80 ? "bg-green-500/20 text-green-500" : "bg-orange-500/20 text-orange-500"
+                                h.avg_score > 0 ? "bg-primary/20 text-primary" : "bg-orange-500/20 text-orange-500"
                               )}>
-                                {h.avg_score} UNITS
+                                {h.avg_score || 0} UNITS
                               </span>
                             </td>
                             <td className="py-4 font-mono text-primary font-bold">
-                              {runtime > 0 ? `${Math.floor(runtime / 60)}h ${runtime % 60}m` : "---"}
+                              {runtimeTotalMins > 0 ? `${Math.floor(runtimeTotalMins / 60)}h ${runtimeTotalMins % 60}m` : "---"}
                             </td>
                           </tr>
                         );

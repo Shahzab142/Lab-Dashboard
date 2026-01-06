@@ -10,11 +10,11 @@ interface DeviceCardProps {
 export function DeviceCard({ device }: DeviceCardProps) {
   const navigate = useNavigate();
 
-  // Robust Online Check: status must be 'online' AND last_seen must be within 5 minutes
+  // Robust Online Check: status must be 'online' AND last_seen must be within 40 seconds
   const lastSeenDate = device.last_seen ? new Date(device.last_seen) : null;
   const isOnline = device.status === 'online' &&
     lastSeenDate &&
-    (new Date().getTime() - lastSeenDate.getTime() < 5 * 60 * 1000);
+    (new Date().getTime() - lastSeenDate.getTime() < 40 * 1000);
 
   // Helper for Last Active Time
   const lastActiveText = lastSeenDate ?
@@ -73,8 +73,10 @@ export function DeviceCard({ device }: DeviceCardProps) {
           </div>
 
           <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-widest text-muted-foreground px-1">
-            <span>Last Active</span>
-            <span className="text-white">{lastActiveText}</span>
+            <span>Status</span>
+            <span className={isOnline ? "text-success" : "text-white"}>
+              {isOnline ? "Active Now" : `Last Active: ${lastActiveText}`}
+            </span>
           </div>
         </div>
 
