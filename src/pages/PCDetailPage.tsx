@@ -261,8 +261,8 @@ export default function PCDetailPage() {
                     <thead>
                       <tr className="border-b border-white/5 text-[10px] font-bold uppercase text-muted-foreground">
                         <th className="pb-4">Date</th>
-                        <th className="pb-4">Login</th>
-                        <th className="pb-4">Logout</th>
+                        <th className="pb-4">Start</th>
+                        <th className="pb-4">Last Seen</th>
                         <th className="pb-4">Region/Lab</th>
                         <th className="pb-4">Score</th>
                         <th className="pb-4">Runtime</th>
