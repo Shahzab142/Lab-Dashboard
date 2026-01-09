@@ -205,6 +205,16 @@ export default function PCDetailPage() {
                   <p className="text-[10px] text-muted-foreground uppercase font-bold">Daily Runtime</p>
                   <p className="font-black text-2xl text-white">
                     {(() => {
+                      // Transition Logic: If new runtime_minutes is available, use it. 
+                      // Otherwise fallback to timestamp calculation for today.
+                      const mins = device.runtime_minutes || 0;
+                      if (mins > 0) {
+                        const hours = Math.floor(mins / 60);
+                        const remMins = Math.floor(mins % 60);
+                        return `${hours}h ${remMins}m`;
+                      }
+
+                      // Fallback for transition/new devices
                       if (!device.today_start_time || !device.today_last_active) return '0h 0m';
                       const start = new Date(device.today_start_time).getTime();
                       const end = new Date(device.today_last_active).getTime();
