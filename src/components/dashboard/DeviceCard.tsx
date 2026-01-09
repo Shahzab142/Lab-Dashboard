@@ -1,7 +1,16 @@
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { Monitor, MapPin, Beaker, ShieldCheck, ArrowRight } from 'lucide-react';
+import { Monitor, MapPin, Beaker, ShieldCheck, ArrowRight, MoreVertical, Edit2, Trash2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { apiFetch } from '@/lib/api';
+import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface DeviceCardProps {
   device: any;
@@ -9,6 +18,37 @@ interface DeviceCardProps {
 
 export function DeviceCard({ device }: DeviceCardProps) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  const handleRenamePC = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newName = prompt("Enter new PC name:", device.pc_name);
+    if (!newName || newName === device.pc_name) return;
+
+    try {
+      await apiFetch(`/devices/${device.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ pc_name: newName })
+      });
+      toast.success("PC renamed successfully");
+      queryClient.invalidateQueries({ queryKey: ['devices-list'] });
+    } catch (err) {
+      toast.error("Failed to rename PC");
+    }
+  };
+
+  const handleDeletePC = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm(`Are you sure you want to delete ${device.pc_name}?`)) return;
+
+    try {
+      await apiFetch(`/devices/manage?hid=${device.id}`, { method: 'DELETE' });
+      toast.success("PC deleted successfully");
+      queryClient.invalidateQueries({ queryKey: ['devices-list'] });
+    } catch (err) {
+      toast.error("Failed to delete PC");
+    }
+  };
 
   // Robust Online Check: status must be 'online' AND last_seen must be within 40 seconds
   const lastSeenDate = device.last_seen ? new Date(device.last_seen) : null;
@@ -55,11 +95,29 @@ export function DeviceCard({ device }: DeviceCardProps) {
               </p>
             </div>
           </div>
-          <div className={cn(
-            "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
-            isOnline ? "bg-success/20 text-success" : "bg-red-500/10 text-red-500"
-          )}>
-            {isOnline ? "Live" : "Offline"}
+          <div className="flex items-center gap-2">
+            <div className={cn(
+              "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
+              isOnline ? "bg-success/20 text-success" : "bg-red-500/10 text-red-500"
+            )}>
+              {isOnline ? "Live" : "Offline"}
+            </div>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                <button className="p-1 hover:bg-white/10 rounded transition-colors text-muted-foreground hover:text-white">
+                  <MoreVertical size={16} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-black/90 border-white/10 backdrop-blur-xl">
+                <DropdownMenuItem onClick={handleRenamePC} className="gap-2 text-white hover:bg-white/10 cursor-pointer">
+                  <Edit2 size={12} /> Rename PC
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleDeletePC} className="gap-2 text-red-500 hover:bg-red-500/10 cursor-pointer">
+                  <Trash2 size={12} /> Delete PC
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 

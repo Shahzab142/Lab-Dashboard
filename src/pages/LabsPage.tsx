@@ -1,16 +1,24 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiFetch } from '@/lib/api';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Monitor, ArrowRight, Building2, Search } from 'lucide-react';
+import { ArrowLeft, Monitor, ArrowRight, Building2, Search, MoreVertical, Edit2, Trash2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useState } from 'react';
 import { LineChart, Line, ResponsiveContainer, Tooltip } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
 
 export default function LabsPage() {
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
     const [searchParams] = useSearchParams();
     const city = searchParams.get('city');
     const [searchTerm, setSearchTerm] = useState('');
@@ -21,6 +29,36 @@ export default function LabsPage() {
         enabled: !!city,
         refetchInterval: 10000
     });
+
+    const handleRenameLab = async (e: React.MouseEvent, oldName: string) => {
+        e.stopPropagation();
+        const newName = prompt("Enter new name for lab:", oldName);
+        if (!newName || newName === oldName) return;
+
+        try {
+            await apiFetch('/stats/lab/rename', {
+                method: 'PATCH',
+                body: JSON.stringify({ city, old_name: oldName, new_name: newName })
+            });
+            toast.success(`Lab renamed to ${newName}`);
+            queryClient.invalidateQueries({ queryKey: ['lab-stats'] });
+        } catch (err) {
+            toast.error("Failed to rename lab");
+        }
+    };
+
+    const handleDeleteLab = async (e: React.MouseEvent, labName: string) => {
+        e.stopPropagation();
+        if (!confirm(`Are you sure you want to delete ${labName}? This will remove all PCs in this lab.`)) return;
+
+        try {
+            await apiFetch(`/stats/lab/delete?city=${city}&lab=${labName}`, { method: 'DELETE' });
+            toast.success(`${labName} and its nodes deleted.`);
+            queryClient.invalidateQueries({ queryKey: ['lab-stats'] });
+        } catch (err) {
+            toast.error("Failed to delete lab");
+        }
+    };
 
     const filteredLabs = labs.filter((lab: any) =>
         lab.lab_name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -91,7 +129,7 @@ export default function LabsPage() {
                                 className="group relative overflow-hidden bg-black/40 border-white/5 backdrop-blur-3xl cursor-pointer hover:border-primary/50 transition-all hover:scale-[1.02]"
                             >
                                 <CardContent className="p-8 space-y-6">
-                                    <div className="flex items-start justify-between">
+                                    <div className="flex items-start justify-between relative">
                                         <div className="flex items-center gap-4">
                                             <div className="p-4 rounded-2xl bg-white/5 text-primary">
                                                 <Building2 size={24} />
@@ -103,6 +141,22 @@ export default function LabsPage() {
                                                 <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Facility Environment</p>
                                             </div>
                                         </div>
+
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                                <button className="p-2 hover:bg-white/10 rounded-lg transition-colors text-muted-foreground hover:text-white">
+                                                    <MoreVertical size={20} />
+                                                </button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" className="bg-black/90 border-white/10 backdrop-blur-xl">
+                                                <DropdownMenuItem onClick={(e) => handleRenameLab(e, lab.lab_name)} className="gap-2 text-white hover:bg-white/10 cursor-pointer">
+                                                    <Edit2 size={14} /> Rename Lab
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={(e) => handleDeleteLab(e, lab.lab_name)} className="gap-2 text-red-500 hover:bg-red-500/10 cursor-pointer">
+                                                    <Trash2 size={14} /> Delete Lab
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
                                     </div>
 
                                     {/* PC Availability Graph */}

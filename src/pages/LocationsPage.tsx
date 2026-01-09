@@ -1,16 +1,23 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '@/lib/api';
 import { Skeleton } from '@/components/ui/skeleton';
-import { MapPin, ArrowRight, Search, Building2 } from 'lucide-react';
+import { MapPin, ArrowRight, Search, Building2, MoreVertical, Edit2, Trash2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useState } from 'react';
-import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
-import { LineChart, Line, ResponsiveContainer, YAxis, Tooltip } from 'recharts';
+import { LineChart, Line, ResponsiveContainer, Tooltip } from 'recharts';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
 
 export default function LocationsPage() {
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
     const [searchTerm, setSearchTerm] = useState('');
 
     const { data: locations = [], isLoading } = useQuery({
@@ -18,6 +25,36 @@ export default function LocationsPage() {
         queryFn: () => apiFetch('/stats/locations'),
         refetchInterval: 10000
     });
+
+    const handleRenameCity = async (e: React.MouseEvent, oldName: string) => {
+        e.stopPropagation();
+        const newName = prompt("Enter new name for city:", oldName);
+        if (!newName || newName === oldName) return;
+
+        try {
+            await apiFetch('/stats/city/rename', {
+                method: 'PATCH',
+                body: JSON.stringify({ old_name: oldName, new_name: newName })
+            });
+            toast.success(`City renamed to ${newName}`);
+            queryClient.invalidateQueries({ queryKey: ['location-stats'] });
+        } catch (err) {
+            toast.error("Failed to rename city");
+        }
+    };
+
+    const handleDeleteCity = async (e: React.MouseEvent, cityName: string) => {
+        e.stopPropagation();
+        if (!confirm(`Are you sure you want to delete ${cityName}? This will remove all PCs in this city.`)) return;
+
+        try {
+            await apiFetch(`/stats/city/delete?city=${cityName}`, { method: 'DELETE' });
+            toast.success(`${cityName} and its nodes deleted.`);
+            queryClient.invalidateQueries({ queryKey: ['location-stats'] });
+        } catch (err) {
+            toast.error("Failed to delete city");
+        }
+    };
 
     const filteredLocations = locations.filter((loc: any) =>
         loc.city.toLowerCase().includes(searchTerm.toLowerCase())
@@ -65,8 +102,6 @@ export default function LocationsPage() {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                     {filteredLocations.map((loc: any) => {
-                        // Mock history data for the line effect since we only have snapshot 
-                        // But we want to show Total vs Online labs
                         const graphData = [
                             { name: 'Total Labs', val: loc.total_labs },
                             { name: 'Online Labs', val: loc.online_labs },
@@ -80,7 +115,7 @@ export default function LocationsPage() {
                                 className="group relative overflow-hidden bg-black/40 border-white/5 backdrop-blur-3xl cursor-pointer hover:border-primary/50 transition-all hover:scale-[1.02]"
                             >
                                 <CardContent className="p-8 space-y-6">
-                                    <div className="flex items-start justify-between">
+                                    <div className="flex items-start justify-between relative">
                                         <div className="flex items-center gap-4">
                                             <div className="p-4 rounded-2xl bg-white/5 text-primary">
                                                 <MapPin size={24} />
@@ -92,6 +127,22 @@ export default function LocationsPage() {
                                                 <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Regional Hub</p>
                                             </div>
                                         </div>
+
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                                <button className="p-2 hover:bg-white/10 rounded-lg transition-colors text-muted-foreground hover:text-white">
+                                                    <MoreVertical size={20} />
+                                                </button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" className="bg-black/90 border-white/10 backdrop-blur-xl">
+                                                <DropdownMenuItem onClick={(e) => handleRenameCity(e, loc.city)} className="gap-2 text-white hover:bg-white/10 cursor-pointer">
+                                                    <Edit2 size={14} /> Rename City
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={(e) => handleDeleteCity(e, loc.city)} className="gap-2 text-red-500 hover:bg-red-500/10 cursor-pointer">
+                                                    <Trash2 size={14} /> Delete City
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
                                     </div>
 
                                     {/* Lab Status Graph Overlay */}
