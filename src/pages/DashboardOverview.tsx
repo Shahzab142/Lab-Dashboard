@@ -46,7 +46,7 @@ export default function DashboardOverview() {
           [...Array(3)].map((_, i) => <Skeleton key={i} className="h-32 rounded-3xl" />)
         ) : (
           <>
-            <div onClick={() => navigate('/dashboard/locations')} className="cursor-pointer transition-transform hover:scale-[1.02]">
+            <div onClick={() => navigate('/dashboard/cities')} className="cursor-pointer transition-transform hover:scale-[1.02]">
               <StatsCard title="Total Cities" value={locations.length} icon={Globe} variant="default" />
             </div>
             <div onClick={() => navigate('/dashboard/devices?status=online')} className="cursor-pointer transition-transform hover:scale-[1.02]">
