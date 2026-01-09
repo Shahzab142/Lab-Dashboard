@@ -9,6 +9,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import DashboardOverview from "./pages/DashboardOverview";
 import LocationsPage from "./pages/LocationsPage";
+import LabsPage from "./pages/LabsPage";
 import DevicesPage from "./pages/DevicesPage";
 import PCDetailPage from "./pages/PCDetailPage";
 import FilteredDevicesPage from "./pages/FilteredDevicesPage";
@@ -35,9 +36,9 @@ const App = () => (
               }
             >
               <Route index element={<DashboardOverview />} />
-              <Route path="locations" element={<LocationsPage />} />
+              <Route path="cities" element={<LocationsPage />} />
+              <Route path="labs" element={<LabsPage />} />
               <Route path="devices" element={<DevicesPage />} />
-              <Route path="devices/:filter" element={<FilteredDevicesPage />} />
               <Route path="pc/:id" element={<PCDetailPage />} />
             </Route>
             <Route path="*" element={<NotFound />} />

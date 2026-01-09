@@ -19,7 +19,9 @@ import {
   Edit3,
   Trash2,
   Power,
-  PowerOff
+  PowerOff,
+  Layout,
+  Smartphone
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -154,7 +156,15 @@ export default function PCDetailPage() {
                 <div className="flex-1">
                   <p className="text-[10px] text-muted-foreground uppercase font-bold">Region</p>
                   {isEditing ? (
-                    <Input className="mt-1 bg-black/40 border-primary text-xs" value={editData.city} onChange={(e) => setEditData({ ...editData, city: e.target.value })} />
+                    <select
+                      className="mt-1 w-full bg-black/40 border border-primary text-white text-xs rounded p-1"
+                      value={editData.city}
+                      onChange={(e) => setEditData({ ...editData, city: e.target.value })}
+                    >
+                      {["Ahmadpur East", "Ahmed Nager Chatha", "Ali Pur", "Arifwala", "Attock", "Bhalwal", "Bahawalnagar", "Bahawalpur", "Bhakkar", "Burewala", "Chillianwala", "Chakwal", "Chichawatni", "Chiniot", "Chishtian", "Daska", "Darya Khan", "Dera Ghazi Khan", "Dhaular", "Dina", "Dinga", "Dipalpur", "Faisalabad", "Fateh Jang", "Ghakhar Mandi", "Gojra", "Gujar Khan", "Gujranwala", "Gujrat", "Hafizabad", "Haroonabad", "Hasilpur", "Haveli Lakha", "Jauharabad", "Jhang", "Jhelum", "Kalabagh", "Karor Lal Esan", "Kasur", "Kamalia", "Kamoke", "Khanewal", "Khanpur", "Kharian", "Khushab", "Kot Adu", "Lahore", "Lalamusa", "Layyah", "Liaquat Pur", "Lodhran", "Malakwal", "Mamoori", "Mailsi", "Mandi Bahauddin", "Mian Channu", "Mianwali", "Multan", "Murree", "Muridke", "Mianwali Bangla", "Muzaffargarh", "Narowal", "Okara", "Renala Khurd", "Pakpattan", "Pattoki", "Pir Mahal", "Qila Didar Singh", "Rabwah", "Raiwind", "Rajanpur", "Rahim Yar Khan", "Rawalpindi", "Sadiqabad", "Safdarabad", "Sahiwal", "Sangla Hill", "Sarai Alamgir", "Sargodha", "Shakargarh", "Sheikhupura", "Sialkot", "Sohawa", "Soianwala", "Siranwali", "Talagang", "Taxila", "Toba Tek Singh", "Vehari", "Wah Cantonment", "Wazirabad"].sort().map(c => (
+                        <option key={c} value={c} className="bg-slate-900">{c}</option>
+                      ))}
+                    </select>
                   ) : (
                     <p className="font-bold text-sm">{device.city}</p>
                   )}
@@ -165,7 +175,15 @@ export default function PCDetailPage() {
                 <div className="flex-1">
                   <p className="text-[10px] text-muted-foreground uppercase font-bold">Laboratory</p>
                   {isEditing ? (
-                    <Input className="mt-1 bg-black/40 border-primary text-xs" value={editData.lab_name} onChange={(e) => setEditData({ ...editData, lab_name: e.target.value })} />
+                    <select
+                      className="mt-1 w-full bg-black/40 border border-primary text-white text-xs rounded p-1"
+                      value={editData.lab_name}
+                      onChange={(e) => setEditData({ ...editData, lab_name: e.target.value })}
+                    >
+                      {["ITU Main Campus Lab", "ITU Barki Campus Lab"].map(l => (
+                        <option key={l} value={l} className="bg-slate-900">{l}</option>
+                      ))}
+                    </select>
                   ) : (
                     <p className="font-bold text-sm">{device.lab_name}</p>
                   )}
@@ -187,6 +205,16 @@ export default function PCDetailPage() {
                   <p className="text-[10px] text-muted-foreground uppercase font-bold">Daily Runtime</p>
                   <p className="font-black text-2xl text-white">
                     {(() => {
+                      // Transition Logic: If new runtime_minutes is available, use it. 
+                      // Otherwise fallback to timestamp calculation for today.
+                      const mins = device.runtime_minutes || 0;
+                      if (mins > 0) {
+                        const hours = Math.floor(mins / 60);
+                        const remMins = Math.floor(mins % 60);
+                        return `${hours}h ${remMins}m`;
+                      }
+
+                      // Fallback for transition/new devices
                       if (!device.today_start_time || !device.today_last_active) return '0h 0m';
                       const start = new Date(device.today_start_time).getTime();
                       const end = new Date(device.today_last_active).getTime();
@@ -245,6 +273,56 @@ export default function PCDetailPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* DIGITAL WELLBEING - Samsung Style */}
+          <Card className="bg-black/40 border-white/5 backdrop-blur-3xl overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-xs font-bold tracking-widest text-success uppercase">Digital Wellbeing</CardTitle>
+              <Smartphone className="w-4 h-4 text-success/50" />
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {device.app_usage && Object.keys(device.app_usage).length > 0 ? (
+                (() => {
+                  const sortedApps = Object.entries(device.app_usage as Record<string, number>)
+                    .sort(([, a], [, b]) => b - a)
+                    .slice(0, 5);
+                  const totalSecs = Object.values(device.app_usage as Record<string, number>).reduce((acc, v) => acc + v, 0);
+
+                  return (
+                    <div className="space-y-4">
+                      {sortedApps.map(([app, secs]) => {
+                        const percent = Math.max(5, (secs / totalSecs) * 100);
+                        const hrs = Math.floor(secs / 3600);
+                        const mins = Math.floor((secs % 3600) / 60);
+                        return (
+                          <div key={app} className="space-y-1.5 group">
+                            <div className="flex justify-between items-end">
+                              <span className="text-[11px] font-bold text-white/80 group-hover:text-success transition-colors truncate max-w-[150px]">{app}</span>
+                              <span className="text-[10px] font-mono text-muted-foreground">{hrs > 0 ? `${hrs}h ` : ''}{mins}m</span>
+                            </div>
+                            <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-success transition-all duration-1000 ease-out rounded-full shadow-[0_0_10px_rgba(34,197,94,0.3)]"
+                                style={{ width: `${percent}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <div className="pt-2 border-t border-white/5 mt-4">
+                        <p className="text-[9px] text-muted-foreground uppercase font-black tracking-widest text-center">Software Efficiency Active</p>
+                      </div>
+                    </div>
+                  );
+                })()
+              ) : (
+                <div className="py-8 text-center bg-white/5 rounded-2xl border border-dashed border-white/10">
+                  <Layout className="w-8 h-8 text-muted-foreground/20 mx-auto mb-2" />
+                  <p className="text-[10px] text-muted-foreground font-bold uppercase">Learning Activity...</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         {/* History Main Section */}
@@ -264,6 +342,7 @@ export default function PCDetailPage() {
                         <th className="pb-4">Start</th>
                         <th className="pb-4">Last Seen</th>
                         <th className="pb-4">Region/Lab</th>
+                        <th className="pb-4">Primary Software</th>
                         <th className="pb-4">Score</th>
                         <th className="pb-4">Runtime</th>
                       </tr>
@@ -289,6 +368,15 @@ export default function PCDetailPage() {
                                 <span className="text-primary font-bold">{h.city || 'N/A'}</span>
                                 <span className="text-[10px] text-muted-foreground">{h.lab_name || 'N/A'}</span>
                               </div>
+                            </td>
+                            <td className="py-4">
+                              {h.app_usage && Object.keys(h.app_usage).length > 0 ? (
+                                <span className="text-[10px] font-bold bg-success/10 text-success px-2 py-1 rounded border border-success/20 uppercase">
+                                  {Object.entries(h.app_usage as Record<string, number>).sort(([, a], [, b]) => b - a)[0][0]}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-muted-foreground italic">No Log</span>
+                              )}
                             </td>
                             <td className="py-4">
                               <span className={cn(

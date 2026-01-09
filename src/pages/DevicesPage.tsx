@@ -14,6 +14,7 @@ export default function DevicesPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const cityParam = searchParams.get('city');
+  const labParam = searchParams.get('lab');
   const statusParam = searchParams.get('status') as 'all' | 'online' | 'offline';
 
   const [search, setSearch] = useState("");
@@ -24,10 +25,11 @@ export default function DevicesPage() {
   }, [statusParam]);
 
   const { data: response, isLoading } = useQuery({
-    queryKey: ['devices-list', cityParam, statusFilter, search],
+    queryKey: ['devices-list', cityParam, labParam, statusFilter, search],
     queryFn: () => {
       let path = '/devices?';
       if (cityParam) path += `city=${cityParam}&`;
+      if (labParam) path += `lab=${labParam}&`;
       if (statusFilter !== 'all') path += `status=${statusFilter}&`;
       if (search) path += `search=${search}&`;
       return apiFetch(path);
@@ -45,17 +47,17 @@ export default function DevicesPage() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate(cityParam ? `/dashboard/labs?city=${cityParam}` : '/dashboard/cities')}
             className="rounded-full bg-white/5 hover:bg-white/10"
           >
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
             <h1 className="text-3xl font-black italic tracking-tighter uppercase text-white">
-              {cityParam ? cityParam : "GLOBAL"} <span className="text-primary">TERMINAL</span>
+              {labParam ? `${labParam}` : (cityParam ? cityParam : "GLOBAL")} <span className="text-primary">TERMINAL</span>
             </h1>
             <p className="text-muted-foreground font-medium mt-1 uppercase tracking-widest text-[10px]">
-              System Node Management & Inventory
+              {cityParam && labParam ? `${cityParam.toUpperCase()} / ${labParam.toUpperCase()} INFRASTRUCTURE` : "System Node Management & Inventory"}
             </p>
           </div>
         </div>
