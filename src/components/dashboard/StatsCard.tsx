@@ -6,36 +6,38 @@ interface StatsCardProps {
   title: string;
   value: number | string;
   icon: LucideIcon;
-  variant?: 'cyan' | 'pink' | 'purple' | 'success';
+  variant?: 'blue' | 'yellow' | 'purple' | 'success' | 'cyan' | 'pink';
 }
 
-export function StatsCard({ title, value, icon: Icon, variant = 'purple' }: StatsCardProps) {
+export function StatsCard({ title, value, icon: Icon, variant = 'blue' }: StatsCardProps) {
   const colors = {
-    cyan: '#00f2ff',
-    pink: '#ff0080',
+    blue: '#3b82f6',
+    yellow: '#eab308',
     purple: '#a855f7',
-    success: '#22c55e'
+    success: '#22c55e',
+    cyan: '#06b6d4',
+    pink: '#ec4899'
   };
 
   return (
     <div className={cn(
       'glass-card rounded-[2rem] p-8 group premium-border relative overflow-hidden transition-all hover:translate-y-[-6px]',
-      variant === 'pink' && 'glow-pink',
-      variant === 'cyan' && 'glow-cyan',
+      variant === 'blue' && 'glow-blue',
+      variant === 'yellow' && 'glow-yellow',
       variant === 'purple' && 'glow-purple'
     )}>
       <div className="flex items-center justify-between mb-6">
         <div className={cn(
           "p-4 rounded-2xl bg-white/5 shadow-inner border border-white/5",
-          variant === 'cyan' && 'text-cyan-400',
-          variant === 'pink' && 'text-pink-400',
+          variant === 'blue' && 'text-blue-400',
+          variant === 'yellow' && 'text-yellow-400',
           variant === 'purple' && 'text-purple-400'
         )}>
           <Icon className="w-6 h-6" />
         </div>
         <div className="bg-black/20 p-3 rounded-2xl border border-white/5">
           <MiniWaveChart
-            color={colors[variant]}
+            color={colors[variant as keyof typeof colors]}
             width={140}
             height={50}
             intensity={0.6}
@@ -62,8 +64,8 @@ export function StatsCard({ title, value, icon: Icon, variant = 'purple' }: Stat
       {/* Dynamic Background Accent */}
       <div className={cn(
         "absolute -right-10 -bottom-10 w-40 h-40 blur-[80px] opacity-10 rounded-full",
-        variant === 'cyan' && 'bg-cyan-500',
-        variant === 'pink' && 'bg-pink-500',
+        variant === 'blue' && 'bg-blue-500',
+        variant === 'yellow' && 'bg-yellow-500',
         variant === 'purple' && 'bg-purple-500'
       )} />
 

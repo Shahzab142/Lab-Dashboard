@@ -67,8 +67,9 @@ export default function LocationsPage() {
             <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-white/5">
                 <div>
                     <h1 className="text-4xl font-black italic tracking-tighter uppercase text-white font-display">
-                        REGIONAL <span className="text-primary text-glow-pink">NODES</span>
+                        CITY WISE <span className="text-primary text-glow-pink">SYSTEM</span>
                     </h1>
+
                     <p className="text-muted-foreground font-black mt-1 uppercase tracking-[0.3em] text-[10px]">
                         Global Infrastructure Distribution
                     </p>

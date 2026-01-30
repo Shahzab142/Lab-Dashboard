@@ -56,8 +56,9 @@ export default function DevicesPage() {
           </Button>
           <div>
             <h1 className="text-4xl font-black italic tracking-tighter uppercase text-white font-display leading-[0.8]">
-              {labParam ? `${labParam}` : (cityParam ? cityParam : "GLOBAL")} <span className="text-primary text-glow-pink">FLEET</span>
+              {labParam ? `${labParam}` : (cityParam ? cityParam : "TOTAL")} <span className="text-primary text-glow-pink">SYSTEM</span>
             </h1>
+
             <p className="text-muted-foreground font-black mt-2 uppercase tracking-[0.3em] text-[10px]">
               {cityParam && labParam ? `${cityParam.toUpperCase()} / ${labParam.toUpperCase()} INFRASTRUCTURE` : "System Node Management & Inventory"}
             </p>
@@ -65,8 +66,20 @@ export default function DevicesPage() {
         </div>
 
         <div className="flex flex-col sm:flex-row items-center gap-4">
+          <Button
+            onClick={async () => {
+              const { generateDynamicReport } = await import('@/lib/pdf-generator');
+              await generateDynamicReport('SYSTEM', response);
+            }}
+            className="bg-white/5 hover:bg-white/10 border border-white/10 text-white gap-2 px-6 rounded-2xl h-12 text-[10px] font-black uppercase tracking-widest transition-all group backdrop-blur-xl"
+          >
+            <Monitor size={16} className="text-primary group-hover:scale-110 transition-transform" />
+            generate dailybasePDF
+          </Button>
+
           {/* Segmented Control for Status */}
           <div className="flex p-1 rounded-2xl bg-white/5 border border-white/5 backdrop-blur-xl">
+
             {[
               { id: 'all', label: 'All Units', color: 'text-white' },
               { id: 'online', label: 'Live Nodes', color: 'text-cyan-400' },

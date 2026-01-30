@@ -1,114 +1,134 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 
 interface MiniWaveChartProps {
     color?: string;
     height?: number;
     width?: number;
     animate?: boolean;
-    intensity?: number; // 0 to 1, representing activity level
+    intensity?: number;
     showGrid?: boolean;
 }
 
 export function MiniWaveChart({
-    color = "#ff0080",
+    color = "#3b82f6",
     height = 40,
     width = 120,
     animate = true,
     intensity = 0.5,
     showGrid = true
 }: MiniWaveChartProps) {
-    const path = useMemo(() => {
+    const [currentColor, setCurrentColor] = useState(color);
+
+    useEffect(() => {
+        if (!animate) return;
+        const colors = [
+            '#3b82f6', // Electric Blue
+            '#00d4ff', // Cyber Cyan
+            '#10b981', // Emerald Sync
+            '#a3e635', // Acid Lime
+            '#fbbf24', // Tech Gold
+            '#f97316', // Core Orange
+            '#ef4444', // Alert Red
+            '#f43f5e', // Rose Pulse
+            '#ec4899', // Neon Pink
+            '#a855f7', // Quantum Purple
+            '#8b5cf6', // Deep Violet
+            '#6366f1', // Plasma Indigo
+            '#2dd4bf'  // Bio Teal
+        ];
+        let colorIndex = colors.indexOf(color);
+        if (colorIndex === -1) colorIndex = 0;
+
+        const interval = setInterval(() => {
+            colorIndex = (colorIndex + 1) % colors.length;
+            setCurrentColor(colors[colorIndex]);
+        }, 2000);
+
+        return () => clearInterval(interval);
+    }, [color, animate]);
+
+    // Use a fixed beauty intensity so Online/Offline look exactly the same
+    const displayIntensity = 0.8;
+
+    const generateOrganicSeamlessPath = (scale: number) => {
         const pointsCount = 10;
         const step = width / (pointsCount - 1);
-
-        // Generate data points influenced by intensity
-        // Static-ish base with subtle variance
         const baseHeight = height * 0.5;
-        const amplitude = (height * 0.3) * intensity;
+        const amplitude = (height * 0.35) * displayIntensity * scale;
 
+        // Beautiful organic data points (the one you liked)
+        // Note: First and last points are baseHeight to ensure seamless connection
         const data = [
             baseHeight,
+            baseHeight - amplitude * 0.8,
+            baseHeight + amplitude * 1.2,
             baseHeight - amplitude * 0.5,
-            baseHeight + amplitude * 0.8,
-            baseHeight - amplitude * 0.2,
-            baseHeight + amplitude * 0.4,
-            baseHeight - amplitude * 0.7,
-            baseHeight + amplitude * 0.3,
+            baseHeight + amplitude * 1.0,
             baseHeight - amplitude * 0.9,
-            baseHeight + amplitude * 0.1,
-            baseHeight
+            baseHeight + amplitude * 0.4,
+            baseHeight - amplitude * 1.3,
+            baseHeight + amplitude * 0.6,
+            baseHeight // Matches start
         ];
 
-        let d = `M 0 ${data[0]}`;
-        for (let i = 1; i < data.length; i++) {
-            const x_prev = (i - 1) * step;
-            const x_curr = i * step;
-            const cp1x = x_prev + step / 2;
-            const cp2x = x_prev + step / 2;
-            d += ` C ${cp1x} ${data[i - 1]}, ${cp2x} ${data[i]}, ${x_curr} ${data[i]}`;
-        }
-        return d;
-    }, [width, height, intensity]);
+        const generateSegment = (xOffset: number) => {
+            let path = "";
+            for (let i = 0; i < data.length; i++) {
+                const x = (i * step) + xOffset;
+                if (i === 0 && xOffset === 0) {
+                    path += `M ${x} ${data[i]}`;
+                } else if (i === 0) {
+                    path += ` L ${x} ${data[i]}`;
+                } else {
+                    const prevX = ((i - 1) * step) + xOffset;
+                    const prevY = data[i - 1];
+                    const cp1x = prevX + step / 2;
+                    const cp2x = prevX + step / 2;
+                    path += ` C ${cp1x} ${prevY}, ${cp2x} ${data[i]}, ${x} ${data[i]}`;
+                }
+            }
+            return path;
+        };
 
-    // Grid lines
-    const gridLines = useMemo(() => {
-        if (!showGrid) return null;
-        const cols = 6;
-        const rows = 3;
-        const vLines = [];
-        const hLines = [];
+        // Tile twice for seamless scroll
+        return generateSegment(0) + generateSegment(width);
+    };
 
-        for (let i = 1; i < cols; i++) {
-            vLines.push((width / cols) * i);
-        }
-        for (let i = 1; i < rows; i++) {
-            hLines.push((height / rows) * i);
-        }
-        return { vLines, hLines };
-    }, [width, height, showGrid]);
+    const primaryPath = useMemo(() => generateOrganicSeamlessPath(1), [width, height]);
+    const secondaryPath = useMemo(() => generateOrganicSeamlessPath(0.7), [width, height]);
 
     return (
         <div className="relative overflow-hidden shrink-0" style={{ width, height }}>
-            <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} fill="none" xmlns="http://www.w3.org/2000/svg">
-                {/* Grid System */}
-                {gridLines && (
-                    <g opacity="0.1">
-                        {gridLines.vLines.map(x => (
-                            <line key={`v-${x}`} x1={x} y1={0} x2={x} y2={height} stroke="white" strokeWidth="0.5" />
-                        ))}
-                        {gridLines.hLines.map(y => (
-                            <line key={`h-${y}`} x1={0} y1={y} x2={width} y2={y} stroke="white" strokeWidth="0.5" />
-                        ))}
-                    </g>
-                )}
-
+            <svg width={width * 2} height={height} viewBox={`0 0 ${width * 2} ${height}`} fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+                {/* Secondary Ghost Wave */}
                 <path
-                    d={path}
-                    stroke={color}
-                    strokeWidth="2"
+                    d={secondaryPath}
+                    stroke={currentColor}
+                    strokeWidth="1.5"
+                    strokeOpacity="0.15"
+                    strokeLinecap="round"
+                    className="animate-wave-flow"
+                    style={{ animationDuration: '5s', transition: 'stroke 1.5s ease-in-out' }}
+                />
+
+                {/* Main Premium Wave */}
+                <path
+                    d={primaryPath}
+                    stroke={currentColor}
+                    strokeWidth="3"
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    className={animate && intensity > 0.1 ? "animate-wave-flow" : ""}
+                    className="animate-wave-flow"
                     style={{
-                        filter: `drop-shadow(0 0 6px ${color}88)`,
-                        transition: 'all 0.5s ease-in-out'
+                        filter: `drop-shadow(0 0 12px ${currentColor})`,
+                        transition: 'stroke 1.5s ease-in-out, filter 1.5s ease-in-out',
+                        animationDuration: '3s'
                     }}
                 />
-
-                {/* Fill Gradient */}
-                <path
-                    d={`${path} L ${width} ${height} L 0 ${height} Z`}
-                    fill={`url(#grad-${color.replace('#', '')})`}
-                    fillOpacity="0.05"
-                />
-
-                <defs>
-                    <linearGradient id={`grad-${color.replace('#', '')}`} x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stopColor={color} />
-                        <stop offset="100%" stopColor="transparent" />
-                    </linearGradient>
-                </defs>
             </svg>
+
+            {/* Liquid Shine Overlay */}
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full animate-[shimmer_3s_infinite]" />
         </div>
     );
 }

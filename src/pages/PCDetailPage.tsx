@@ -21,8 +21,18 @@ import {
   Power,
   PowerOff,
   Layout,
-  Smartphone
+  Smartphone,
+  Info,
+  History,
+  Sunset
 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -30,7 +40,7 @@ import { Input } from '@/components/ui/input';
 import { useState, useEffect } from 'react';
 import { MiniWaveChart } from '@/components/dashboard/MiniWaveChart';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
+import { cn, formatAppName } from '@/lib/utils';
 
 export default function PCDetailPage() {
   const { id } = useParams();
@@ -38,6 +48,7 @@ export default function PCDetailPage() {
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({ pc_name: '', city: '', lab_name: '' });
+  const [selectedHistory, setSelectedHistory] = useState<any>(null);
 
   const { data: detail, isLoading } = useQuery({
     queryKey: ['pc-detail', id],
@@ -144,9 +155,33 @@ export default function PCDetailPage() {
             </>
           ) : (
             <>
+              <Button
+                onClick={async () => {
+                  const toastId = toast.loading("Synthesizing node audit PDF...");
+                  try {
+                    const { generateDynamicReport } = await import('@/lib/pdf-generator');
+                    await generateDynamicReport('PC', {
+                      ...device,
+                      isOnline,
+                      session_count: detail?.session_count
+                    }, device.system_id);
+                    toast.success("Audit Generated Successfully", { id: toastId });
+                  } catch (e) {
+                    console.error(e);
+                    toast.error("Failed to generate audit PDF", { id: toastId });
+                  }
+                }}
+                className="bg-primary hover:bg-primary/90 text-white gap-2 px-6 rounded-2xl h-12 text-[10px] font-black uppercase tracking-widest transition-all group shadow-2xl glow-pink mr-4"
+              >
+                <Monitor size={16} className="text-white group-hover:scale-110 transition-transform" />
+                generate system pdf
+              </Button>
+
+
               <Button variant="ghost" size="lg" onClick={() => setIsEditing(true)} className="bg-white/5 border border-white/10 hover:bg-white/10 font-black text-[10px] tracking-widest uppercase rounded-2xl px-6 italic transition-all">
                 <Edit3 className="w-4 h-4 mr-3" /> Reconfigure
               </Button>
+
               <Button
                 variant="destructive"
                 size="lg"
@@ -207,9 +242,10 @@ export default function PCDetailPage() {
                         value={editData.lab_name}
                         onChange={(e) => setEditData({ ...editData, lab_name: e.target.value })}
                       >
-                        {["ITU Main Campus Lab", "ITU Barki Campus Lab"].map(l => (
+                        {["ITU Main Campus", "ITU Birki Campus"].map(l => (
                           <option key={l} value={l} className="bg-[#0a0a0a]">{l}</option>
                         ))}
+
                       </select>
                     ) : (
                       <p className="font-black text-xl italic uppercase tracking-tighter text-white mt-0.5">{device.lab_name}</p>
@@ -234,10 +270,23 @@ export default function PCDetailPage() {
                       const mins = device.runtime_minutes || 0;
                       const hours = Math.floor(mins / 60);
                       const remMins = Math.floor(mins % 60);
-                      return `${hours}h ${remMins}m`;
+                      return `${hours}H ${remMins}M`;
                     })()}
                   </p>
                 </div>
+              </div>
+
+              <div className="p-5 rounded-[1.5rem] bg-pink-500/5 border border-pink-500/10">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sunset className="text-pink-400 w-4 h-4" />
+                    <p className="text-[8px] text-muted-foreground uppercase font-black tracking-widest opacity-60">Terminal Signal</p>
+                  </div>
+                  <div className="h-1 w-1 rounded-full bg-pink-500 animate-pulse" />
+                </div>
+                <p className="font-black text-lg italic text-white mt-3 uppercase tracking-tighter">
+                  {device.today_last_active ? new Date(device.today_last_active).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'TRACKING...'}
+                </p>
               </div>
 
               <div className="p-6 rounded-[2rem] bg-gradient-to-br from-primary/10 to-secondary/5 border border-white/5 relative overflow-hidden group">
@@ -295,7 +344,7 @@ export default function PCDetailPage() {
                         return (
                           <div key={app} className="space-y-2.5">
                             <div className="flex justify-between items-end px-1">
-                              <span className="text-[10px] font-black text-white italic uppercase tracking-tighter truncate max-w-[180px]">{app}</span>
+                              <span className="text-xs font-bold text-white uppercase tracking-wider truncate max-w-[200px]">{formatAppName(app)}</span>
                               <span className="text-[9px] font-black text-cyan-400 font-mono tracking-widest">{hrs > 0 ? `${hrs}H ` : ''}{mins}M</span>
                             </div>
                             <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden p-0.5 border border-white/5">
@@ -380,9 +429,7 @@ export default function PCDetailPage() {
                     <thead>
                       <tr className="text-[9px] font-black uppercase text-muted-foreground/60 tracking-[0.2em] italic">
                         <th className="px-6 pb-2">Temporal Index</th>
-                        <th className="px-6 pb-2 text-center">Software Load</th>
-                        <th className="px-6 pb-2 text-center">Optimized Units</th>
-                        <th className="px-6 pb-2 text-right">Cycle Length</th>
+                        <th className="px-6 pb-2 text-right">Optimized Units</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -392,33 +439,25 @@ export default function PCDetailPage() {
                         return rowDate < serverDate;
                       }).map((h: any) => {
                         const dateObj = h.history_date ? new Date(h.history_date) : new Date(h.start_time);
-                        const runtimeTotalMins = h.runtime_minutes || 0;
+                        const rowDateStr = h.history_date ? h.history_date : new Date(h.start_time).toISOString().split('T')[0];
 
                         return (
-                          <tr key={h.id || h.history_date} className="text-xs group hover:bg-white/[0.03] transition-all rounded-3xl">
+                          <tr
+                            key={h.id || h.history_date}
+                            onClick={() => navigate(`/dashboard/pc/${id}/history/${rowDateStr}`)}
+                            className="text-xs group hover:bg-white/[0.05] transition-all rounded-3xl cursor-pointer active:scale-[0.99]"
+                          >
                             <td className="px-6 py-5 bg-white/2 rounded-l-[1.5rem] border-y border-l border-white/5">
                               <div className="flex flex-col">
                                 <span className="font-black italic text-white uppercase tracking-tighter text-sm">{dateObj.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }).toUpperCase()}</span>
                                 <span className="text-[9px] font-bold text-muted-foreground/60 uppercase racking-widest mt-0.5">Node Broadcast Archive</span>
                               </div>
                             </td>
-                            <td className="px-6 py-5 bg-white/2 border-y border-white/5 text-center">
-                              {h.app_usage && Object.keys(h.app_usage).length > 0 ? (
-                                <span className="text-[9px] font-black bg-cyan-500/10 text-cyan-400 px-3 py-1.5 rounded-full border border-cyan-500/20 uppercase tracking-widest italic">
-                                  {Object.entries(h.app_usage as Record<string, number>).sort(([, a], [, b]) => b - a)[0][0]}
-                                </span>
-                              ) : (
-                                <span className="text-[10px] text-muted-foreground italic font-black opacity-20 whitespace-nowrap">NULL DATA</span>
-                              )}
-                            </td>
-                            <td className="px-6 py-5 bg-white/2 border-y border-white/5 text-center">
-                              <div className="flex flex-col items-center">
+                            <td className="px-6 py-5 bg-white/2 rounded-r-[1.5rem] border-y border-r border-white/5 text-right">
+                              <div className="flex flex-col items-end">
                                 <span className="text-lg font-black italic text-white leading-none">{h.avg_score || 0}</span>
                                 <span className="text-[7px] font-black text-primary uppercase tracking-widest mt-1">UNITS</span>
                               </div>
-                            </td>
-                            <td className="px-6 py-5 bg-white/2 rounded-r-[1.5rem] border-y border-r border-white/5 text-right font-mono text-primary font-black text-sm">
-                              {runtimeTotalMins > 0 ? `${Math.floor(runtimeTotalMins / 60)}H ${runtimeTotalMins % 60}M` : "00H 00M"}
                             </td>
                           </tr>
                         );
@@ -436,6 +475,92 @@ export default function PCDetailPage() {
           </Card>
         </div>
       </div>
+
+      {/* History Detail Modal */}
+      <Dialog open={!!selectedHistory} onOpenChange={() => setSelectedHistory(null)}>
+        <DialogContent className="glass-card premium-border border-white/10 bg-black/95 backdrop-blur-3xl text-white rounded-[2.5rem] max-w-2xl p-0 overflow-hidden shadow-[0_0_100px_rgba(0,0,0,1)]">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-secondary to-primary animate-pulse" />
+
+          <DialogHeader className="p-8 pb-4">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="p-3 rounded-2xl bg-primary/10 text-primary border border-primary/20">
+                <History size={24} />
+              </div>
+              <DialogTitle className="text-2xl font-black italic tracking-tighter uppercase">
+                Archive Log: {selectedHistory ? new Date(selectedHistory.history_date || selectedHistory.start_time).toLocaleDateString('en-US', { month: 'long', day: '2-digit', year: 'numeric' }).toUpperCase() : ''}
+              </DialogTitle>
+            </div>
+            <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.3em]">
+              Detailed Software Spectrum & Telemetry Analytics
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="p-8 pt-2 space-y-8">
+            {/* Quick Stats Grid */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-5 rounded-3xl bg-white/5 border border-white/5">
+                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Average Load</p>
+                <p className="text-3xl font-black italic text-primary tracking-tighter">{selectedHistory?.avg_score || 0} <span className="text-xs uppercase ml-1">Units</span></p>
+              </div>
+              <div className="p-5 rounded-3xl bg-white/5 border border-white/5">
+                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Active Duration</p>
+                <p className="text-3xl font-black italic text-white tracking-tighter">
+                  {selectedHistory?.runtime_minutes ? `${Math.floor(selectedHistory.runtime_minutes / 60)}H ${selectedHistory.runtime_minutes % 60}M` : '00H 00M'}
+                </p>
+              </div>
+            </div>
+
+            {/* Comprehensive App Breakdown */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 px-1">
+                <Info size={14} className="text-cyan-400" />
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-400">Full Software breakdown</span>
+              </div>
+
+              <div className="space-y-4 bg-white/[0.02] border border-white/5 rounded-3xl p-6">
+                {selectedHistory?.app_usage && Object.keys(selectedHistory.app_usage).length > 0 ? (
+                  (() => {
+                    const items = Object.entries(selectedHistory.app_usage as Record<string, number>)
+                      .sort(([, a], [, b]) => b - a);
+                    const totalS = Object.values(selectedHistory.app_usage as Record<string, number>).reduce((acc, v) => acc + v, 0);
+
+                    return items.map(([app, secs]) => {
+                      const percent = Math.max(5, (secs / totalS) * 100);
+                      const h = Math.floor(secs / 3600);
+                      const m = Math.floor((secs % 3600) / 60);
+                      return (
+                        <div key={app} className="space-y-2">
+                          <div className="flex justify-between items-end px-1">
+                            <span className="text-xs font-bold text-white uppercase tracking-wider truncate max-w-[300px]">{formatAppName(app)}</span>
+                            <span className="text-[10px] font-mono text-cyan-400 font-bold">{h > 0 ? `${h}H ` : ''}{m}M</span>
+                          </div>
+                          <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-cyan-600 to-cyan-400 rounded-full"
+                              style={{ width: `${percent}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()
+                ) : (
+                  <p className="text-center py-8 text-muted-foreground text-[10px] font-black uppercase tracking-widest">No detailed app data recorded for this session.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="pt-4 flex justify-end">
+              <Button
+                onClick={() => setSelectedHistory(null)}
+                className="premium-border glass-card rounded-2xl px-8 font-black text-[10px] uppercase tracking-widest hover:bg-primary/20 transition-all shadow-2xl"
+              >
+                Close Archive
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -25,11 +25,15 @@ export default function Dashboard() {
 
       <DashboardSidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} isMobile={isMobile} />
 
-      <main className={`flex-1 overflow-auto transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1) ${!isMobile && sidebarOpen ? 'ml-72' : 'ml-0'}`}>
-        <div className="pl-14 md:pl-0 relative z-10">
-          <Outlet />
+      <main className={`flex-1 overflow-auto transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1) ${!isMobile && sidebarOpen ? 'ml-60' : 'ml-0'}`}>
+        <div className="pl-14 md:pl-0 relative z-10 flex flex-col">
+          <div className="flex-1">
+            <Outlet />
+          </div>
         </div>
       </main>
     </div>
   );
 }
+
+
