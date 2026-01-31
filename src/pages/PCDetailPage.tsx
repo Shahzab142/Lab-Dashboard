@@ -242,7 +242,7 @@ export default function PCDetailPage() {
                         value={editData.lab_name}
                         onChange={(e) => setEditData({ ...editData, lab_name: e.target.value })}
                       >
-                        {["ITU Main Campus", "ITU Birki Campus"].map(l => (
+                        {["ITU Main Campus", "ITU Barki Campus"].map(l => (
                           <option key={l} value={l} className="bg-[#0a0a0a]">{l}</option>
                         ))}
 

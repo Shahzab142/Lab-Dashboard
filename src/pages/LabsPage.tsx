@@ -62,9 +62,11 @@ export default function LabsPage() {
         }
     };
 
-    const filteredLabs = labs.filter((lab: any) =>
-        lab.lab_name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredLabs = labs
+        .filter((lab: any) =>
+            lab.lab_name.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+        .sort((a: any, b: any) => (b.total_pcs || 0) - (a.total_pcs || 0)); // Highest capacity first
 
     return (
         <div className="p-4 md:p-8 space-y-8 animate-in slide-in-from-right-4 duration-700">

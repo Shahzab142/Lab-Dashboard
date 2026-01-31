@@ -57,12 +57,14 @@ const LabDashboard = () => {
             fullName: city.name,
             labCount: cityStats ? cityStats.total_labs : 0,
         };
-    });
+    })
+        .sort((a, b) => b.labCount - a.labCount) // Highest labs first
+        .filter(city => city.labCount > 0 || !selectedCity); // Keep only active ones or all if global view is needed (actually filtering might be better to remove empty ones)
 
     const drillDownData = cityLabs.map((l: any) => ({
         lab_name: l.lab_name,
         total_pcs: l.total_pcs,
-    }));
+    })).sort((a, b) => b.total_pcs - a.total_pcs); // Highest PCs first
 
     const maxLabs = Math.max(...liveChartData.map(d => d.labCount), 10);
     const maxDrill = Math.max(...drillDownData.map(d => d.total_pcs), 10);

@@ -58,9 +58,11 @@ export default function LocationsPage() {
         }
     };
 
-    const filteredLocations = locations.filter((loc: any) =>
-        loc.city.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredLocations = locations
+        .filter((loc: any) =>
+            loc.city.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+        .sort((a: any, b: any) => (b.total_pcs || 0) - (a.total_pcs || 0)); // Highest capacity first
 
     return (
         <div className="p-4 md:p-8 space-y-8 animate-in slide-in-from-right-4 duration-700">
