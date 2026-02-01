@@ -91,9 +91,9 @@ export default function PCDetailPage() {
   if (isLoading) return <div className="p-8"><Skeleton className="h-screen rounded-[2.5rem]" /></div>;
   if (!detail?.device) return (
     <div className="min-h-[80vh] flex flex-col items-center justify-center text-center space-y-6">
-      <Monitor className="w-20 h-20 text-white/5" />
-      <h1 className="text-3xl font-black italic text-white uppercase tracking-tighter">System Offline / Not Found</h1>
-      <Button onClick={() => navigate(-1)} className="premium-border glass-card px-8">Return to Fleet</Button>
+      <Monitor className="w-20 h-20 text-foreground opacity-5" />
+      <h1 className="text-3xl font-black italic text-foreground uppercase tracking-tighter">System Offline / Not Found</h1>
+      <Button onClick={() => navigate(-1)} className="premium-border glass-card px-8 text-foreground">Return to Fleet</Button>
     </div>
   );
 
@@ -109,13 +109,13 @@ export default function PCDetailPage() {
 
   return (
     <div className="p-4 md:p-8 space-y-8 animate-in zoom-in-95 duration-700">
-      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-white/5">
+      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-border">
         <div className="flex items-start gap-6">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => navigate(-1)}
-            className="rounded-2xl bg-white/5 hover:bg-primary/20 hover:text-primary transition-all group shrink-0"
+            className="rounded-2xl bg-muted hover:bg-primary/20 hover:text-primary transition-all group shrink-0"
           >
             <ArrowLeft className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
           </Button>
@@ -123,12 +123,12 @@ export default function PCDetailPage() {
             <div className="flex items-center gap-4">
               {isEditing ? (
                 <Input
-                  className="text-4xl font-black italic tracking-tighter uppercase bg-white/5 border-primary h-14 rounded-2xl text-white px-6 focus:ring-primary/20"
+                  className="text-4xl font-black italic tracking-tighter uppercase bg-muted border-primary h-14 rounded-2xl text-foreground px-6 focus:ring-primary/20"
                   value={editData.pc_name}
                   onChange={(e) => setEditData({ ...editData, pc_name: e.target.value })}
                 />
               ) : (
-                <h1 className="text-5xl font-black italic tracking-tighter uppercase text-white font-display leading-tight">{device.pc_name || "STATION"}</h1>
+                <h1 className="text-5xl font-black italic tracking-tighter uppercase text-foreground font-display leading-tight">{device.pc_name || "STATION"}</h1>
               )}
               <div className={cn(
                 "px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] italic shadow-2xl",
@@ -138,7 +138,7 @@ export default function PCDetailPage() {
               </div>
             </div>
             <p className="text-muted-foreground font-black text-[10px] uppercase tracking-[0.4em] opacity-60">
-              Network Identifier: <span className="text-white">{device.system_id}</span> • Architecture: <span className="text-white">x86_64</span>
+              Network Identifier: <span className="text-foreground">{device.system_id}</span> • Architecture: <span className="text-foreground">x86_64</span>
             </p>
           </div>
         </div>
@@ -149,7 +149,7 @@ export default function PCDetailPage() {
               <Button variant="ghost" size="lg" onClick={() => setIsEditing(false)} className="font-black text-[10px] tracking-widest uppercase rounded-2xl px-6">
                 <X className="w-4 h-4 mr-2" /> Abort
               </Button>
-              <Button variant="default" size="lg" onClick={() => updateMutation.mutate(editData)} className="bg-primary hover:bg-primary/90 text-white font-black text-[10px] tracking-widest uppercase rounded-2xl px-8 shadow-2xl glow-pink">
+              <Button variant="default" size="lg" onClick={() => updateMutation.mutate(editData)} className="bg-primary hover:bg-primary/90 text-primary-foreground font-black text-[10px] tracking-widest uppercase rounded-2xl px-8 shadow-2xl glow-pink">
                 <Save className="w-4 h-4 mr-3" /> Execute Update
               </Button>
             </>
@@ -178,7 +178,7 @@ export default function PCDetailPage() {
               </Button>
 
 
-              <Button variant="ghost" size="lg" onClick={() => setIsEditing(true)} className="bg-white/5 border border-white/10 hover:bg-white/10 font-black text-[10px] tracking-widest uppercase rounded-2xl px-6 italic transition-all">
+              <Button variant="ghost" size="lg" onClick={() => setIsEditing(true)} className="bg-muted border border-border hover:bg-muted/80 font-black text-[10px] tracking-widest uppercase rounded-2xl px-6 italic transition-all text-foreground">
                 <Edit3 className="w-4 h-4 mr-3" /> Reconfigure
               </Button>
 
@@ -205,7 +205,7 @@ export default function PCDetailPage() {
               <CardTitle className="text-[10px] font-black tracking-[0.4em] text-primary uppercase italic opacity-80">Registry Core</CardTitle>
             </CardHeader>
             <CardContent className="p-8 pt-4 space-y-4">
-              <div className="p-5 rounded-[1.5rem] bg-white/5 border border-white/5 transition-all hover:bg-white/[0.07] group">
+              <div className="p-5 rounded-[1.5rem] bg-muted border border-border transition-all hover:bg-muted/80 group">
                 <div className="flex items-center gap-4">
                   <div className="p-3 rounded-2xl bg-primary/10 text-primary group-hover:glow-pink transition-all">
                     <MapPin size={22} />
@@ -219,17 +219,17 @@ export default function PCDetailPage() {
                         onChange={(e) => setEditData({ ...editData, city: e.target.value })}
                       >
                         {["Ahmadpur East", "Ahmed Nager Chatha", "Ali Pur", "Arifwala", "Attock", "Bhalwal", "Bahawalnagar", "Bahawalpur", "Bhakkar", "Burewala", "Chillianwala", "Chakwal", "Chichawatni", "Chiniot", "Chishtian", "Daska", "Darya Khan", "Dera Ghazi Khan", "Dhaular", "Dina", "Dinga", "Dipalpur", "Faisalabad", "Fateh Jang", "Ghakhar Mandi", "Gojra", "Gujar Khan", "Gujranwala", "Gujrat", "Hafizabad", "Haroonabad", "Hasilpur", "Haveli Lakha", "Jauharabad", "Jhang", "Jhelum", "Kalabagh", "Karor Lal Esan", "Kasur", "Kamalia", "Kamoke", "Khanewal", "Khanpur", "Kharian", "Khushab", "Kot Adu", "Lahore", "Lalamusa", "Layyah", "Liaquat Pur", "Lodhran", "Malakwal", "Mamoori", "Mailsi", "Mandi Bahauddin", "Mian Channu", "Mianwali", "Multan", "Murree", "Muridke", "Mianwali Bangla", "Muzaffargarh", "Narowal", "Okara", "Renala Khurd", "Pakpattan", "Pattoki", "Pir Mahal", "Qila Didar Singh", "Rabwah", "Raiwind", "Rajanpur", "Rahim Yar Khan", "Rawalpindi", "Sadiqabad", "Safdarabad", "Sahiwal", "Sangla Hill", "Sarai Alamgir", "Sargodha", "Shakargarh", "Sheikhupura", "Sialkot", "Sohawa", "Soianwala", "Siranwali", "Talagang", "Taxila", "Toba Tek Singh", "Vehari", "Wah Cantonment", "Wazirabad"].sort().map(c => (
-                          <option key={c} value={c} className="bg-[#0a0a0a]">{c}</option>
+                          <option key={c} value={c} className="bg-popover text-foreground">{c}</option>
                         ))}
                       </select>
                     ) : (
-                      <p className="font-black text-xl italic uppercase tracking-tighter text-white mt-0.5">{device.city}</p>
+                      <p className="font-black text-xl italic uppercase tracking-tighter text-foreground mt-0.5">{device.city}</p>
                     )}
                   </div>
                 </div>
               </div>
 
-              <div className="p-5 rounded-[1.5rem] bg-white/5 border border-white/5 transition-all hover:bg-white/[0.07] group">
+              <div className="p-5 rounded-[1.5rem] bg-muted border border-border transition-all hover:bg-muted/80 group">
                 <div className="flex items-center gap-4">
                   <div className="p-3 rounded-2xl bg-secondary/10 text-secondary group-hover:glow-purple transition-all">
                     <Beaker size={22} />
@@ -238,17 +238,17 @@ export default function PCDetailPage() {
                     <p className="text-[9px] text-muted-foreground uppercase font-black tracking-widest">Facility Cluster</p>
                     {isEditing ? (
                       <select
-                        className="mt-2 w-full bg-black/40 border border-secondary/40 text-white text-xs rounded-xl p-3 outline-none"
+                        className="mt-2 w-full bg-background border border-secondary/40 text-foreground text-xs rounded-xl p-3 outline-none"
                         value={editData.lab_name}
                         onChange={(e) => setEditData({ ...editData, lab_name: e.target.value })}
                       >
                         {["ITU Main Campus", "ITU Barki Campus"].map(l => (
-                          <option key={l} value={l} className="bg-[#0a0a0a]">{l}</option>
+                          <option key={l} value={l} className="bg-popover text-foreground">{l}</option>
                         ))}
 
                       </select>
                     ) : (
-                      <p className="font-black text-xl italic uppercase tracking-tighter text-white mt-0.5">{device.lab_name}</p>
+                      <p className="font-black text-xl italic uppercase tracking-tighter text-foreground mt-0.5">{device.lab_name}</p>
                     )}
                   </div>
                 </div>
@@ -258,14 +258,14 @@ export default function PCDetailPage() {
                 <div className="p-5 rounded-[1.5rem] bg-cyan-500/5 border border-cyan-500/10">
                   <Sunrise className="text-cyan-400 w-4 h-4 mb-3" />
                   <p className="text-[8px] text-muted-foreground uppercase font-black tracking-widest opacity-60">System Boot</p>
-                  <p className="font-black text-lg italic text-white leading-tight">
+                  <p className="font-black text-lg italic text-foreground leading-tight">
                     {device.today_start_time ? new Date(device.today_start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
                   </p>
                 </div>
                 <div className="p-5 rounded-[1.5rem] bg-primary/5 border border-primary/10 shadow-2xl">
                   <Timer className="text-primary w-4 h-4 mb-3" />
                   <p className="text-[8px] text-muted-foreground uppercase font-black tracking-widest opacity-60">Active Cycle</p>
-                  <p className="font-black text-lg italic text-white leading-tight">
+                  <p className="font-black text-lg italic text-foreground leading-tight">
                     {(() => {
                       const mins = device.runtime_minutes || 0;
                       const hours = Math.floor(mins / 60);
@@ -284,19 +284,19 @@ export default function PCDetailPage() {
                   </div>
                   <div className="h-1 w-1 rounded-full bg-pink-500 animate-pulse" />
                 </div>
-                <p className="font-black text-lg italic text-white mt-3 uppercase tracking-tighter">
+                <p className="font-black text-lg italic text-foreground mt-3 uppercase tracking-tighter">
                   {device.today_last_active ? new Date(device.today_last_active).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'TRACKING...'}
                 </p>
               </div>
 
-              <div className="p-6 rounded-[2rem] bg-gradient-to-br from-primary/10 to-secondary/5 border border-white/5 relative overflow-hidden group">
+              <div className="p-6 rounded-[2rem] bg-gradient-to-br from-primary/10 to-secondary/5 border border-border relative overflow-hidden group">
                 <div className="absolute top-0 right-0 p-4 opacity-20 group-hover:opacity-40 transition-opacity">
                   <Cpu size={32} className="text-primary" />
                 </div>
                 <p className="text-[10px] text-muted-foreground uppercase font-black tracking-[0.2em] mb-3">Live Telemetry Signal</p>
 
                 {/* Large Detail Trace */}
-                <div className="bg-black/40 rounded-2xl border border-white/5 p-4 mb-4 flex justify-center">
+                <div className="bg-background/40 rounded-2xl border border-border p-4 mb-4 flex justify-center">
                   <MiniWaveChart
                     color={isOnline ? "#00f2ff" : "#ff0080"}
                     width={280}
@@ -308,14 +308,14 @@ export default function PCDetailPage() {
 
                 <div className="flex items-baseline justify-between">
                   <div className="flex items-baseline gap-3">
-                    <span className="text-5xl font-black italic tracking-tighter text-white text-glow-pink">
+                    <span className="text-5xl font-black italic tracking-tighter text-foreground text-glow-pink">
                       {device.cpu_score || 0}
                     </span>
                     <span className="text-[10px] font-black text-primary uppercase tracking-widest">Load Units</span>
                   </div>
                   <div className="text-right">
-                    <p className="text-[8px] font-black text-muted-foreground/40 uppercase tracking-widest">Capture Frequency</p>
-                    <p className="text-[10px] font-black text-white italic">60.0 Hz</p>
+                    <p className="text-[8px] font-black opacity-40 uppercase tracking-widest">Capture Frequency</p>
+                    <p className="text-[10px] font-black text-foreground italic">60.0 Hz</p>
                   </div>
                 </div>
               </div>
@@ -344,10 +344,10 @@ export default function PCDetailPage() {
                         return (
                           <div key={app} className="space-y-2.5">
                             <div className="flex justify-between items-end px-1">
-                              <span className="text-xs font-bold text-white uppercase tracking-wider truncate max-w-[200px]">{formatAppName(app)}</span>
+                              <span className="text-xs font-bold text-foreground uppercase tracking-wider truncate max-w-[200px]">{formatAppName(app)}</span>
                               <span className="text-[9px] font-black text-cyan-400 font-mono tracking-widest">{hrs > 0 ? `${hrs}H ` : ''}{mins}M</span>
                             </div>
-                            <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden p-0.5 border border-white/5">
+                            <div className="h-2 w-full bg-muted rounded-full overflow-hidden p-0.5 border border-border">
                               <div
                                 className="h-full bg-gradient-to-r from-cyan-600 to-cyan-400 transition-all duration-1000 ease-out rounded-full shadow-[0_0_15px_rgba(34,211,238,0.4)]"
                                 style={{ width: `${percent}%` }}
@@ -360,7 +360,7 @@ export default function PCDetailPage() {
                   );
                 })()
               ) : (
-                <div className="py-12 text-center bg-white/2 rounded-[2rem] border border-dashed border-white/10 opacity-40">
+                <div className="py-12 text-center bg-muted/20 rounded-[2rem] border border-dashed border-border opacity-40">
                   <Layout className="w-10 h-10 text-muted-foreground mx-auto mb-4" />
                   <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em]">Telemetry Initialization...</p>
                 </div>
@@ -391,7 +391,7 @@ export default function PCDetailPage() {
                   )}>
                     {isOnline ? "Operational" : "Idle State"}
                   </h2>
-                  <p className="text-[10px] font-bold text-white/40 mt-1">
+                  <p className="text-[10px] font-bold opacity-40 mt-1">
                     LOG_X: {isOnline ? `NODE_BROADCAST_START @ ${new Date(device.today_start_time).toLocaleTimeString()}` : `LAST_KNOWN_SIGN @ ${new Date(device.last_seen || Date.now()).toLocaleTimeString()}`}
                   </p>
                 </div>
@@ -405,10 +405,10 @@ export default function PCDetailPage() {
                 </div>
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground mb-1">Defense Matrix</p>
-                  <h2 className="text-3xl font-black italic uppercase tracking-tighter leading-tight text-white">
+                  <h2 className="text-3xl font-black italic uppercase tracking-tighter leading-tight text-foreground">
                     SECURED
                   </h2>
-                  <p className="text-[10px] font-bold text-white/40 mt-1 uppercase">Authentication Verified • Crypt Lock Active</p>
+                  <p className="text-[10px] font-bold opacity-40 mt-1 uppercase">Authentication Verified • Crypt Lock Active</p>
                 </div>
               </CardContent>
             </Card>
@@ -417,10 +417,10 @@ export default function PCDetailPage() {
           <Card className="glass-card premium-border rounded-[2.5rem] overflow-hidden">
             <CardHeader className="p-8 pb-0 flex flex-row items-center justify-between">
               <div>
-                <CardTitle className="text-[10px] font-black tracking-[0.4em] text-white uppercase italic opacity-80">Telemetry Archives</CardTitle>
+                <CardTitle className="text-[10px] font-black tracking-[0.4em] text-foreground uppercase italic opacity-80">Telemetry Archives</CardTitle>
                 <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Rolling 7-Day Performance Insight</p>
               </div>
-              <Calendar className="text-white/10 w-6 h-6" />
+              <Calendar className="opacity-10 w-6 h-6" />
             </CardHeader>
             <CardContent className="p-8">
               {history && history.length > 0 ? (
@@ -445,17 +445,17 @@ export default function PCDetailPage() {
                           <tr
                             key={h.id || h.history_date}
                             onClick={() => navigate(`/dashboard/pc/${id}/history/${rowDateStr}`)}
-                            className="text-xs group hover:bg-white/[0.05] transition-all rounded-3xl cursor-pointer active:scale-[0.99]"
+                            className="text-xs group hover:bg-muted/50 transition-all rounded-3xl cursor-pointer active:scale-[0.99]"
                           >
-                            <td className="px-6 py-5 bg-white/2 rounded-l-[1.5rem] border-y border-l border-white/5">
+                            <td className="px-6 py-5 bg-muted/20 rounded-l-[1.5rem] border-y border-l border-border">
                               <div className="flex flex-col">
-                                <span className="font-black italic text-white uppercase tracking-tighter text-sm">{dateObj.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }).toUpperCase()}</span>
-                                <span className="text-[9px] font-bold text-muted-foreground/60 uppercase racking-widest mt-0.5">Node Broadcast Archive</span>
+                                <span className="font-black italic text-foreground uppercase tracking-tighter text-sm">{dateObj.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }).toUpperCase()}</span>
+                                <span className="text-[9px] font-bold opacity-60 uppercase racking-widest mt-0.5">Node Broadcast Archive</span>
                               </div>
                             </td>
-                            <td className="px-6 py-5 bg-white/2 rounded-r-[1.5rem] border-y border-r border-white/5 text-right">
+                            <td className="px-6 py-5 bg-muted/20 rounded-r-[1.5rem] border-y border-r border-border text-right">
                               <div className="flex flex-col items-end">
-                                <span className="text-lg font-black italic text-white leading-none">{h.avg_score || 0}</span>
+                                <span className="text-lg font-black italic text-foreground leading-none">{h.avg_score || 0}</span>
                                 <span className="text-[7px] font-black text-primary uppercase tracking-widest mt-1">UNITS</span>
                               </div>
                             </td>
@@ -466,7 +466,7 @@ export default function PCDetailPage() {
                   </table>
                 </div>
               ) : (
-                <div className="p-16 text-center border-2 border-dashed border-white/5 rounded-[2.5rem] bg-white/[0.02] opacity-40">
+                <div className="p-16 text-center border-2 border-dashed border-border rounded-[2.5rem] bg-muted/20 opacity-40">
                   <Activity className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                   <p className="text-muted-foreground font-black uppercase text-[10px] tracking-[0.3em] italic">No Historical Sequence Found</p>
                 </div>
@@ -478,7 +478,7 @@ export default function PCDetailPage() {
 
       {/* History Detail Modal */}
       <Dialog open={!!selectedHistory} onOpenChange={() => setSelectedHistory(null)}>
-        <DialogContent className="glass-card premium-border border-white/10 bg-black/95 backdrop-blur-3xl text-white rounded-[2.5rem] max-w-2xl p-0 overflow-hidden shadow-[0_0_100px_rgba(0,0,0,1)]">
+        <DialogContent className="glass-card premium-border border-border bg-popover/95 backdrop-blur-3xl text-foreground rounded-[2.5rem] max-w-2xl p-0 overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.5)]">
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-secondary to-primary animate-pulse" />
 
           <DialogHeader className="p-8 pb-4">
@@ -498,13 +498,13 @@ export default function PCDetailPage() {
           <div className="p-8 pt-2 space-y-8">
             {/* Quick Stats Grid */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="p-5 rounded-3xl bg-white/5 border border-white/5">
+              <div className="p-5 rounded-3xl bg-muted border border-border">
                 <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Average Load</p>
                 <p className="text-3xl font-black italic text-primary tracking-tighter">{selectedHistory?.avg_score || 0} <span className="text-xs uppercase ml-1">Units</span></p>
               </div>
-              <div className="p-5 rounded-3xl bg-white/5 border border-white/5">
+              <div className="p-5 rounded-3xl bg-muted border border-border">
                 <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Active Duration</p>
-                <p className="text-3xl font-black italic text-white tracking-tighter">
+                <p className="text-3xl font-black italic text-foreground tracking-tighter">
                   {selectedHistory?.runtime_minutes ? `${Math.floor(selectedHistory.runtime_minutes / 60)}H ${selectedHistory.runtime_minutes % 60}M` : '00H 00M'}
                 </p>
               </div>
@@ -517,7 +517,7 @@ export default function PCDetailPage() {
                 <span className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-400">Full Software breakdown</span>
               </div>
 
-              <div className="space-y-4 bg-white/[0.02] border border-white/5 rounded-3xl p-6">
+              <div className="space-y-4 bg-muted/20 border border-border rounded-3xl p-6">
                 {selectedHistory?.app_usage && Object.keys(selectedHistory.app_usage).length > 0 ? (
                   (() => {
                     const items = Object.entries(selectedHistory.app_usage as Record<string, number>)
@@ -531,10 +531,10 @@ export default function PCDetailPage() {
                       return (
                         <div key={app} className="space-y-2">
                           <div className="flex justify-between items-end px-1">
-                            <span className="text-xs font-bold text-white uppercase tracking-wider truncate max-w-[300px]">{formatAppName(app)}</span>
+                            <span className="text-xs font-bold text-foreground uppercase tracking-wider truncate max-w-[300px]">{formatAppName(app)}</span>
                             <span className="text-[10px] font-mono text-cyan-400 font-bold">{h > 0 ? `${h}H ` : ''}{m}M</span>
                           </div>
-                          <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                          <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
                             <div
                               className="h-full bg-gradient-to-r from-cyan-600 to-cyan-400 rounded-full"
                               style={{ width: `${percent}%` }}

@@ -6,42 +6,52 @@
 
 @layer base {
   :root {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-
-    /* Updated to Blue and Yellow Theme */
-    --primary: 210 100% 52%;
-    /* Bright Blue */
+    --background: 0 0% 3%;
+    --foreground: 0 0% 100%;
+    --card: 0 0% 4%;
+    --card-foreground: 0 0% 100%;
+    --popover: 0 0% 4%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 210 100% 55%;
     --primary-foreground: 0 0% 100%;
-
-    --secondary: 220 100% 40%;
-    /* Deeper Blue */
+    --secondary: 220 100% 35%;
     --secondary-foreground: 0 0% 100%;
-
     --accent: 45 100% 50%;
-    /* Vibrant Yellow */
-    --accent-foreground: 240 10% 3.9%;
-
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-
-    --success: 160 100% 50%;
-    --success-foreground: 240 10% 3.9%;
-
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 210 100% 52%;
-
+    --accent-foreground: 0 0% 0%;
+    --muted: 0 0% 10%;
+    --muted-foreground: 0 0% 70%;
+    --destructive: 0 100% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 150 100% 50%;
+    --success-foreground: 0 0% 0%;
+    --border: 0 0% 15%;
+    --input: 0 0% 10%;
+    --ring: 210 100% 55%;
     --radius: 1.25rem;
+  }
+
+  .light {
+    --background: 0 0% 98%;
+    --foreground: 0 0% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+    --primary: 210 100% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 100% 35%;
+    --secondary-foreground: 0 0% 100%;
+    --accent: 45 100% 45%;
+    --accent-foreground: 0 0% 10%;
+    --muted: 0 0% 94%;
+    --muted-foreground: 0 0% 40%;
+    --destructive: 0 100% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 150 100% 40%;
+    --success-foreground: 0 0% 100%;
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 210 100% 50%;
   }
 }
 
@@ -59,6 +69,12 @@
     background-attachment: fixed;
   }
 
+  .light body {
+    background-image:
+      radial-gradient(at 0% 0%, hsla(210, 100%, 45%, 0.05) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, hsla(45, 100%, 40%, 0.05) 0px, transparent 50%);
+  }
+
   h1,
   h2,
   h3,
@@ -74,12 +90,17 @@
 
 @layer utilities {
   .glass-card {
-    @apply bg-black/40 backdrop-blur-2xl border border-white/10 shadow-2xl;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.82);
+    @apply bg-card/60 backdrop-blur-2xl border border-border/50 shadow-2xl;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+  }
+
+  .light .glass-card {
+    @apply bg-white/80 border-white/90 shadow-2xl;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.08);
   }
 
   .premium-border {
-    @apply border border-white/20 hover:border-primary/50 transition-all duration-300;
+    @apply border border-border/80 hover:border-primary/50 transition-all duration-300;
   }
 
   .glow-blue {
@@ -100,6 +121,18 @@
 
   .text-glow-blue {
     text-shadow: 0 0 10px hsl(210 100% 40% / 0.5);
+  }
+
+  .glow-pink {
+    box-shadow: 0 0 25px hsla(330, 100%, 60%, 0.3);
+  }
+
+  .glow-cyan {
+    box-shadow: 0 0 25px hsla(180, 100%, 50%, 0.3);
+  }
+
+  .text-glow-pink {
+    text-shadow: 0 0 10px hsla(330, 100%, 60%, 0.5);
   }
 }
 
@@ -150,5 +183,5 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-white/10 rounded-full hover:bg-primary/50 transition-colors;
+  @apply bg-muted-foreground/20 rounded-full hover:bg-primary/50 transition-colors;
 }

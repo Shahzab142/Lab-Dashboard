@@ -33,9 +33,9 @@ export default function PCHistoryDetailPage() {
     if (isLoading) return <div className="p-8"><Skeleton className="h-screen rounded-[2.5rem]" /></div>;
     if (!detail?.device) return (
         <div className="min-h-[80vh] flex flex-col items-center justify-center text-center space-y-6">
-            <History className="w-20 h-20 text-white/5" />
-            <h1 className="text-3xl font-black italic text-white uppercase tracking-tighter">History Log Not Found</h1>
-            <Button onClick={() => navigate(-1)} className="premium-border glass-card px-8 uppercase font-black text-xs">Return</Button>
+            <History className="w-20 h-20 text-foreground opacity-5" />
+            <h1 className="text-3xl font-black italic text-foreground uppercase tracking-tighter">History Log Not Found</h1>
+            <Button onClick={() => navigate(-1)} className="premium-border glass-card px-8 uppercase font-black text-xs text-foreground">Return</Button>
         </div>
     );
 
@@ -54,9 +54,9 @@ export default function PCHistoryDetailPage() {
 
     if (!historyLog) return (
         <div className="min-h-[80vh] flex flex-col items-center justify-center text-center space-y-6">
-            <History className="w-20 h-20 text-white/5" />
-            <h1 className="text-3xl font-black italic text-white uppercase tracking-tighter">No Archive Data for {date}</h1>
-            <Button onClick={() => navigate(-1)} className="premium-border glass-card px-8 uppercase font-black text-xs">Back to Device</Button>
+            <History className="w-20 h-20 text-foreground opacity-5" />
+            <h1 className="text-3xl font-black italic text-foreground uppercase tracking-tighter">No Archive Data for {date}</h1>
+            <Button onClick={() => navigate(-1)} className="premium-border glass-card px-8 uppercase font-black text-xs text-foreground">Back to Device</Button>
         </div>
     );
 
@@ -79,19 +79,19 @@ export default function PCHistoryDetailPage() {
     return (
         <div className="p-4 md:p-8 space-y-8 animate-in slide-in-from-bottom-5 duration-700">
             {/* Header Section */}
-            <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-white/5">
+            <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-border">
                 <div className="flex items-start gap-6">
                     <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => navigate(-1)}
-                        className="rounded-2xl bg-white/5 hover:bg-primary/20 hover:text-primary transition-all group shrink-0"
+                        className="rounded-2xl bg-muted hover:bg-primary/20 hover:text-primary transition-all group shrink-0"
                     >
                         <ArrowLeft className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
                     </Button>
                     <div className="space-y-4">
                         <div className="flex items-center gap-4">
-                            <h1 className="text-5xl font-black italic tracking-tighter uppercase text-white font-display leading-tight">
+                            <h1 className="text-5xl font-black italic tracking-tighter uppercase text-foreground font-display leading-tight">
                                 ARCHIVE: <span className="text-primary">{date}</span>
                             </h1>
                             <div className="px-4 py-1.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-[10px] font-black uppercase tracking-widest italic glow-pink">
@@ -99,7 +99,7 @@ export default function PCHistoryDetailPage() {
                             </div>
                         </div>
                         <p className="text-muted-foreground font-black text-[10px] uppercase tracking-[0.4em] opacity-60">
-                            Station Identifier: <span className="text-white">{device.pc_name}</span> • Facility: <span className="text-white">{device.lab_name}</span>
+                            Station Identifier: <span className="text-foreground">{device.pc_name}</span> • Facility: <span className="text-foreground">{device.lab_name}</span>
                         </p>
                     </div>
                 </div>
@@ -113,7 +113,7 @@ export default function PCHistoryDetailPage() {
                             <CardTitle className="text-[10px] font-black tracking-[0.4em] text-primary uppercase italic opacity-80">Cycle Parameters</CardTitle>
                         </CardHeader>
                         <CardContent className="p-8 pt-4 space-y-6">
-                            <div className="p-6 rounded-[2rem] bg-white/5 border border-white/5 relative overflow-hidden group hover:bg-white/[0.08] transition-all">
+                            <div className="p-6 rounded-[2rem] bg-muted border border-border relative overflow-hidden group hover:bg-muted/80 transition-all">
                                 <div className="flex items-center gap-4">
                                     <div className="p-4 rounded-2xl bg-primary/10 text-primary glow-pink">
                                         <Zap size={24} />
@@ -121,7 +121,7 @@ export default function PCHistoryDetailPage() {
                                     <div>
                                         <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">Optimized Performance</p>
                                         <div className="flex items-baseline gap-2">
-                                            <span className="text-4xl font-black italic text-white tracking-tighter text-glow-pink">{Number(historyLog.avg_score || 0).toFixed(1)}</span>
+                                            <span className="text-4xl font-black italic text-foreground tracking-tighter text-glow-pink">{Number(historyLog.avg_score || 0).toFixed(1)}</span>
                                             <span className="text-[10px] font-black text-primary uppercase">Units Avg</span>
                                         </div>
                                     </div>
@@ -136,7 +136,7 @@ export default function PCHistoryDetailPage() {
                                         </div>
                                         <div>
                                             <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">Total Duration</p>
-                                            <p className="text-3xl font-black italic text-white tracking-tighter">{hours}H <span className="text-primary">{mins}M</span></p>
+                                            <p className="text-3xl font-black italic text-foreground tracking-tighter">{hours}H <span className="text-primary">{mins}M</span></p>
                                         </div>
                                     </div>
                                 </div>
@@ -151,7 +151,7 @@ export default function PCHistoryDetailPage() {
                                             </div>
                                             <div>
                                                 <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground mb-1">Monitoring Start</p>
-                                                <h3 className="text-2xl font-black italic uppercase tracking-tighter text-white">
+                                                <h3 className="text-2xl font-black italic uppercase tracking-tighter text-foreground">
                                                     {(() => {
                                                         const rawVal = historyLog.start_time || (isToday ? device.today_start_time : null);
                                                         if (!rawVal) return '08:00 AM';
@@ -161,7 +161,7 @@ export default function PCHistoryDetailPage() {
                                                 </h3>
                                             </div>
                                         </div>
-                                        <div className="hidden sm:block px-4 py-2 rounded-xl bg-white/5 border border-white/5">
+                                        <div className="hidden sm:block px-4 py-2 rounded-xl bg-muted border border-border">
                                             <span className="text-[10px] font-black text-yellow-500/60 uppercase">Session Entry</span>
                                         </div>
                                     </CardContent>
@@ -175,7 +175,7 @@ export default function PCHistoryDetailPage() {
                                             </div>
                                             <div>
                                                 <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground mb-1">Monitoring End</p>
-                                                <h3 className="text-2xl font-black italic uppercase tracking-tighter text-white">
+                                                <h3 className="text-2xl font-black italic uppercase tracking-tighter text-foreground">
                                                     {(() => {
                                                         const rawEnd = historyLog.end_time || (isToday ? (device.today_last_active || device.last_seen) : null);
 
@@ -210,7 +210,7 @@ export default function PCHistoryDetailPage() {
                                                 </h3>
                                             </div>
                                         </div>
-                                        <div className="hidden sm:block px-4 py-2 rounded-xl bg-white/5 border border-white/5">
+                                        <div className="hidden sm:block px-4 py-2 rounded-xl bg-muted border border-border">
                                             <span className="text-[10px] font-black text-pink-500/60 uppercase">{isToday ? 'Session Tracking' : 'Session Exit'}</span>
                                         </div>
                                     </CardContent>
@@ -221,7 +221,7 @@ export default function PCHistoryDetailPage() {
                                 <div className="flex items-center justify-between p-5 rounded-2xl bg-primary/5 border border-primary/10 hover:bg-primary/10 transition-all">
                                     <div className="flex items-center gap-3">
                                         <Activity size={18} className="text-primary" />
-                                        <span className="text-[10px] font-black uppercase text-white/60 tracking-widest">Peak Performance</span>
+                                        <span className="text-[10px] font-black uppercase opacity-60 tracking-widest">Peak Performance</span>
                                     </div>
                                     <span className="text-sm font-black italic text-primary">{(historyLog.avg_score * 1.2).toFixed(1)} UNITS</span>
                                 </div>
@@ -240,8 +240,8 @@ export default function PCHistoryDetailPage() {
                                 <CardTitle className="text-[10px] font-black tracking-[0.4rem] text-cyan-400 uppercase italic opacity-80">Deep Software Analysis</CardTitle>
                                 <div className="flex items-center gap-4 mt-2">
                                     <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">{formattedDate}</p>
-                                    <div className="h-1 w-1 rounded-full bg-white/20" />
-                                    <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">{device.pc_name} @ {device.lab_name}</p>
+                                    <div className="h-1 w-1 rounded-full opacity-20" />
+                                    <p className="text-[9px] font-black opacity-40 uppercase tracking-widest">{device.pc_name} @ {device.lab_name}</p>
                                 </div>
                             </div>
                             <Layout className="text-cyan-400/20 w-8 h-8" />
@@ -271,18 +271,18 @@ export default function PCHistoryDetailPage() {
                                                 if (secs < 60 && idx > 5) return null; // Hide tiny apps if list is long
 
                                                 return (
-                                                    <div key={app} className="p-5 rounded-3xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.07] transition-all group">
+                                                    <div key={app} className="p-5 rounded-3xl bg-muted border border-border hover:bg-muted/80 transition-all group">
                                                         <div className="flex justify-between items-start mb-4">
                                                             <div className="flex flex-col">
                                                                 <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Application {idx + 1}</span>
-                                                                <span className="text-lg font-black text-white uppercase tracking-tight">{formatAppName(app)}</span>
+                                                                <span className="text-lg font-black text-foreground uppercase tracking-tight">{formatAppName(app)}</span>
                                                             </div>
                                                             <div className="text-right">
                                                                 <span className="text-[10px] font-black text-cyan-400 uppercase tracking-widest block mb-1">Scale Adjusted Time</span>
-                                                                <span className="text-xl font-mono text-white font-black">{h > 0 ? `${h}H ` : ''}{m}M</span>
+                                                                <span className="text-xl font-mono text-foreground font-black">{h > 0 ? `${h}H ` : ''}{m}M</span>
                                                             </div>
                                                         </div>
-                                                        <div className="h-2 w-full bg-black/40 rounded-full overflow-hidden p-0.5 border border-white/5">
+                                                        <div className="h-2 w-full bg-background rounded-full overflow-hidden p-0.5 border border-border">
                                                             <div
                                                                 className="h-full bg-gradient-to-r from-cyan-600 to-cyan-400 rounded-full shadow-[0_0_15px_rgba(34,211,238,0.4)]"
                                                                 style={{ width: `${Math.max(2, percent)}%` }}
@@ -294,7 +294,7 @@ export default function PCHistoryDetailPage() {
                                         })()}
                                     </div>
 
-                                    <div className="flex flex-col justify-center items-center space-y-8 bg-black/20 rounded-[3rem] p-8 border border-white/5">
+                                    <div className="flex flex-col justify-center items-center space-y-8 bg-muted/20 rounded-[3rem] p-8 border border-border">
                                         <div className="relative w-full aspect-square flex items-center justify-center">
                                             {/* Central Visualizer */}
                                             <div className="absolute inset-0 flex items-center justify-center opacity-20">
@@ -303,7 +303,7 @@ export default function PCHistoryDetailPage() {
                                             <div className="relative text-center z-10">
                                                 <Activity className="w-16 h-16 text-primary mx-auto mb-6 animate-pulse" />
                                                 <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.5em] mb-2">Cycle Efficiency</p>
-                                                <p className="text-7xl font-black italic text-white tracking-tighter">
+                                                <p className="text-7xl font-black italic text-foreground tracking-tighter">
                                                     {historyLog.avg_score > 400 ? '99' : historyLog.avg_score > 200 ? '96' : '92'}
                                                     <span className="text-primary">%</span>
                                                 </p>
@@ -313,11 +313,11 @@ export default function PCHistoryDetailPage() {
                                         <div className="w-full grid grid-cols-2 gap-4">
                                             <div className="text-center p-4">
                                                 <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest mb-1">Process Count</p>
-                                                <p className="text-2xl font-black text-white">{Object.keys(historyLog.app_usage).length}</p>
+                                                <p className="text-2xl font-black text-foreground">{Object.keys(historyLog.app_usage).length}</p>
                                             </div>
                                             <div className="text-center p-4">
                                                 <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest mb-1">System Load</p>
-                                                <p className="text-2xl font-black text-white uppercase italic">Optimal</p>
+                                                <p className="text-2xl font-black text-foreground uppercase italic">Optimal</p>
                                             </div>
                                         </div>
                                     </div>

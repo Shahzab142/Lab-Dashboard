@@ -7,6 +7,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Cpu } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 const punjabCities = [
     { name: "Lahore", short: "LHR" }, { name: "Faisalabad", short: "FSD" }, { name: "Rawalpindi", short: "RWP" },
@@ -70,7 +71,7 @@ const LabDashboard = () => {
     const maxDrill = Math.max(...drillDownData.map(d => d.total_pcs), 10);
 
     return (
-        <div className="h-screen w-full bg-[#030303] text-white flex flex-col overflow-hidden relative">
+        <div className="h-screen w-full bg-background text-foreground flex flex-col overflow-hidden relative">
             {/* Background Grid */}
             <div className="fixed inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none" />
 
@@ -79,13 +80,13 @@ const LabDashboard = () => {
                 {selectedCity && (
                     <Button
                         onClick={() => setSelectedCity(null)}
-                        className="bg-primary/20 hover:bg-primary/40 border border-primary/40 text-white rounded-full px-4 md:px-6 h-10 md:h-12 flex items-center gap-2 md:gap-3 backdrop-blur-xl transition-all"
+                        className="bg-primary/20 hover:bg-primary/40 border border-primary/40 text-foreground rounded-full px-4 md:px-6 h-10 md:h-12 flex items-center gap-2 md:gap-3 backdrop-blur-xl transition-all"
                     >
                         <ArrowLeft className="w-4 h-4 md:w-5 md:h-5" />
                         <span className="font-black italic text-[9px] md:text-xs uppercase tracking-widest">Global View</span>
                     </Button>
                 )}
-                <div className="p-3 md:p-4 bg-black/40 backdrop-blur-xl border border-white/5 rounded-xl md:rounded-2xl shrink-0">
+                <div className="p-3 md:p-4 bg-muted/40 backdrop-blur-xl border border-border rounded-xl md:rounded-2xl shrink-0 text-foreground">
                     <div className="flex items-center gap-2 md:gap-3">
                         <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-primary rounded-full animate-pulse shadow-[0_0_10px_hsl(var(--primary))]" />
                         <h1 className="text-sm md:text-xl font-black italic uppercase tracking-tighter leading-none whitespace-nowrap">
@@ -106,18 +107,18 @@ const LabDashboard = () => {
                             await generateDynamicReport('GLOBAL', { locations });
                         }
                     }}
-                    className="bg-white/5 hover:bg-white/10 border border-white/10 text-white gap-2 px-4 md:px-6 rounded-xl md:rounded-2xl h-10 md:h-12 text-[8px] md:text-[10px] font-black uppercase tracking-widest transition-all group backdrop-blur-xl"
+                    className="bg-muted hover:bg-muted/80 border border-border text-foreground gap-2 px-4 md:px-6 rounded-xl md:rounded-2xl h-10 md:h-12 text-[8px] md:text-[10px] font-black uppercase tracking-widest transition-all group backdrop-blur-xl"
                 >
                     <Cpu size={14} className="text-primary group-hover:scale-110 transition-transform" />
                     generate dailybasePDF
                 </Button>
-                <div className="p-3 md:p-4 bg-black/40 backdrop-blur-xl border border-white/5 rounded-xl md:rounded-2xl flex flex-col items-end shrink-0 max-w-[120px] md:max-w-none">
+                <div className="p-3 md:p-4 bg-muted/40 backdrop-blur-xl border border-border rounded-xl md:rounded-2xl flex flex-col items-end shrink-0 max-w-[120px] md:max-w-none text-foreground">
 
                     <div className="flex items-center gap-2 mb-0.5 md:mb-1">
                         <Cpu size={10} className="text-primary hidden md:block" />
-                        <span className="text-[7px] md:text-[10px] font-black text-white/30 uppercase tracking-[0.2em] md:tracking-[0.3em] font-mono italic truncate">Analysis Engine</span>
+                        <span className="text-[7px] md:text-[10px] font-black opacity-30 uppercase tracking-[0.2em] md:tracking-[0.3em] font-mono italic truncate">Analysis Engine</span>
                     </div>
-                    <span className="text-[7px] md:text-[10px] font-black uppercase text-white/60 tracking-widest">V4.0-AUTH</span>
+                    <span className="text-[7px] md:text-[10px] font-black uppercase opacity-60 tracking-widest">V4.0-AUTH</span>
                 </div>
             </div>
 
@@ -128,7 +129,9 @@ const LabDashboard = () => {
                 <div className="flex-1 w-full overflow-x-auto overflow-y-hidden custom-scrollbar">
                     <div
                         style={{
-                            minWidth: selectedCity ? Math.max(1400, drillDownData.length * 180) : "5000px",
+                            minWidth: selectedCity
+                                ? (drillDownData.length < 10 ? "100%" : `${drillDownData.length * 160}px`)
+                                : "5000px",
                             height: "100%"
                         }}
                         className="flex flex-col justify-end pb-4 px-12"
@@ -138,11 +141,18 @@ const LabDashboard = () => {
                                 <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary" />
                             </div>
                         ) : (
-                            <div className="h-full w-full">
-                                <ChartContainer config={chartConfig} className="h-full w-full">
+                            <div className="h-full w-full flex justify-center">
+                                <ChartContainer
+                                    config={chartConfig}
+                                    className={cn(
+                                        "h-full w-full",
+                                        selectedCity && drillDownData.length < 10 && "max-w-4xl mx-auto"
+                                    )}
+                                >
                                     <BarChart
                                         data={selectedCity ? drillDownData : liveChartData}
                                         margin={{ top: 20, right: 60, left: 40, bottom: 40 }}
+                                        barCategoryGap={selectedCity ? "45%" : "25%"}
                                         onClick={(data) => {
                                             if (data && data.activePayload) {
                                                 const payload = data.activePayload[0].payload;
@@ -164,26 +174,26 @@ const LabDashboard = () => {
                                                 <stop offset="100%" stopColor="#eab308" stopOpacity={0.15} />
                                             </linearGradient>
                                         </defs>
-                                        <CartesianGrid vertical={false} stroke="rgba(255, 255, 255, 0.08)" strokeDasharray="5 5" />
+                                        <CartesianGrid vertical={false} stroke="currentColor" opacity={0.1} strokeDasharray="5 5" />
                                         <XAxis
                                             dataKey={selectedCity ? "lab_name" : "city"}
-                                            axisLine={{ stroke: 'rgba(255,255,255,0.2)', strokeWidth: 2 }}
+                                            axisLine={{ stroke: 'currentColor', strokeWidth: 2, opacity: 0.1 }}
                                             tickLine={false}
-                                            tick={{ fill: "rgba(255, 255, 255, 1)", fontSize: 13, fontWeight: 900 }}
+                                            tick={{ fill: "currentColor", fontSize: 13, fontWeight: 900, opacity: 0.8 }}
                                             dy={20}
                                             interval={0}
                                         />
                                         <YAxis
-                                            axisLine={{ stroke: 'rgba(255,255,255,0.2)', strokeWidth: 2 }}
+                                            axisLine={{ stroke: 'currentColor', strokeWidth: 2, opacity: 0.1 }}
                                             tickLine={false}
-                                            tick={{ fill: "rgba(255, 255, 255, 0.9)", fontSize: 18, fontWeight: 950 }}
+                                            tick={{ fill: "currentColor", fontSize: 18, fontWeight: 950, opacity: 0.6 }}
                                             domain={selectedCity ? [0, Math.ceil(maxDrill / 10) * 10 + 10] : [0, Math.ceil(maxLabs / 5) * 5 + 5]}
                                             dx={-15}
                                         />
                                         <ChartTooltip
-                                            cursor={{ fill: 'rgba(255,255,255,0.08)' }}
+                                            cursor={{ fill: 'currentColor', opacity: 0.05 }}
                                             content={<ChartTooltipContent
-                                                className="border-white/20 bg-black/98 backdrop-blur-3xl shadow-2xl p-4 scale-150"
+                                                className="border-border bg-popover/98 backdrop-blur-3xl shadow-2xl p-4 scale-150 text-foreground"
                                             />}
                                         />
                                         <Bar

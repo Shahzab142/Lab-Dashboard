@@ -78,7 +78,7 @@ export default function Login() {
             <ShieldCheck className="w-12 h-12 text-primary relative z-10 glow-pink" />
           </div>
           <div className="space-y-2">
-            <CardTitle className="text-4xl font-black tracking-tighter text-white italic uppercase font-display">
+            <CardTitle className="text-4xl font-black tracking-tighter text-foreground italic uppercase font-display">
               LAB <span className="text-primary text-glow-pink">GUARDIAN</span>
             </CardTitle>
             <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.3em]">
@@ -101,7 +101,7 @@ export default function Login() {
                   placeholder="admin@guardian.net"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="bg-white/5 border-white/10 pl-12 h-14 transition-all focus:bg-white/10 focus:ring-primary/20 rounded-2xl font-medium"
+                  className="bg-muted border-border pl-12 h-14 transition-all focus:bg-muted/80 focus:ring-primary/20 rounded-2xl font-medium text-foreground"
                   required
                 />
               </div>
@@ -119,13 +119,13 @@ export default function Login() {
                   placeholder="••••••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="bg-white/5 border-white/10 pl-12 pr-12 h-14 transition-all focus:bg-white/10 focus:ring-primary/20 rounded-2xl font-medium"
+                  className="bg-muted border-border pl-12 pr-12 h-14 transition-all focus:bg-muted/80 focus:ring-primary/20 rounded-2xl font-medium text-foreground"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white transition-colors p-1"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -133,7 +133,7 @@ export default function Login() {
             </div>
 
             {/* Premium Math Captcha */}
-            <div className="space-y-3 p-5 rounded-2xl bg-white/5 border border-white/5 group">
+            <div className="space-y-3 p-5 rounded-2xl bg-muted border border-border group">
               <div className="flex items-center justify-between mb-1">
                 <Label className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-muted-foreground/60">
                   Human Intelligence Check
@@ -147,7 +147,7 @@ export default function Login() {
                 </button>
               </div>
               <div className="flex items-center gap-4">
-                <div className="flex-1 flex items-center justify-center h-14 rounded-xl bg-black/40 border border-white/10 text-xl font-black text-cyan-400 italic tracking-widest select-none font-mono">
+                <div className="flex-1 flex items-center justify-center h-14 rounded-xl bg-background border border-border text-xl font-black text-cyan-400 italic tracking-widest select-none font-mono">
                   {captcha.num1} + {captcha.num2}
                 </div>
                 <Input
@@ -155,7 +155,7 @@ export default function Login() {
                   placeholder="?"
                   value={userCaptcha}
                   onChange={(e) => setUserCaptcha(e.target.value)}
-                  className="w-24 h-14 bg-white/5 border-white/10 text-center font-black text-xl rounded-xl"
+                  className="w-24 h-14 bg-muted border-border text-center font-black text-xl rounded-xl text-foreground"
                   required
                 />
               </div>
@@ -163,7 +163,7 @@ export default function Login() {
 
             <Button
               type="submit"
-              className="w-full h-14 bg-primary hover:bg-primary/90 text-white font-black text-sm tracking-widest shadow-2xl glow-pink transition-all hover:scale-[1.02] active:scale-[0.98] rounded-2xl uppercase italic"
+              className="w-full h-14 bg-primary hover:bg-primary/90 text-primary-foreground font-black text-sm tracking-widest shadow-2xl glow-pink transition-all hover:scale-[1.02] active:scale-[0.98] rounded-2xl uppercase italic"
               disabled={isLoading}
             >
               {isLoading ? (
@@ -175,15 +175,15 @@ export default function Login() {
             </Button>
           </form>
 
-          <div className="pt-4 border-t border-white/5 flex items-center justify-between opacity-40">
-            <span className="text-[9px] font-black uppercase tracking-widest">v2.0 PRO</span>
-            <span className="text-[9px] font-black uppercase tracking-widest">Encypted Session</span>
+          <div className="pt-4 border-t border-border flex items-center justify-between opacity-40">
+            <span className="text-[9px] font-black uppercase tracking-widest text-foreground">v2.0 PRO</span>
+            <span className="text-[9px] font-black uppercase tracking-widest text-foreground">Encypted Session</span>
           </div>
         </CardContent>
       </Card>
 
       {/* Footer Branding */}
-      <div className="absolute bottom-10 left-1/2 -translate-x-1/2 text-white/10 text-[10px] font-black uppercase tracking-[0.5em] pointer-events-none text-center w-full">
+      <div className="absolute bottom-10 left-1/2 -translate-x-1/2 text-foreground/10 text-[10px] font-black uppercase tracking-[0.5em] pointer-events-none text-center w-full">
         Authorized Terminal LG_2026 • Secure Infrastructure
       </div>
     </div>

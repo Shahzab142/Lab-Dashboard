@@ -81,7 +81,7 @@ export default function LabsPage() {
                         <ArrowLeft className="w-3 h-3 mr-2" /> RETURN TO REGIONS
                     </Button>
                     <div>
-                        <h1 className="text-4xl font-black italic tracking-tighter uppercase text-white font-display">
+                        <h1 className="text-4xl font-black italic tracking-tighter uppercase text-foreground font-display">
                             <span className="text-primary text-glow-pink">{city?.toUpperCase()}</span> CLUSTERS
                         </h1>
                         <p className="text-muted-foreground font-black mt-1 uppercase tracking-[0.3em] text-[10px]">
@@ -96,7 +96,7 @@ export default function LabsPage() {
                         placeholder="SEARCH FACILITIES..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-12 bg-white/5 border-white/10 focus:border-primary/50 text-[10px] font-black uppercase tracking-[0.2em] h-12 rounded-2xl transition-all"
+                        className="pl-12 bg-muted/50 border-border focus:border-primary/50 text-[10px] font-black uppercase tracking-[0.2em] h-12 rounded-2xl transition-all"
                     />
                 </div>
             </header>
@@ -106,9 +106,9 @@ export default function LabsPage() {
                     {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-64 rounded-[2.5rem]" />)}
                 </div>
             ) : filteredLabs.length === 0 ? (
-                <div className="p-20 text-center glass-card border-dashed border-white/10 rounded-[3rem]">
+                <div className="p-20 text-center glass-card border-dashed border-border rounded-[3rem]">
                     <Building2 className="w-16 h-16 text-muted-foreground mx-auto mb-6 opacity-20" />
-                    <h3 className="text-xl font-black italic text-white uppercase tracking-tighter">No Access Points Detected</h3>
+                    <h3 className="text-xl font-black italic text-foreground uppercase tracking-tighter">No Access Points Detected</h3>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
@@ -128,21 +128,21 @@ export default function LabsPage() {
                                     {/* Name & Control */}
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="flex items-center gap-3 overflow-hidden">
-                                            <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-primary shrink-0">
+                                            <div className="p-2.5 rounded-xl bg-muted border border-border text-primary shrink-0">
                                                 <Building2 size={16} />
                                             </div>
-                                            <h2 className="text-sm md:text-base font-bold tracking-tight uppercase text-white group-hover:text-primary transition-colors truncate">
+                                            <h2 className="text-sm md:text-base font-bold tracking-tight uppercase text-foreground group-hover:text-primary transition-colors truncate">
                                                 {lab.lab_name}
                                             </h2>
                                         </div>
 
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                                <button className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-muted-foreground/30 shrink-0">
+                                                <button className="p-1.5 hover:bg-muted rounded-lg transition-colors text-muted-foreground/30 shrink-0">
                                                     <MoreVertical size={16} />
                                                 </button>
                                             </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end" className="bg-black/95 border-white/10 backdrop-blur-xl rounded-xl p-1.5">
+                                            <DropdownMenuContent align="end" className="bg-popover border-border backdrop-blur-xl rounded-xl p-1.5">
                                                 <DropdownMenuItem onClick={(e) => handleRenameLab(e, lab.lab_name)} className="gap-2 text-[9px] font-black uppercase p-2.5 rounded-lg">
                                                     <Edit2 size={12} /> Rename
                                                 </DropdownMenuItem>
@@ -165,10 +165,10 @@ export default function LabsPage() {
                                     </div>
 
                                     {/* Numeric Readouts */}
-                                    <div className="flex items-end justify-between border-t border-white/5 pt-4">
+                                    <div className="flex items-end justify-between border-t border-border/50 pt-4">
                                         <div className="flex items-baseline gap-2">
-                                            <span className="text-3xl font-black italic text-white tracking-tighter">{total}</span>
-                                            <span className="text-[8px] font-black text-white/40 uppercase tracking-widest">Total</span>
+                                            <span className="text-3xl font-black italic text-foreground tracking-tighter">{total}</span>
+                                            <span className="text-[8px] font-black opacity-40 uppercase tracking-widest">Total</span>
                                         </div>
                                         <div className="flex items-baseline gap-2">
                                             <span className="text-3xl font-black italic text-[#00ff9d] tracking-tighter text-glow-cyan">{online}</span>

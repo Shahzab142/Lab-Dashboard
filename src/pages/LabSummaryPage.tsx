@@ -105,42 +105,41 @@ const LabSummaryPage = () => {
     }
 
     return (
-        <div className="p-8 space-y-12 animate-in fade-in duration-700 min-h-screen bg-[#030303] text-white overflow-x-hidden">
+        <div className="p-4 md:p-6 space-y-6 animate-in fade-in duration-700 min-h-screen bg-background text-foreground overflow-x-hidden">
             {/* Elegant Background elements */}
-            <div className="fixed inset-0 bg-[radial-gradient(circle_at_50%_-20%,#1a1a1a,transparent)] pointer-events-none" />
-            <div className="fixed inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none" />
+            <div className="fixed inset-0 bg-[radial-gradient(circle_at_50%_-20%,hsl(var(--primary)/0.05),transparent)] pointer-events-none" />
+            <div className="fixed inset-0 bg-[linear-gradient(to_right,hsl(var(--foreground)/0.02)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--foreground)/0.02)_1px,transparent_1px)] bg-[size:30px_30px] pointer-events-none" />
 
             {/* TOP NAVIGATION BAR */}
-            <div className="relative z-10 flex items-center justify-between border-b border-white/5 pb-8">
-                <div className="flex items-center gap-6">
+            <div className="relative z-10 flex items-center justify-between border-b border-border/50 pb-4">
+                <div className="flex items-center gap-4">
                     <Button
                         onClick={() => navigate(`/dashboard/lab-analytics?city=${city}`)}
-                        className="bg-white/5 border border-white/10 hover:bg-white/10 rounded-2xl w-14 h-14 flex items-center justify-center group transition-all"
+                        className="bg-muted/50 border border-border/50 hover:bg-muted/80 rounded-xl w-10 h-10 flex items-center justify-center group transition-all"
                     >
-                        <ArrowLeft className="w-6 h-6 group-hover:-translate-x-1 transition-transform" />
+                        <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
                     </Button>
                     <div>
-                        <div className="flex items-center gap-2 mb-1">
-                            <span className="text-[10px] font-black text-primary uppercase tracking-widest italic">Core Lab Dashboard</span>
-
-                            <div className="w-1 h-1 bg-white/30 rounded-full" />
-                            <span className="text-[10px] font-black text-white/30 uppercase tracking-widest italic">{city}</span>
+                        <div className="flex items-center gap-2 mb-0.5">
+                            <span className="text-[8px] font-black text-primary uppercase tracking-widest italic">Core Lab Dashboard</span>
+                            <div className="w-0.5 h-0.5 bg-foreground/30 rounded-full" />
+                            <span className="text-[8px] font-black opacity-30 uppercase tracking-widest italic">{city}</span>
                         </div>
-                        <h1 className="text-4xl font-black italic tracking-tighter uppercase leading-none">
-                            {lab} <span className="text-white/20">SEGMENT</span>
+                        <h1 className="text-2xl font-black italic tracking-tighter uppercase leading-none text-foreground">
+                            {lab} <span className="opacity-20">SEGMENT</span>
                         </h1>
                     </div>
                 </div>
 
-                <div className="hidden lg:flex items-center gap-10">
+                <div className="hidden lg:flex items-center gap-6">
                     <Button
                         onClick={async () => {
                             const { generateDynamicReport } = await import('@/lib/pdf-generator');
                             await generateDynamicReport('LAB', labData, lab);
                         }}
-                        className="bg-white/5 hover:bg-white/10 border border-white/10 text-white gap-2 px-6 rounded-2xl h-12 text-[10px] font-black uppercase tracking-widest transition-all group backdrop-blur-xl mr-4"
+                        className="bg-muted/50 hover:bg-muted/80 border border-border/50 text-foreground gap-2 px-4 rounded-xl h-10 text-[9px] font-black uppercase tracking-widest transition-all group backdrop-blur-xl mr-2"
                     >
-                        <Zap size={16} className="text-primary group-hover:scale-110 transition-transform" />
+                        <Zap size={14} className="text-primary group-hover:scale-110 transition-transform" />
                         generate dailybasePDF
                     </Button>
 
@@ -152,126 +151,84 @@ const LabSummaryPage = () => {
                         <div key={i} className="flex flex-col items-end">
                             <div className="flex items-center gap-2 mb-1">
                                 <m.icon size={10} className="text-primary" />
-                                <span className="text-[8px] font-black text-white/20 uppercase tracking-[0.3em]">{m.label}</span>
+                                <span className="text-[8px] font-black opacity-20 uppercase tracking-[0.3em]">{m.label}</span>
                             </div>
-                            <span className="text-[12px] font-black uppercase tracking-widest">{m.value}</span>
+                            <span className="text-[12px] font-black uppercase tracking-widest text-foreground">{m.value}</span>
                         </div>
                     ))}
                 </div>
 
             </div>
 
-            {/* CORE METRICS - TOP ROW (3 CARDS) */}
+            {/* CORE METRICS GRID - EVERYTHING IN ONE VIEW */}
             <div className="relative z-10">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    {allStats.slice(0, 3).map((stat, i) => (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                    {allStats.map((stat, i) => (
                         <div
                             key={i}
                             onClick={() => navigate(`/dashboard/devices?city=${city}&lab=${lab}&status=${stat.filter}`)}
                             className={cn(
-                                "group glass-card premium-border rounded-[2.5rem] p-8 cursor-pointer transition-all duration-500 hover:translate-y-[-8px] relative overflow-hidden flex flex-col justify-between min-h-[220px]",
-                                stat.glow
+                                "group glass-card premium-border rounded-2xl p-4 md:p-5 cursor-pointer transition-all duration-500 hover:translate-y-[-4px] relative overflow-hidden flex flex-col justify-between min-h-[160px] md:min-h-[180px]",
+                                stat.glow,
+                                // Special styling for alerts
+                                i >= 3 && "border-yellow-500/20"
                             )}
                         >
-                            <div className="flex items-center justify-between mb-8">
-                                <div className={cn("p-4 rounded-2xl bg-white/5 border transition-all duration-500 group-hover:scale-110 shadow-inner", stat.borderColor)}>
-                                    <stat.icon size={26} className={stat.color} />
+                            <div className="flex items-start justify-between mb-4">
+                                <div className={cn(
+                                    "p-2.5 rounded-xl bg-background/40 border transition-all duration-500 group-hover:scale-110 shadow-inner",
+                                    stat.borderColor
+                                )}>
+                                    <stat.icon size={20} className={stat.color} />
+                                    {i >= 3 && <div className="absolute -top-1 -right-1 bg-yellow-500 text-black text-[6px] font-black px-1 py-0.5 rounded-sm shadow-lg">ALERT</div>}
                                 </div>
-                                <div className="bg-black/20 p-2.5 rounded-xl border border-white/5 backdrop-blur-xl">
+                                <div className="bg-background/20 p-1.5 rounded-lg border border-border/30 backdrop-blur-md">
                                     <MiniWaveChart
                                         color={stat.waveColor}
-                                        width={140}
-                                        height={55}
+                                        width={80}
+                                        height={35}
                                         intensity={stat.intensity}
-                                        showGrid={true}
+                                        showGrid={false}
                                     />
                                 </div>
                             </div>
 
                             <div className="relative z-10 mt-auto">
-                                <div className={cn("border-l-2 pl-4 mb-2 transition-all group-hover:pl-6", stat.borderColor)}>
-                                    <p className={cn("text-[12px] font-black uppercase tracking-[0.3em] mb-1 italic transition-colors", stat.color)}>
+                                <div className={cn("border-l pl-2 mb-1 transition-all group-hover:pl-3", stat.borderColor)}>
+                                    <p className={cn("text-[8px] md:text-[9px] font-black uppercase tracking-[0.2em] mb-0.5 italic transition-colors", stat.color)}>
                                         {stat.label}
                                     </p>
                                 </div>
-                                <div className="flex items-baseline gap-3">
-                                    <h2 className="text-6xl font-black italic tracking-tighter text-white leading-none transition-all duration-500 group-hover:scale-105">
+                                <div className="flex items-baseline gap-2">
+                                    <h2 className="text-3xl md:text-4xl font-black italic tracking-tighter text-foreground leading-none transition-all duration-500 group-hover:scale-105">
                                         {stat.value}
                                     </h2>
                                     <div className="flex flex-col">
-                                        <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">+12.4%</span>
-                                        <span className="text-[8px] font-bold text-white/10 uppercase tracking-widest italic">Growth</span>
+                                        <span className={cn(
+                                            "text-[7px] font-black uppercase tracking-widest",
+                                            i >= 3 ? "text-red-500" : "text-emerald-500"
+                                        )}>
+                                            {i >= 3 ? "Critical" : "+5.2%"}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
-                            <div className={cn("absolute -right-10 -bottom-10 w-48 h-48 blur-[100px] opacity-10 rounded-full", stat.bg)} />
-                        </div>
-                    ))}
-                </div>
-            </div>
-
-            {/* ALERT METRICS - BOTTOM ROW (MATCHING SIZES) */}
-            <div className="relative z-10">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    {allStats.slice(3).map((stat, i) => (
-                        <div
-                            key={i}
-                            onClick={() => navigate(`/dashboard/devices?city=${city}&lab=${lab}&status=${stat.filter}`)}
-                            className={cn(
-                                "group glass-card premium-border rounded-[2.5rem] p-8 cursor-pointer transition-all duration-500 hover:translate-y-[-8px] relative overflow-hidden flex flex-col justify-between min-h-[220px]",
-                                stat.glow
-                            )}
-                        >
-                            <div className="flex items-center justify-between mb-8">
-                                <div className={cn("relative p-4 rounded-2xl bg-white/5 border transition-all duration-500 group-hover:scale-110 shadow-inner", stat.borderColor)}>
-                                    <stat.icon size={26} className={stat.color} />
-                                    <div className="absolute -top-1 -right-1 bg-yellow-500 text-black text-[8px] font-black px-1.5 py-0.5 rounded-sm shadow-lg">ALERT</div>
-                                </div>
-                                <div className="bg-black/20 p-2.5 rounded-xl border border-white/5 backdrop-blur-xl">
-                                    <MiniWaveChart
-                                        color={stat.waveColor}
-                                        width={140}
-                                        height={55}
-                                        intensity={stat.intensity}
-                                        showGrid={true}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="relative z-10 mt-auto">
-                                <div className={cn("border-l-2 pl-4 mb-2 transition-all group-hover:pl-6", stat.borderColor)}>
-                                    <p className={cn("text-[12px] font-black uppercase tracking-[0.3em] mb-1 italic transition-colors", stat.color)}>
-                                        {stat.label}
-                                    </p>
-                                </div>
-                                <div className="flex items-baseline gap-3">
-                                    <h2 className="text-6xl font-black italic tracking-tighter text-white leading-none transition-all duration-500 group-hover:scale-105">
-                                        {stat.value}
-                                    </h2>
-                                    <div className="flex flex-col">
-                                        <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">Critical</span>
-                                        <span className="text-[8px] font-bold text-white/10 uppercase tracking-widest italic">Node Status</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className={cn("absolute -right-10 -bottom-10 w-48 h-48 blur-[100px] opacity-10 rounded-full", stat.bg)} />
+                            <div className={cn("absolute -right-6 -bottom-6 w-24 h-24 blur-[60px] opacity-10 rounded-full", stat.bg)} />
                         </div>
                     ))}
                 </div>
             </div>
 
             {/* PRESENTATION FOOTER */}
-            <div className="relative z-10 pt-16 flex flex-col md:flex-row justify-between items-center gap-8 border-t border-white/5">
-                <div className="flex gap-12">
-                    <div className="group cursor-default">
-                        <p className="text-[8px] font-black text-white/20 uppercase tracking-[0.5em] mb-1.5 transition-colors group-hover:text-primary">System Branch</p>
-                        <p className="text-xs font-black text-white/60 uppercase italic tracking-widest">{city} • SECTOR CLUSTER</p>
-                    </div>
+            <div className="relative z-10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 border-t border-border/50">
+                <div>
+                    <p className="text-[7px] font-black opacity-20 uppercase tracking-[0.5em] mb-1 group-hover:text-primary">System Branch</p>
+                    <p className="text-[10px] font-black opacity-60 uppercase italic tracking-widest text-foreground">{city} • SECTOR CLUSTER</p>
                 </div>
 
-                <div className="text-center md:text-right space-y-1">
-                    <p className="text-[11px] font-black text-white/30 tracking-widest italic uppercase">© 2026 Lab Guardian • Core Intelligence systems</p>
-                    <p className="text-[9px] font-bold text-primary/40 uppercase tracking-[0.8em] italic">V2.0 PRO INFRASTRUCTURE</p>
+                <div className="text-center md:text-right">
+                    <p className="text-[9px] font-black opacity-30 tracking-widest italic uppercase text-foreground">© 2026 Lab Guardian • Core Intelligence systems</p>
+                    <p className="text-[8px] font-bold text-primary/40 uppercase tracking-[0.5em] italic">V2.0 PRO INFRASTRUCTURE</p>
                 </div>
             </div>
         </div>

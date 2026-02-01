@@ -82,7 +82,7 @@ export function DeviceCard({ device, serverTime }: DeviceCardProps) {
               <Monitor size={18} />
             </div>
             <div className="overflow-hidden">
-              <h3 className="text-sm font-black italic tracking-tighter text-white uppercase truncate">
+              <h3 className="text-sm font-black italic tracking-tighter text-foreground uppercase truncate">
                 {device.pc_name || "STATION"}
               </h3>
               <p className="text-[9px] text-muted-foreground font-mono font-bold opacity-70">
@@ -93,11 +93,11 @@ export function DeviceCard({ device, serverTime }: DeviceCardProps) {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-              <button className="p-2 hover:bg-white/5 rounded-lg text-muted-foreground/50 transition-colors">
+              <button className="p-2 hover:bg-muted rounded-lg text-muted-foreground/50 transition-colors">
                 <MoreVertical size={16} />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-black/95 border-white/10 backdrop-blur-xl rounded-xl p-1">
+            <DropdownMenuContent align="end" className="bg-popover border-border backdrop-blur-xl rounded-xl p-1">
               <DropdownMenuItem onClick={handleRenamePC} className="gap-2 text-[10px] font-black uppercase p-2.5 rounded-lg">
                 <Edit2 size={12} /> Rename
               </DropdownMenuItem>
@@ -109,7 +109,7 @@ export function DeviceCard({ device, serverTime }: DeviceCardProps) {
         </div>
 
         {/* Technical Telemetry Graph */}
-        <div className="bg-black/30 rounded-2xl border border-white/5 p-4 flex flex-col items-center gap-3">
+        <div className="bg-background/50 rounded-2xl border border-border p-4 flex flex-col items-center gap-3">
           <MiniWaveChart
             color={isOnline ? "#00f2ff" : "#ff0080"}
             width={160}
@@ -128,31 +128,31 @@ export function DeviceCard({ device, serverTime }: DeviceCardProps) {
 
         {/* Compute & Info Grid */}
         <div className="grid grid-cols-2 gap-3">
-          <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+          <div className="bg-muted p-3 rounded-xl border border-border">
             <div className="flex items-center gap-1.5 mb-1 opacity-60">
               <Cpu size={10} className="text-muted-foreground" />
               <span className="text-[8px] font-black uppercase text-muted-foreground tracking-tighter">Load Units</span>
             </div>
             <p className={cn(
               "text-lg font-black italic",
-              isOnline ? "text-cyan-400" : "text-white"
+              isOnline ? "text-cyan-400" : "text-foreground"
             )}>{device.cpu_score || 0}</p>
           </div>
-          <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+          <div className="bg-muted p-3 rounded-xl border border-border">
             <div className="flex items-center gap-1.5 mb-1 opacity-60">
               <MapPin size={10} className="text-muted-foreground" />
               <span className="text-[8px] font-black uppercase text-muted-foreground tracking-tighter">Node Base</span>
             </div>
-            <p className="text-xs font-black text-white italic truncate uppercase">{device.city || 'N/A'}</p>
+            <p className="text-xs font-black text-foreground italic truncate uppercase">{device.city || 'N/A'}</p>
           </div>
         </div>
 
         {/* Status Bar */}
-        <div className="flex items-center justify-between pt-3 border-t border-white/5">
+        <div className="flex items-center justify-between pt-3 border-t border-border">
           <span className="text-[9px] font-black uppercase text-muted-foreground/30 italic tracking-widest">STATION PROTOCOL</span>
           <div className={cn(
             "px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest",
-            isOnline ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-[0_0_10px_rgba(0,242,255,0.1)]" : "bg-white/5 text-muted-foreground border border-white/5"
+            isOnline ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-[0_0_10px_rgba(0,242,255,0.1)]" : "bg-muted text-muted-foreground border border-border"
           )}>
             {isOnline ? "ACTIVE" : `LAST: ${lastActiveText}`}
           </div>

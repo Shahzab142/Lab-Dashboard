@@ -28,14 +28,14 @@ export function StatsCard({ title, value, icon: Icon, variant = 'blue' }: StatsC
     )}>
       <div className="flex items-center justify-between mb-6">
         <div className={cn(
-          "p-4 rounded-2xl bg-white/5 shadow-inner border border-white/5",
+          "p-4 rounded-2xl bg-muted shadow-inner border border-border",
           variant === 'blue' && 'text-blue-400',
           variant === 'yellow' && 'text-yellow-400',
           variant === 'purple' && 'text-purple-400'
         )}>
           <Icon className="w-6 h-6" />
         </div>
-        <div className="bg-black/20 p-3 rounded-2xl border border-white/5">
+        <div className="bg-background/40 p-3 rounded-2xl border border-border">
           <MiniWaveChart
             color={colors[variant as keyof typeof colors]}
             width={140}
@@ -51,7 +51,7 @@ export function StatsCard({ title, value, icon: Icon, variant = 'blue' }: StatsC
           {title}
         </p>
         <div className="flex items-baseline gap-3">
-          <h2 className="text-5xl font-black italic tracking-tighter text-white leading-none">
+          <h2 className="text-5xl font-black italic tracking-tighter text-foreground leading-none">
             {value}
           </h2>
           <div className="flex flex-col">
@@ -70,7 +70,7 @@ export function StatsCard({ title, value, icon: Icon, variant = 'blue' }: StatsC
       )} />
 
       {/* Decorative Technical ID */}
-      <div className="absolute top-4 right-8 text-[8px] font-mono font-bold text-white/5 tracking-widest uppercase pointer-events-none">
+      <div className="absolute top-4 right-8 text-[8px] font-mono font-bold text-foreground opacity-5 tracking-widest uppercase pointer-events-none">
         CORE_METRIC_S{Math.floor(Math.random() * 1000)}
       </div>
     </div>
