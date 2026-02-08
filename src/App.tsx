@@ -12,7 +12,10 @@ import LocationsPage from "./pages/LocationsPage";
 import LabsPage from "./pages/LabsPage";
 import DevicesPage from "./pages/DevicesPage";
 import PCDetailPage from "./pages/PCDetailPage";
+import PCHistoryDetailPage from "./pages/PCHistoryDetailPage";
 import FilteredDevicesPage from "./pages/FilteredDevicesPage";
+import LabDashboard from "./pages/LabDashboard";
+import LabSummaryPage from "./pages/LabSummaryPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -39,7 +42,10 @@ const App = () => (
               <Route path="cities" element={<LocationsPage />} />
               <Route path="labs" element={<LabsPage />} />
               <Route path="devices" element={<DevicesPage />} />
+              <Route path="lab-analytics" element={<LabDashboard />} />
+              <Route path="lab-summary/:city/:lab" element={<LabSummaryPage />} />
               <Route path="pc/:id" element={<PCDetailPage />} />
+              <Route path="pc/:id/history/:date" element={<PCHistoryDetailPage />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

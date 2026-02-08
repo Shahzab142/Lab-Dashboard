@@ -3,12 +3,13 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { apiFetch } from '@/lib/api';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DeviceCard } from '@/components/dashboard/DeviceCard';
-import { Search, Monitor, ArrowLeft, Filter, Power, PowerOff, Layout } from 'lucide-react';
+import { Search, Monitor, ArrowLeft, Layout, Activity } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 export default function DevicesPage() {
   const [searchParams] = useSearchParams();
@@ -34,7 +35,9 @@ export default function DevicesPage() {
       if (search) path += `search=${search}&`;
       return apiFetch(path);
     },
-    refetchInterval: 15000
+    refetchInterval: 15000,
+    staleTime: 5000,
+    gcTime: 30000
   });
 
   const devices = response?.devices || [];
@@ -42,63 +45,78 @@ export default function DevicesPage() {
   return (
     <div className="p-4 md:p-8 space-y-8 animate-in slide-in-from-bottom-4 duration-700">
       {/* Network Header */}
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-white/5">
-        <div className="flex items-center gap-4">
+      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-border">
+        <div className="space-y-4">
           <Button
             variant="ghost"
-            size="icon"
+            size="sm"
+            className="h-8 px-3 rounded-xl bg-muted text-[9px] font-black uppercase tracking-widest text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all font-display"
             onClick={() => navigate(cityParam ? `/dashboard/labs?city=${cityParam}` : '/dashboard/cities')}
-            className="rounded-full bg-white/5 hover:bg-white/10"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-3 h-3 mr-2" /> RETURN TO HIERARCHY
           </Button>
           <div>
-            <h1 className="text-3xl font-black italic tracking-tighter uppercase text-white">
-              {labParam ? `${labParam}` : (cityParam ? cityParam : "GLOBAL")} <span className="text-primary">TERMINAL</span>
+            <h1 className="text-4xl font-black tracking-tighter uppercase text-foreground font-display leading-[0.8]">
+              {labParam ? `${labParam}` : (cityParam ? cityParam : "TOTAL")} <span className="text-primary text-glow-pink">SYSTEM</span>
             </h1>
-            <p className="text-muted-foreground font-medium mt-1 uppercase tracking-widest text-[10px]">
+
+            <p className="text-muted-foreground font-black mt-2 uppercase tracking-[0.3em] text-[10px]">
               {cityParam && labParam ? `${cityParam.toUpperCase()} / ${labParam.toUpperCase()} INFRASTRUCTURE` : "System Node Management & Inventory"}
             </p>
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-center gap-4">
+          <Button
+            onClick={async () => {
+              const toastId = toast.loading(`Synthesizing audit for ${labParam || cityParam || 'Fleet'}...`);
+              try {
+                const { generateDynamicReport } = await import('@/lib/pdf-generator');
+                await generateDynamicReport(
+                  (cityParam && labParam) ? 'LAB' : 'SYSTEM',
+                  { ...response, city: cityParam, lab: labParam },
+                  labParam || cityParam || 'SYSTEM WIDE'
+                );
+                toast.success("Infrastructure Audit Ready", { id: toastId });
+              } catch (e) {
+                console.error(e);
+                toast.error("Audit Generation Failed", { id: toastId });
+              }
+            }}
+            className="bg-muted hover:bg-muted/80 border border-border text-foreground gap-2 px-6 rounded-2xl h-12 text-[10px] font-black uppercase tracking-widest transition-all group backdrop-blur-xl"
+          >
+            <Monitor size={16} className="text-primary group-hover:scale-110 transition-transform" />
+            generate facility audit report
+          </Button>
+
           {/* Segmented Control for Status */}
-          <div className="flex p-1 rounded-xl bg-black/40 border border-white/5">
-            <button
-              onClick={() => setStatusFilter('all')}
-              className={cn(
-                "px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                statusFilter === 'all' ? "bg-primary text-black shadow-lg" : "text-muted-foreground hover:text-white"
-              )}
-            >
-              All
-            </button>
-            <button
-              onClick={() => setStatusFilter('online')}
-              className={cn(
-                "px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                statusFilter === 'online' ? "bg-success text-white shadow-lg shadow-success/20" : "text-muted-foreground hover:text-white"
-              )}
-            >
-              Online
-            </button>
-            <button
-              onClick={() => setStatusFilter('offline')}
-              className={cn(
-                "px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                statusFilter === 'offline' ? "bg-red-500 text-white shadow-lg shadow-red-500/20" : "text-muted-foreground hover:text-white"
-              )}
-            >
-              Offline
-            </button>
+          <div className="flex p-1 rounded-2xl bg-muted border border-border backdrop-blur-xl">
+
+            {[
+              { id: 'all', label: 'All Units', color: 'text-foreground' },
+              { id: 'online', label: 'Live Nodes', color: 'text-cyan-400' },
+              { id: 'offline', label: 'Idle Nodes', color: 'text-pink-500' }
+            ].map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setStatusFilter(f.id as any)}
+                className={cn(
+                  "px-5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all",
+                  statusFilter === f.id
+                    ? "bg-primary text-primary-foreground shadow-xl glow-pink"
+                    : cn("text-muted-foreground hover:bg-muted/50", f.color)
+                )}
+              >
+                {f.label}
+              </button>
+            ))}
           </div>
 
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+          <div className="relative w-full sm:w-72 group">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-glow-pink transition-all w-4 h-4" />
             <Input
-              placeholder="SEARCH NODE / HID..."
-              className="pl-10 bg-black/40 border-white/5 font-bold text-xs uppercase"
+              placeholder="SEARCH HID / SYSTEM..."
+              className="pl-12 bg-muted/50 border-border focus:border-primary/50 text-[10px] font-black uppercase tracking-[0.2em] h-12 rounded-2xl transition-all"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -106,30 +124,40 @@ export default function DevicesPage() {
         </div>
       </header>
 
-      {/* Results Count */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-          <Layout size={14} className="text-primary" />
-          Displaying {devices.length} Nodes {cityParam ? `in ${cityParam.toUpperCase()}` : "Globally"}
+      {/* Meta Bar */}
+      <div className="flex items-center justify-between px-2">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-muted">
+            <Layout size={12} className="text-primary" />
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-[10px] font-black text-foreground uppercase tracking-widest">{devices.length}</span>
+            <span className="text-[9px] font-bold text-muted-foreground/60 uppercase tracking-widest">Active Units in Region</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted border border-border">
+          <Activity size={10} className="text-cyan-400 animate-pulse" />
+          <span className="text-[9px] font-black text-cyan-400/80 uppercase tracking-tighter">Real-time Stream Active</span>
         </div>
       </div>
 
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-64 rounded-2xl" />)}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+          {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-64 rounded-[2rem]" />)}
         </div>
       ) : devices.length === 0 ? (
-        <Card className="bg-black/40 border-dashed border-white/10 p-20 text-center">
-          <Monitor className="w-16 h-16 text-muted-foreground/30 mx-auto mb-6" />
-          <h3 className="text-xl font-black italic text-white uppercase tracking-tighter">No Active Nodes Found</h3>
-          <p className="text-muted-foreground text-sm uppercase font-bold tracking-widest mt-2 px-8">
-            The requested filters returned zero results. Adjust your parameters or check agent status.
+        <div className="p-20 text-center glass-card border-dashed border-border rounded-[3rem]">
+          <Monitor className="w-16 h-16 text-muted-foreground/20 mx-auto mb-6" />
+          <h3 className="text-xl font-black text-foreground uppercase tracking-tighter">No Operational Nodes Detected</h3>
+          <p className="text-muted-foreground text-[10px] uppercase font-black tracking-[0.2em] mt-3 max-w-sm mx-auto opacity-60">
+            The telemetry stream returned zero matches for the current filter criteria. Check agent heartbeats.
           </p>
-        </Card>
+        </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-8 pb-20">
           {devices.map((device: any) => (
-            <DeviceCard key={device.id} device={device} />
+            <DeviceCard key={device.system_id} device={device} serverTime={response?.server_time} />
           ))}
         </div>
       )}

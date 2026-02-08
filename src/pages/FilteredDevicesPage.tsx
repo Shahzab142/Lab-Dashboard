@@ -37,7 +37,7 @@ export default function FilteredDevicesPage() {
   const getIcon = () => {
     switch (filter) {
       case 'online': return <Wifi className="w-6 h-6 text-success" />;
-      case 'offline': return <WifiOff className="w-6 h-6 text-offline" />;
+      case 'offline': return <WifiOff className="w-6 h-6 text-muted-foreground" />;
       default: return <Monitor className="w-6 h-6 text-primary" />;
     }
   };
@@ -71,7 +71,7 @@ export default function FilteredDevicesPage() {
       {/* Devices Table */}
       {filteredDevices.length === 0 ? (
         <div className="glass-card rounded-xl p-12 text-center">
-          <Monitor className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <Monitor className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-foreground mb-2">No {filter} devices</h3>
           <p className="text-muted-foreground">Devices will appear here when available.</p>
         </div>

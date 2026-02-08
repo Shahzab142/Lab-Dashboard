@@ -18,13 +18,22 @@ export default function Dashboard() {
   }, []);
 
   return (
-    <div className="min-h-screen flex w-full bg-background">
+    <div className="min-h-screen flex w-full bg-background text-foreground relative overflow-hidden cyber-grid">
+      {/* Global Background Glows */}
+      <div className="fixed top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[150px] pointer-events-none" />
+      <div className="fixed bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-secondary/5 rounded-full blur-[150px] pointer-events-none" />
+
       <DashboardSidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} isMobile={isMobile} />
-      <main className={`flex-1 overflow-auto transition-all duration-300 ${!isMobile && sidebarOpen ? 'ml-64' : 'ml-0'}`}>
-        <div className="pl-14 md:pl-0">
-          <Outlet />
+
+      <main className={`flex-1 overflow-auto transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1) ${!isMobile && sidebarOpen ? 'ml-60' : 'ml-0'}`}>
+        <div className="pl-14 md:pl-0 relative z-10 flex flex-col">
+          <div className="flex-1">
+            <Outlet />
+          </div>
         </div>
       </main>
     </div>
   );
 }
+
+
