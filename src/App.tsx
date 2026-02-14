@@ -13,7 +13,7 @@ import LabsPage from "./pages/LabsPage";
 import DevicesPage from "./pages/DevicesPage";
 import PCDetailPage from "./pages/PCDetailPage";
 import PCHistoryDetailPage from "./pages/PCHistoryDetailPage";
-import FilteredDevicesPage from "./pages/FilteredDevicesPage";
+
 import LabDashboard from "./pages/LabDashboard";
 import LabSummaryPage from "./pages/LabSummaryPage";
 import NotFound from "./pages/NotFound";

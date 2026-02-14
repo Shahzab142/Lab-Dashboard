@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 import {
   ArrowLeft,
   Monitor,
@@ -24,7 +25,8 @@ import {
   Info,
   History,
   Sunset,
-  RefreshCw
+  RefreshCw,
+  School
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -47,6 +49,8 @@ export default function PCDetailPage() {
   const [editData, setEditData] = useState({ pc_name: '', city: '', lab_name: '' });
   const [selectedHistory, setSelectedHistory] = useState<any>(null);
   const [isLocallyDefective, setIsLocallyDefective] = useState(false);
+  const [showDefectiveSuccess, setShowDefectiveSuccess] = useState(false);
+  const [showRepairedSuccess, setShowRepairedSuccess] = useState(false);
 
   // --- HARD RESET LOGIC ---
   useEffect(() => {
@@ -72,11 +76,34 @@ export default function PCDetailPage() {
     return () => resetUI();
   }, [id]);
 
-  // --- DATA FETCHING ---
+  // --- DATA FETCHING (DIRECT FROM DATABASE) ---
   const { data: detail, isLoading, isError, refetch } = useQuery({
     queryKey: ['pc-detail', id],
-    queryFn: () => apiFetch(`/devices/${id}`),
-    refetchInterval: isEditing ? false : 30000,
+    queryFn: async () => {
+      // 1. Fetch Device
+      const { data: device, error: devError } = await supabase
+        .from('devices')
+        .select('*')
+        .eq('system_id', id)
+        .single();
+
+      if (devError) throw devError;
+
+      // 2. Fetch History (Last 7 Days)
+      const { data: history, error: histError } = await supabase
+        .from('device_daily_history')
+        .select('*')
+        .eq('device_id', id)
+        .order('history_date', { ascending: false })
+        .limit(7);
+
+      return {
+        device,
+        history: history || [],
+        server_time: new Date().toISOString() // Use client time as reference since we are direct to DB
+      };
+    },
+    refetchInterval: isEditing ? false : 1000,
   });
 
   useEffect(() => {
@@ -84,7 +111,8 @@ export default function PCDetailPage() {
       setEditData({
         pc_name: detail.device.pc_name || '',
         city: detail.device.city || '',
-        lab_name: detail.device.lab_name || ''
+        lab_name: detail.device.lab_name || '',
+        college: detail.device.college || ''
       });
     }
   }, [detail]);
@@ -102,7 +130,12 @@ export default function PCDetailPage() {
   const updateMutation = useMutation({
     mutationFn: (data: any) => apiFetch(`/devices/${id}`, {
       method: 'PATCH',
-      body: JSON.stringify(data)
+      body: JSON.stringify({
+        pc_name: data.pc_name,
+        city: data.city,
+        lab_name: data.lab_name,
+        college: data.college // Sending college to backend
+      })
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pc-detail', id] });
@@ -117,25 +150,39 @@ export default function PCDetailPage() {
       let newDevices;
 
       if (isLocallyDefective) {
+        // REMOVING FROM DEFECTIVE
         newDevices = defectiveDevices.filter((did: string) => did !== id);
-        toast.success("SYSTEM RESTORED: Unit marked as NORMAL", { duration: 4000 });
+
+        // Update Local Storage
+        localStorage.setItem('defective_devices', JSON.stringify(newDevices));
+        setIsLocallyDefective(false);
+
+        // Show Repaired Modal
+        setShowRepairedSuccess(true);
+        queryClient.invalidateQueries({ queryKey: ['devices'] });
+
+        // Delay navigation
+        setTimeout(() => navigate(-1), 2500);
+
       } else {
+        // ADDING TO DEFECTIVE
         newDevices = [...defectiveDevices, id];
-        toast.error("ALERT: Unit marked as DEFECTIVE", { duration: 4000 });
+
+        localStorage.setItem('defective_devices', JSON.stringify(newDevices));
+        setIsLocallyDefective(true);
+
+        // Show the centered modal
+        setShowDefectiveSuccess(true);
+
+        queryClient.invalidateQueries({ queryKey: ['devices'] });
+        queryClient.invalidateQueries({ queryKey: ['devices-list'] });
+        queryClient.invalidateQueries({ queryKey: ['pc-detail', id] });
+
+        // Wait longer (2.5s) for user to read the centered message
+        setTimeout(() => {
+          navigate(-1);
+        }, 2500);
       }
-
-      localStorage.setItem('defective_devices', JSON.stringify(newDevices));
-      setIsLocallyDefective(!isLocallyDefective);
-
-      // Invalidate all related queries to ensure the UI updates everywhere
-      queryClient.invalidateQueries({ queryKey: ['devices'] });
-      queryClient.invalidateQueries({ queryKey: ['devices-list'] });
-      queryClient.invalidateQueries({ queryKey: ['pc-detail', id] });
-
-      // Return to the previous list page after a brief delay so the user sees the toast
-      setTimeout(() => {
-        navigate(-1);
-      }, 1000);
     } catch (e) {
       toast.error("Logic Error: Could not update status");
     }
@@ -333,6 +380,27 @@ export default function PCDetailPage() {
                   </div>
                 </div>
               </div>
+              <div className="p-5 rounded-xl bg-muted border border-border transition-all hover:border-primary/20 group">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 rounded-lg bg-indigo-500 text-white shadow-sm">
+                    <School size={22} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider">Institution / College</p>
+                    {isEditing ? (
+                      <input
+                        className="mt-2 w-full bg-card border border-border text-primary text-xs rounded-lg p-2.5 outline-none focus:ring-1 focus:ring-primary shadow-sm uppercase font-bold"
+                        value={editData.college || ''}
+                        onChange={(e) => setEditData({ ...editData, college: e.target.value })}
+                        placeholder="ENTER COLLEGE NAME"
+                      />
+                    ) : (
+                      <p className="font-bold text-xl uppercase tracking-tight text-primary mt-0.5">{device.college || 'Not Assigned'}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
 
               <div className="p-5 rounded-xl bg-card border border-border transition-all hover:border-secondary/20 group relative overflow-hidden">
                 <div className="absolute -right-2 -top-2 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity">
@@ -390,14 +458,56 @@ export default function PCDetailPage() {
                 <div className="flex items-baseline justify-between">
                   <div className="flex items-baseline gap-2">
                     <span className="text-5xl font-bold tracking-tighter text-primary">{device.cpu_score || 0}</span>
-                    <span className="text-[10px] font-bold text-secondary uppercase tracking-widest">CPU LOAD %</span>
+                    <span className="text-[10px] font-bold text-secondary uppercase tracking-widest">COMPUTE INDEX</span>
                   </div>
                   <div className="text-right">
                     <p className="text-[8px] font-bold opacity-40 uppercase tracking-widest">Update Rate</p>
-                    <p className="text-[10px] font-bold text-primary">60S / SYNC</p>
+                    <p className="text-[10px] font-bold text-primary">1S / SYNC</p>
                   </div>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* APPLICATION USAGE CARD - SIDEBAR VIEW */}
+          <Card className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+            <CardHeader className="p-8 pb-0 flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-[10px] font-bold tracking-widest text-primary uppercase opacity-60">Current Session Workload</CardTitle>
+                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mt-1">Real-time Apps</p>
+              </div>
+              <Activity className="text-primary opacity-20 w-5 h-4" />
+            </CardHeader>
+            <CardContent className="p-8 pb-4">
+              {device.app_usage && Object.keys(device.app_usage).length > 0 ? (
+                <div className="space-y-4 max-h-[350px] overflow-y-auto pr-3 custom-scrollbar">
+                  {(() => {
+                    const items = Object.entries(device.app_usage as Record<string, number>).sort(([, a], [, b]) => b - a);
+                    const totalS = Object.values(device.app_usage as Record<string, number>).reduce((acc, v) => acc + v, 0);
+                    return items.slice(0, 15).map(([app, secs]) => {
+                      const percent = Math.max(5, (secs / totalS) * 100);
+                      const h = Math.floor(secs / 3600);
+                      const m = Math.floor((secs % 3600) / 60);
+                      return (
+                        <div key={app} className="space-y-1.5 pb-2 border-b border-border/10 last:border-0">
+                          <div className="flex justify-between items-end px-1">
+                            <span className="text-[11px] font-bold text-white uppercase tracking-tight truncate max-w-[150px]">{formatAppName(app)}</span>
+                            <span className="text-[9px] font-bold text-primary">{h > 0 ? `${h}h ` : ''}{m}m</span>
+                          </div>
+                          <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
+                            <div className="h-full bg-primary rounded-full transition-all duration-1000" style={{ width: `${percent}%` }} />
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              ) : (
+                <div className="py-8 text-center border border-dashed border-border rounded-xl bg-muted/30">
+                  <Activity className="w-8 h-8 text-muted-foreground mx-auto mb-2 opacity-20" />
+                  <p className="text-muted-foreground font-bold uppercase text-[8px] tracking-widest opacity-40">Telemetry Absent</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -430,6 +540,7 @@ export default function PCDetailPage() {
               </CardContent>
             </Card>
           </div>
+
 
           <Card className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
             <CardHeader className="p-8 pb-0 flex flex-row items-center justify-between">
@@ -552,6 +663,36 @@ export default function PCDetailPage() {
       >
         <RefreshCw size={20} />
       </button>
+
+      {/* Success Modal for Defective Transfer */}
+      {showDefectiveSuccess && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-card border border-red-500/30 p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 text-center max-w-md w-full animate-in zoom-in-95 duration-300">
+            <div className="p-4 rounded-full bg-red-500/10 text-red-500 mb-2 ring-1 ring-red-500/40">
+              <ShieldCheck size={48} />
+            </div>
+            <h2 className="text-2xl font-black uppercase tracking-tighter text-white">System Transfer Complete</h2>
+            <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest leading-relaxed">
+              PC Successfully Transferred to <br /><span className="text-red-500">Defective System</span>
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Success Modal for Repaired Transfer */}
+      {showRepairedSuccess && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-card border border-emerald-500/30 p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 text-center max-w-md w-full animate-in zoom-in-95 duration-300">
+            <div className="p-4 rounded-full bg-emerald-500/10 text-emerald-500 mb-2 ring-1 ring-emerald-500/40">
+              <RefreshCw size={48} />
+            </div>
+            <h2 className="text-2xl font-black uppercase tracking-tighter text-white">System Restored</h2>
+            <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest leading-relaxed">
+              System Repaired <br /><span className="text-emerald-500">Successfully</span>
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

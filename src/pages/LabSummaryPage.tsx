@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { apiFetch } from '@/lib/api';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Monitor, Wifi, WifiOff, Activity, Shield, Terminal, ArrowRight, Target, Zap, Waves } from "lucide-react";
+import { ArrowLeft, Monitor, Wifi, WifiOff, Activity, Shield, Terminal, ArrowRight, Target, Zap, Waves, FileText } from "lucide-react";
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from "@/lib/utils";
 import { MiniWaveChart } from '@/components/dashboard/MiniWaveChart';
@@ -126,7 +126,7 @@ const LabSummaryPage = () => {
             intensity: getIntensity(offline30d, totalCount || 1)
         },
         {
-            label: "Effective Units",
+            label: "Defective System",
             value: defectiveCount,
             icon: Zap,
             color: "text-yellow-500",
@@ -193,8 +193,8 @@ const LabSummaryPage = () => {
                         }}
                         className="bg-white hover:bg-white/90 text-black gap-3 px-6 rounded-lg h-12 text-[10px] font-bold uppercase tracking-widest transition-all shadow-lg"
                     >
-                        <Zap size={16} />
-                        Export Facility Audit
+                        <FileText size={16} />
+                        Generate PDF
                     </Button>
 
                     <div className="hidden lg:flex items-center gap-8">

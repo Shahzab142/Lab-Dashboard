@@ -144,15 +144,31 @@ export async function generateDynamicReport(type: ReportType, data: any, context
             const onlineCount = data.online ?? devices.filter((d: any) => d.status === 'online').length;
             const offlineCount = data.offline ?? (totalPcs - onlineCount);
 
-            const offline7d = data.offline_7d ?? 0;
-            const offline30d = data.offline_30d ?? 0;
+            // Recalculate Offline Stats locally to ensure accuracy with Dashboard
+            const now = new Date();
+            const getOfflineCount = (days: number) => {
+                return devices.filter((d: any) => {
+                    if (d.status !== 'offline') return false;
+                    if (!d.last_seen) return true;
+                    const diff = (now.getTime() - new Date(d.last_seen).getTime()) / (1000 * 60 * 60 * 24);
+                    return diff >= days;
+                }).length;
+            };
+
+            const offline7d = data.offline_7d ?? getOfflineCount(7);
+            const offline30d = data.offline_30d ?? getOfflineCount(30);
 
             const totalScoreSum = devices.reduce((acc: number, d: any) => acc + getScore(d), 0);
-            const avgPerf = totalPcs > 0 ? (totalScoreSum / totalPcs).toFixed(1) : (getScore(data).toFixed(1) || '0.0');
+            const avgPerf = totalPcs > 0 ? (totalScoreSum / totalPcs).toFixed(1) : '0.0';
 
             // Two rows of summary for LAB to include 7d/30d offline
+            // Two rows of summary for LAB to include 7d/30d offline
+            doc.setTextColor(colors.navy[0], colors.navy[1], colors.navy[2]);
+            doc.setFontSize(14); doc.setFont('helvetica', 'bold');
+            doc.text(`${cityName} / ${labName}`.toUpperCase(), 15, startY);
+
+            startY += 8;
             drawSummaryBox(doc, 15, startY, [
-                { label: 'LOCATION', value: `${cityName} / ${labName}`.toUpperCase() },
                 { label: 'TOTAL PC', value: totalPcs },
                 { label: 'ONLINE', value: onlineCount },
                 { label: 'OFFLINE', value: offlineCount }
@@ -349,12 +365,16 @@ function drawSummaryBox(doc: jsPDF, x: number, y: number, items: { label: string
             doc.setDrawColor(colors.border[0], colors.border[1], colors.border[2]);
             doc.line(itemX, y + 5, itemX, y + 20);
         }
+
+        // LABEL ON TOP
         doc.setTextColor(colors.muted[0], colors.muted[1], colors.muted[2]);
         doc.setFontSize(7); doc.setFont('helvetica', 'bold');
-        doc.text(item.label, itemX + (itemWidth / 2), y + 8, { align: 'center' });
+        doc.text(item.label, itemX + (itemWidth / 2), y + 8, { align: 'center' }); // Label higher
+
+        // VALUE ON BOTTOM
         doc.setTextColor(colors.navy[0], colors.navy[1], colors.navy[2]);
         doc.setFontSize(10); doc.setFont('helvetica', 'bold');
-        doc.text(String(item.value), itemX + (itemWidth / 2), y + 18, { align: 'center' });
+        doc.text(String(item.value), itemX + (itemWidth / 2), y + 18, { align: 'center' }); // Value lower
     });
 }
 

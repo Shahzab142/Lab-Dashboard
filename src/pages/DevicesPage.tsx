@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { apiFetch } from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DeviceCard } from '@/components/dashboard/DeviceCard';
 import { Search, Monitor, ArrowLeft, Layout, Activity } from 'lucide-react';
@@ -27,23 +28,34 @@ export default function DevicesPage() {
 
   const { data: response, isLoading } = useQuery({
     queryKey: ['devices-list', cityParam, labParam, statusFilter, search],
-    queryFn: () => {
-      let path = '/devices?';
-      if (cityParam) path += `city=${cityParam}&`;
-      if (labParam) path += `lab=${labParam}&`;
+    queryFn: async () => {
+      let query = supabase.from('devices').select('*');
 
-      // If we're filtering by specific duration or defective, we get relevant base devices from API
-      let apiStatus = 'all';
-      if (statusFilter === 'online') apiStatus = 'online';
-      if (statusFilter === 'offline') apiStatus = 'offline';
-      if (statusFilter === 'offline_7d' || statusFilter === 'offline_30d') apiStatus = 'offline';
+      if (cityParam) query = query.eq('city', cityParam);
+      if (labParam) query = query.eq('lab_name', labParam);
 
-      if (apiStatus !== 'all') path += `status=${apiStatus}&`;
-      if (search) path += `search=${search}&`;
-      return apiFetch(path);
+      // Handle base status filter from DB
+      if (statusFilter === 'online') query = query.eq('status', 'online');
+      if (statusFilter === 'offline' || statusFilter === 'offline_7d' || statusFilter === 'offline_30d') {
+        query = query.eq('status', 'offline');
+      }
+
+      if (search) {
+        // Simple search on pc_name
+        query = query.ilike('pc_name', `%${search}%`);
+      }
+
+      // Execute query
+      const { data, error } = await query;
+      if (error) throw error;
+
+      return {
+        devices: data,
+        server_time: new Date().toISOString()
+      };
     },
-    refetchInterval: 15000,
-    staleTime: 5000,
+    refetchInterval: 1000,
+    staleTime: 1000,
     gcTime: 30000
   });
 

@@ -149,12 +149,12 @@ export function DeviceCard({ device, serverTime }: DeviceCardProps) {
           <div className="bg-background border border-border p-2 rounded-lg">
             <div className="flex items-center gap-1 mb-1 opacity-60">
               <Cpu size={10} className="text-primary" />
-              <span className="text-[8px] font-bold uppercase text-white/70 tracking-tight">CPU Load</span>
+              <span className="text-[8px] font-bold uppercase text-white/70 tracking-tight">COMPUTE</span>
             </div>
             <p className={cn(
               "text-lg font-bold tracking-tight",
               isOnline ? "text-white" : "text-white/60"
-            )}>{device.cpu_score || 0}%</p>
+            )}>{device.cpu_score || 0}</p>
           </div>
           <div className="bg-background border border-border p-2 rounded-lg">
             <div className="flex items-center gap-1 mb-1 opacity-60">
