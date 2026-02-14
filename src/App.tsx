@@ -17,6 +17,7 @@ import FilteredDevicesPage from "./pages/FilteredDevicesPage";
 import LabDashboard from "./pages/LabDashboard";
 import LabSummaryPage from "./pages/LabSummaryPage";
 import NotFound from "./pages/NotFound";
+import { GlobalFailsafe } from "@/components/GlobalFailsafe";
 
 const queryClient = new QueryClient();
 
@@ -27,6 +28,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <GlobalFailsafe />
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/login" element={<Login />} />

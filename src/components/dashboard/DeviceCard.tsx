@@ -56,6 +56,16 @@ export function DeviceCard({ device, serverTime }: DeviceCardProps) {
     lastSeenDate &&
     (referenceTime.getTime() - lastSeenDate.getTime() < 60 * 1000);
 
+  // Persistent defective check
+  const isCurrentlyDefective = (() => {
+    try {
+      const defectiveDevices = JSON.parse(localStorage.getItem('defective_devices') || '[]');
+      return device.is_defective || defectiveDevices.includes(device.system_id);
+    } catch (e) {
+      return device.is_defective || false;
+    }
+  })();
+
   const lastActiveText = lastSeenDate ?
     new Intl.DateTimeFormat('en-US', {
       hour: '2-digit', minute: '2-digit'
@@ -88,6 +98,14 @@ export function DeviceCard({ device, serverTime }: DeviceCardProps) {
               <p className="text-[9px] text-white font-mono font-bold opacity-60">
                 SN: {device.system_id}
               </p>
+              <p className="text-[7px] text-primary/80 font-mono font-black uppercase tracking-[0.1em] mt-0.5">
+                HID: {device.hardware_id || device.hwid || "N/A"}
+              </p>
+              {isCurrentlyDefective && (
+                <span className="inline-block mt-1 px-1.5 py-0.5 rounded-[4px] bg-red-500 text-[7px] font-black uppercase text-white shadow-sm animate-pulse">
+                  Defective Unit
+                </span>
+              )}
             </div>
           </div>
 

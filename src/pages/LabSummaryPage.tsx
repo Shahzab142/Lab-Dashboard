@@ -30,10 +30,24 @@ const LabSummaryPage = () => {
     const devices = devicesResponse?.devices || [];
     const serverTime = devicesResponse?.server_time || new Date().toISOString();
 
-    // Manually calculate offline duration stats for accuracy
+    // Persistent Defective Logic using LocalStorage
+    const defectiveFromStorage = JSON.parse(localStorage.getItem('defective_devices') || '[]');
+
+    // Calculate all stats from the fresh device list and inject persistent defective state
+    const processedDevices = devices.map((d: any) => ({
+        ...d,
+        is_defective: d.is_defective || defectiveFromStorage.includes(d.system_id || d.id)
+    }));
+
+    const defectiveCount = processedDevices.filter((d: any) => d.is_defective).length;
+    const onlineCount = processedDevices.filter((d: any) => d.status === 'online' && !d.is_defective).length;
+    const offlineCount = processedDevices.filter((d: any) => d.status === 'offline' && !d.is_defective).length;
+    const totalCount = processedDevices.length;
+
     const getOfflineCount = (days: number) => {
         const now = new Date(serverTime);
-        return devices.filter((d: any) => {
+        return processedDevices.filter((d: any) => {
+            if (d.is_defective) return false;
             if (d.status !== 'offline') return false;
             if (!d.last_seen) return true;
             const lastSeen = new Date(d.last_seen);
@@ -51,7 +65,7 @@ const LabSummaryPage = () => {
     const stats = [
         {
             label: "Total PC Assets",
-            value: labData?.total_pcs || 0,
+            value: totalCount,
             icon: Monitor,
             color: "text-primary",
             bg: "bg-primary/5",
@@ -63,7 +77,7 @@ const LabSummaryPage = () => {
         },
         {
             label: "Online Terminals",
-            value: labData?.online || 0,
+            value: onlineCount,
             icon: Wifi,
             color: "text-emerald-500",
             bg: "bg-emerald-500/10",
@@ -71,11 +85,11 @@ const LabSummaryPage = () => {
             waveColor: "#10b981",
             filter: "online",
             subtitle: "Active Heartbeat Sync",
-            intensity: getIntensity(labData?.online || 0, labData?.total_pcs || 1)
+            intensity: getIntensity(onlineCount, totalCount || 1)
         },
         {
             label: "Offline Units",
-            value: labData?.offline || 0,
+            value: offlineCount,
             icon: WifiOff,
             color: "text-red-500",
             bg: "bg-red-500/10",
@@ -83,7 +97,7 @@ const LabSummaryPage = () => {
             waveColor: "#ef4444",
             filter: "offline",
             subtitle: "Connection Terminated",
-            intensity: getIntensity(labData?.offline || 0, labData?.total_pcs || 1)
+            intensity: getIntensity(offlineCount, totalCount || 1)
         }
     ];
 
@@ -98,7 +112,7 @@ const LabSummaryPage = () => {
             borderColor: "border-orange-500/20",
             waveColor: "#f97316",
             filter: "offline_7d",
-            intensity: getIntensity(offline7d, labData?.total_pcs || 1)
+            intensity: getIntensity(offline7d, totalCount || 1)
         },
         {
             label: "One Month+ Offline PCs",
@@ -109,7 +123,18 @@ const LabSummaryPage = () => {
             borderColor: "border-secondary/20",
             waveColor: "#f99a1d",
             filter: "offline_30d",
-            intensity: getIntensity(offline30d, labData?.total_pcs || 1)
+            intensity: getIntensity(offline30d, totalCount || 1)
+        },
+        {
+            label: "Effective Units",
+            value: defectiveCount,
+            icon: Zap,
+            color: "text-yellow-500",
+            bg: "bg-yellow-500/10",
+            borderColor: "border-yellow-500/20",
+            waveColor: "#eab308",
+            filter: "defective",
+            intensity: getIntensity(defectiveCount, totalCount || 1)
         }
     ];
 

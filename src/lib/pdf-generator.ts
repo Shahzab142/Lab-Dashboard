@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
+import { apiFetch } from './api';
 
 type ReportType = 'GLOBAL' | 'CITY' | 'LAB' | 'SYSTEM' | 'PC';
 
@@ -171,24 +172,39 @@ export async function generateDynamicReport(type: ReportType, data: any, context
             doc.text(`DETAILED NODE INVENTORY: ${labName.toUpperCase()}`, 15, startY);
 
             if (devices.length > 0) {
+                const { formatAppName } = await import('@/lib/utils');
                 autoTable(doc, {
                     startY: startY + 5,
-                    head: [['STATION NAME', 'SYSTEM ID', 'STATUS', 'CPU LOAD', 'TOTAL SCORE', 'TIMESTAMP']],
-                    body: devices.map((d: any) => [
-                        d.pc_name?.toUpperCase() || 'STATION',
-                        d.system_id,
-                        {
-                            content: (d.status || 'offline').toUpperCase(),
-                            styles: { textColor: d.status === 'online' ? colors.success : colors.danger, fontStyle: 'bold' }
-                        },
-                        `${getScore(d).toFixed(1)}%`,
-                        getScore(d).toFixed(0),
-                        d.last_seen ? format(new Date(d.last_seen), 'HH:mm:ss') : 'N/A'
-                    ]),
+                    head: [['STATION NAME', 'STATUS', 'CPU LOAD', 'USED APPLICATIONS']],
+                    body: devices.map((d: any) => {
+                        const apps = d.app_usage ? Object.entries(d.app_usage as Record<string, number>)
+                            .sort(([, a], [, b]) => b - a)
+                            .map(([app, secs]) => {
+                                const h = Math.floor(secs / 3600);
+                                const m = Math.floor((secs % 3600) / 60);
+                                const timeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
+                                return `• ${formatAppName(app)} (${timeStr})`;
+                            }).join('\n') : 'NO TELEMETRY';
+
+                        return [
+                            d.pc_name?.toUpperCase() || 'STATION',
+                            {
+                                content: (d.status || 'offline').toUpperCase(),
+                                styles: { textColor: d.status === 'online' ? colors.success : colors.danger, fontStyle: 'bold' }
+                            },
+                            { content: `${getScore(d).toFixed(1)}%`, styles: { fontStyle: 'bold' } },
+                            { content: apps, styles: { fontSize: 6.5, cellPadding: 2, lineHeight: 1.2 } }
+                        ];
+                    }),
                     theme: 'grid',
                     headStyles: { fillColor: colors.navy, fontSize: 8 },
-                    styles: { fontSize: 7, cellPadding: 3, halign: 'center' },
-                    columnStyles: { 0: { halign: 'left', fontStyle: 'bold' } }
+                    styles: { fontSize: 7.5, cellPadding: 4, halign: 'center', valign: 'middle' },
+                    columnStyles: {
+                        0: { halign: 'left', fontStyle: 'bold', cellWidth: 35 },
+                        1: { cellWidth: 25 },
+                        2: { cellWidth: 25 },
+                        3: { halign: 'left', cellWidth: 95 }
+                    }
                 });
             } else {
                 doc.setFontSize(10);
@@ -228,8 +244,8 @@ export async function generateDynamicReport(type: ReportType, data: any, context
 
             if (device.app_usage && Object.keys(device.app_usage).length > 0) {
                 doc.setFontSize(12); doc.setFont('helvetica', 'bold');
-                doc.text('SOFTWARE SPECTRUM (TOP USAGE)', 15, startY);
-                const apps = Object.entries(device.app_usage as Record<string, number>).sort(([, a], [, b]) => b - a).slice(0, 10);
+                doc.text('SOFTWARE SPECTRUM (FULL UTILIZATION)', 15, startY);
+                const apps = Object.entries(device.app_usage as Record<string, number>).sort(([, a], [, b]) => b - a);
                 autoTable(doc, {
                     startY: startY + 5,
                     head: [['APPLICATION', 'DURATION', 'PERCENTAGE']],
@@ -244,22 +260,38 @@ export async function generateDynamicReport(type: ReportType, data: any, context
                 startY = (doc as any).lastAutoTable.finalY + 15;
             }
 
-            if (history.length > 0) {
-                doc.setFontSize(12); doc.setFont('helvetica', 'bold');
-                doc.text('TELEMETRY ARCHIVE (7 DAYS)', 15, startY);
-                autoTable(doc, {
-                    startY: startY + 5,
-                    head: [['DATE', 'AVG PERFORMANCE', 'RUNTIME', 'PEAK SIGNAL']],
-                    body: history.slice(0, 7).map((h: any) => [
+            const { formatAppName } = await import('@/lib/utils');
+            doc.setFontSize(12); doc.setFont('helvetica', 'bold');
+            doc.text('TELEMETRY ARCHIVE (COMPLETE HISTORY)', 15, startY);
+            autoTable(doc, {
+                startY: startY + 5,
+                head: [['DATE', 'AVG PERFORMANCE', 'RUNTIME', 'USED APPLICATIONS']],
+                body: history.map((h: any) => {
+                    const apps = h.app_usage ? Object.entries(h.app_usage as Record<string, number>)
+                        .sort(([, a], [, b]) => b - a)
+                        .map(([app, secs]) => {
+                            const h = Math.floor(secs / 3600);
+                            const m = Math.floor((secs % 3600) / 60);
+                            const timeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
+                            return `• ${formatAppName(app)} (${timeStr})`;
+                        }).join('\n') : 'NO TELEMETRY';
+
+                    return [
                         h.history_date || format(new Date(h.start_time), 'yyyy-MM-dd'),
                         `${getScore(h).toFixed(1)}%`,
                         `${Math.floor((h.runtime_minutes || 0) / 60)}H ${(h.runtime_minutes || 0) % 60}M`,
-                        'STABLE'
-                    ]),
-                    theme: 'striped',
-                    styles: { fontSize: 8 }
-                });
-            }
+                        apps
+                    ];
+                }),
+                theme: 'striped',
+                styles: { fontSize: 8, valign: 'middle' },
+                columnStyles: {
+                    0: { cellWidth: 25 },
+                    1: { cellWidth: 30, halign: 'center' },
+                    2: { cellWidth: 25, halign: 'center' },
+                    3: { cellWidth: 'auto' }
+                }
+            });
         }
 
         const pageCount = doc.getNumberOfPages();
@@ -327,3 +359,165 @@ function drawSummaryBox(doc: jsPDF, x: number, y: number, items: { label: string
 }
 
 export const generateDailyReport = (stats: any, locations: any[]) => generateDynamicReport('GLOBAL', { locations });
+
+export async function generateCustomMultiLabReport(selectedData: { city: string, labs: string[], pcs?: Record<string, string[]> }[]) {
+    try {
+        const doc = new jsPDF();
+        const timestamp = format(new Date(), 'yyyy-MM-dd HH:mm:ss');
+
+        // Colors
+        const colors = {
+            navy: [15, 23, 42] as [number, number, number],
+            primary: [249, 154, 29] as [number, number, number],
+            success: [34, 197, 94] as [number, number, number],
+            danger: [239, 68, 68] as [number, number, number],
+            muted: [100, 116, 139] as [number, number, number],
+            border: [226, 232, 240] as [number, number, number],
+            bg: [248, 250, 252] as [number, number, number]
+        };
+
+        // Professional Header (Common for all pages)
+        const drawHeader = (doc: jsPDF) => {
+            doc.setFillColor(colors.navy[0], colors.navy[1], colors.navy[2]);
+            doc.rect(0, 0, 210, 45, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(24);
+            doc.setFont('helvetica', 'bold');
+            doc.text('LAB GUARDIAN PRO', 15, 20);
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            doc.text('CUSTOM MULTI-FACILITY AUDIT REPORT', 15, 27);
+            doc.setTextColor(200, 200, 200);
+            doc.setFontSize(8);
+            doc.text(`DATE: ${timestamp}`, 140, 20);
+            doc.text(`REPORT TYPE: SELECTIVE AUDIT`, 140, 25);
+        };
+
+        let isFirstPage = true;
+
+        for (const cityData of selectedData) {
+            for (const labName of cityData.labs) {
+                if (!isFirstPage) {
+                    doc.addPage();
+                }
+                isFirstPage = false;
+
+                drawHeader(doc);
+
+                let startY = 60;
+
+                // Lab Info Header
+                doc.setTextColor(colors.navy[0], colors.navy[1], colors.navy[2]);
+                doc.setFontSize(16);
+                doc.setFont('helvetica', 'bold');
+                doc.text(`${cityData.city.toUpperCase()} - ${labName.toUpperCase()}`, 15, startY);
+
+                startY += 10;
+
+                // Fetch data for this specific lab
+                const response = await apiFetch(`/devices?city=${cityData.city}&lab=${labName}`);
+                let devices = response?.devices || [];
+
+                // Filter by specific PCs if provided
+                const selectedPcsForLab = cityData.pcs?.[labName];
+                if (selectedPcsForLab && selectedPcsForLab.length > 0) {
+                    devices = devices.filter((d: any) => selectedPcsForLab.includes(d.system_id));
+                }
+
+                // Fetch detailed history for each device
+                const detailedDevices = await Promise.all(devices.map(async (d: any) => {
+                    try {
+                        const detail = await apiFetch(`/devices/${d.system_id}`);
+                        return { ...d, history: detail?.history || [] };
+                    } catch (e) {
+                        return d;
+                    }
+                }));
+
+                if (detailedDevices.length > 0) {
+                    const { formatAppName } = await import('@/lib/utils');
+                    autoTable(doc, {
+                        startY: startY,
+                        head: [['PC NAME', 'STATUS', 'CPU PERFORMANCE', 'USED APPLICATIONS (DATE-WISE HISTORY)']],
+                        body: detailedDevices.map((d: any) => {
+                            let usageContent = 'NO HISTORY DATA';
+
+                            if (d.history && d.history.length > 0) {
+                                // Sort history by date descending
+                                const sortedHistory = [...d.history].sort((a: any, b: any) => {
+                                    return new Date(b.history_date || b.start_time).getTime() - new Date(a.history_date || a.start_time).getTime();
+                                });
+
+                                usageContent = sortedHistory.map((h: any) => {
+                                    const dateStr = h.history_date || format(new Date(h.start_time), 'yyyy-MM-dd');
+
+                                    const appsStr = h.app_usage ? Object.entries(h.app_usage as Record<string, number>)
+                                        .sort(([, a], [, b]) => b - a)
+                                        .map(([app, secs]) => {
+                                            const h = Math.floor(secs / 3600);
+                                            const m = Math.floor((secs % 3600) / 60);
+                                            const timeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
+                                            return `• ${formatAppName(app)} (${timeStr})`;
+                                        }).join('\n') : 'No Apps Recorded';
+
+                                    return `[${dateStr}]\n${appsStr}`;
+                                }).join('\n\n');
+                            } else if (d.app_usage) {
+                                // Fallback to current aggregated usage if no history
+                                usageContent = Object.entries(d.app_usage as Record<string, number>)
+                                    .sort(([, a], [, b]) => b - a)
+                                    .map(([app, secs]) => {
+                                        const h = Math.floor(secs / 3600);
+                                        const m = Math.floor((secs % 3600) / 60);
+                                        const timeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
+                                        return `• ${formatAppName(app)} (${timeStr})`;
+                                    }).join('\n');
+                            }
+
+                            return [
+                                d.pc_name?.toUpperCase() || 'STATION',
+                                {
+                                    content: (d.status || 'offline').toUpperCase(),
+                                    styles: { textColor: d.status === 'online' ? colors.success : colors.danger, fontStyle: 'bold' }
+                                },
+                                { content: `${(parseFloat(d.avg_performance || d.cpu_score) || 0).toFixed(1)}%`, styles: { fontStyle: 'bold' } },
+                                { content: usageContent, styles: { fontSize: 6.5, cellPadding: 2, lineHeight: 1.2 } }
+                            ];
+                        }),
+                        theme: 'grid',
+                        headStyles: { fillColor: colors.navy, fontSize: 9 },
+                        styles: { fontSize: 8, cellPadding: 4, halign: 'center', valign: 'middle' },
+                        columnStyles: {
+                            0: { halign: 'left', fontStyle: 'bold', cellWidth: 35 },
+                            1: { cellWidth: 25 },
+                            2: { cellWidth: 25 },
+                            3: { halign: 'left', cellWidth: 95 }
+                        }
+                    });
+                } else {
+                    doc.setFontSize(10);
+                    doc.setTextColor(colors.muted[0], colors.muted[1], colors.muted[2]);
+                    doc.text('No matching nodes found for this facility audit section.', 15, startY + 5);
+                }
+            }
+        }
+
+        // Add Footer to all pages
+        const pageCount = doc.getNumberOfPages();
+        for (let i = 1; i <= pageCount; i++) {
+            doc.setPage(i);
+            doc.setDrawColor(colors.border[0], colors.border[1], colors.border[2]);
+            doc.line(15, 280, 195, 280);
+            doc.setFontSize(7);
+            doc.setTextColor(colors.muted[0], colors.muted[1], colors.muted[2]);
+            doc.text('LAB GUARDIAN - PROFESSIONAL INFRASTRUCTURE AUDIT TOOL', 15, 285);
+            doc.text(`CONFIDENTIAL - PAGE ${i} OF ${pageCount}`, 195, 285, { align: 'right' });
+        }
+
+        doc.save(`Custom_Audit_Report_${format(new Date(), 'yyyyMMdd_HHmm')}.pdf`);
+        return true;
+    } catch (error) {
+        console.error("Custom PDF Generation Error:", error);
+        throw error;
+    }
+}

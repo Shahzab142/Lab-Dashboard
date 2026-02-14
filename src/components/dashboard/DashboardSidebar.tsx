@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from './ThemeToggle';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { GeneratePDFDialog } from './GeneratePDFDialog';
 
 const navItems = [
   { to: '/dashboard', icon: Beaker, label: 'LAB DASHBOARD' },
@@ -123,6 +124,8 @@ export function DashboardSidebar({ isOpen, setIsOpen, isMobile }: DashboardSideb
               </div>
             </div>
           </div>
+
+          <GeneratePDFDialog />
 
           <button
             onClick={() => signOut()}

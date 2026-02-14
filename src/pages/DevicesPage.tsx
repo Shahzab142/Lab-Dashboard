@@ -16,10 +16,10 @@ export default function DevicesPage() {
   const navigate = useNavigate();
   const cityParam = searchParams.get('city');
   const labParam = searchParams.get('lab');
-  const statusParam = searchParams.get('status') as 'all' | 'online' | 'offline' | 'offline_7d' | 'offline_30d';
+  const statusParam = searchParams.get('status') as 'all' | 'online' | 'offline' | 'offline_7d' | 'offline_30d' | 'defective';
 
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<'all' | 'online' | 'offline' | 'offline_7d' | 'offline_30d'>(statusParam || 'all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'online' | 'offline' | 'offline_7d' | 'offline_30d' | 'defective'>(statusParam || 'all');
 
   useEffect(() => {
     if (statusParam) setStatusFilter(statusParam);
@@ -32,10 +32,11 @@ export default function DevicesPage() {
       if (cityParam) path += `city=${cityParam}&`;
       if (labParam) path += `lab=${labParam}&`;
 
-      // If we're filtering by specific duration, we first get all offline devices from API
-      const apiStatus = (statusFilter === 'offline_7d' || statusFilter === 'offline_30d')
-        ? 'offline'
-        : statusFilter;
+      // If we're filtering by specific duration or defective, we get relevant base devices from API
+      let apiStatus = 'all';
+      if (statusFilter === 'online') apiStatus = 'online';
+      if (statusFilter === 'offline') apiStatus = 'offline';
+      if (statusFilter === 'offline_7d' || statusFilter === 'offline_30d') apiStatus = 'offline';
 
       if (apiStatus !== 'all') path += `status=${apiStatus}&`;
       if (search) path += `search=${search}&`;
@@ -48,18 +49,35 @@ export default function DevicesPage() {
 
   let devices = response?.devices || [];
 
-  // Frontend filtering for specific offline durations
-  if (statusFilter === 'offline_7d' || statusFilter === 'offline_30d') {
-    const now = response?.server_time ? new Date(response.server_time) : new Date();
-    const daysThreshold = statusFilter === 'offline_7d' ? 7 : 30;
+  // Frontend filtering for specific offline durations and defective status
+  const defectiveDevices = JSON.parse(localStorage.getItem('defective_devices') || '[]');
 
-    devices = devices.filter((device: any) => {
-      if (!device.last_seen) return true; // Treat as very old if never seen
-      const lastSeen = new Date(device.last_seen);
-      const diffTime = Math.abs(now.getTime() - lastSeen.getTime());
-      const diffDays = diffTime / (1000 * 60 * 60 * 24);
-      return diffDays >= daysThreshold;
-    });
+  if (statusFilter === 'defective') {
+    devices = devices.map(d => ({
+      ...d,
+      is_defective: d.is_defective || defectiveDevices.includes(d.system_id)
+    })).filter((d: any) => d.is_defective);
+  } else {
+    // For other filters, inject the persisted defective state
+    devices = devices.map(d => ({
+      ...d,
+      is_defective: d.is_defective || defectiveDevices.includes(d.system_id)
+    }));
+
+    if (statusFilter === 'offline_7d' || statusFilter === 'offline_30d') {
+      const now = response?.server_time ? new Date(response.server_time) : new Date();
+      const daysThreshold = statusFilter === 'offline_7d' ? 7 : 30;
+
+      devices = devices.filter((device: any) => {
+        if (device.is_defective) return false; // Show in defective category instead
+        if (device.status !== 'offline') return false;
+        if (!device.last_seen) return true;
+        const lastSeen = new Date(device.last_seen);
+        const diffTime = Math.abs(now.getTime() - lastSeen.getTime());
+        const diffDays = diffTime / (1000 * 60 * 60 * 24);
+        return diffDays >= daysThreshold;
+      });
+    }
   }
 
   return (
