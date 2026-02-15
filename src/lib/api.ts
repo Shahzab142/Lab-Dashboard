@@ -16,7 +16,7 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
 
     try {
         const res = await fetch(
-            `${import.meta.env.VITE_API_URL}${path}`,
+            `https://lab-systems-monitoring-server-1.onrender.com/api${path}`,
             finalOptions
         );
 
