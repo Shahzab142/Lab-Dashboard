@@ -12,8 +12,12 @@ import LocationsPage from "./pages/LocationsPage";
 import LabsPage from "./pages/LabsPage";
 import DevicesPage from "./pages/DevicesPage";
 import PCDetailPage from "./pages/PCDetailPage";
-import FilteredDevicesPage from "./pages/FilteredDevicesPage";
+import PCHistoryDetailPage from "./pages/PCHistoryDetailPage";
+
+import LabDashboard from "./pages/LabDashboard";
+import LabSummaryPage from "./pages/LabSummaryPage";
 import NotFound from "./pages/NotFound";
+import { GlobalFailsafe } from "@/components/GlobalFailsafe";
 
 const queryClient = new QueryClient();
 
@@ -24,6 +28,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <GlobalFailsafe />
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/login" element={<Login />} />
@@ -35,11 +40,14 @@ const App = () => (
                 </ProtectedRoute>
               }
             >
-              <Route index element={<DashboardOverview />} />
+              <Route index element={<LabDashboard />} />
               <Route path="cities" element={<LocationsPage />} />
               <Route path="labs" element={<LabsPage />} />
               <Route path="devices" element={<DevicesPage />} />
+              <Route path="overview" element={<DashboardOverview />} />
+              <Route path="lab-summary/:city/:lab" element={<LabSummaryPage />} />
               <Route path="pc/:id" element={<PCDetailPage />} />
+              <Route path="pc/:id/history/:date" element={<PCHistoryDetailPage />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

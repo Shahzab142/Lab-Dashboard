@@ -4,9 +4,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Monitor, Loader2, Mail, Lock, Eye, EyeOff, ShieldCheck, RefreshCw } from 'lucide-react';
+import { Loader2, Mail, Lock, Eye, EyeOff, ShieldCheck, RefreshCw } from 'lucide-react';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -41,32 +41,22 @@ export default function Login() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!email || !password) {
       toast.error('Please fill in all fields');
       generateCaptcha();
       return;
     }
-
-    // Captcha Validation
     if (userCaptcha !== captcha.answer) {
       toast.error('Incorrect captcha answer');
       generateCaptcha();
       return;
     }
-
     setIsLoading(true);
-
     try {
       const { error } = await signIn(email, password);
-
       if (error) {
-        if (error.message.includes('Invalid login credentials')) {
-          toast.error('Invalid email or password');
-        } else {
-          toast.error(error.message);
-        }
-        generateCaptcha(); // Regenerate on failure
+        toast.error(error.message.includes('Invalid login credentials') ? 'Invalid email or password' : error.message);
+        generateCaptcha();
       } else {
         toast.success('Access Granted - Welcome to Lab Guardian');
         navigate('/dashboard');
@@ -80,102 +70,105 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] p-4 overflow-hidden relative">
-      {/* Premium Animated Background */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(59,130,246,0.1),transparent_70%)]" />
-        <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] bg-primary/10 rounded-full blur-[120px] animate-pulse" />
-        <div className="absolute -bottom-[20%] -right-[10%] w-[50%] h-[50%] bg-success/10 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '2s' }} />
-
-        {/* Subtle Grid Pattern */}
-        <div className="absolute inset-0 opacity-[0.03] pointer-events-none"
-          style={{ backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)', backgroundSize: '30px 30px' }} />
-      </div>
-
-      <Card className="w-full max-w-md border border-white/10 bg-black/40 backdrop-blur-3xl relative z-10 shadow-2xl animate-in fade-in-0 zoom-in-95 duration-700">
-        <CardHeader className="text-center space-y-3 pb-8">
-          <div className="mx-auto w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center border border-primary/20 shadow-[0_0_30px_rgba(59,130,246,0.2)] animate-in zoom-in-50 duration-700">
-            <ShieldCheck className="w-10 h-10 text-primary" />
+    <div className="min-h-screen flex items-center justify-center bg-background p-4 overflow-hidden relative font-sans">
+      <Card className="w-full max-w-md bg-white border border-border shadow-2xl relative z-10 animate-in fade-in-0 zoom-in-95 duration-700 p-1">
+        <CardHeader className="relative text-center space-y-2 pb-4 pt-32 px-8 border-b border-border/50 mx-4">
+          {/* Internal Logos */}
+          <div className="absolute top-2 left-2">
+            <div className="w-28 h-28 rounded-full bg-white flex items-center justify-center shadow-lg border border-border/20 p-3 overflow-hidden">
+              <img
+                src="/panjab_logo.png"
+                alt="Government of Punjab"
+                className="w-full h-full object-contain"
+              />
+            </div>
           </div>
-          <div className="space-y-1">
-            <CardTitle className="text-3xl font-black tracking-tight text-white italic">
-              LAB <span className="text-primary">GUARDIAN</span>
+          <div className="absolute top-2 right-2">
+            <div className="w-28 h-28 rounded-full bg-white flex items-center justify-center shadow-lg border border-border/20 p-3 overflow-hidden">
+              <img
+                src="/cm_panjab.png"
+                alt="Chief Minister Punjab"
+                className="w-full h-full object-contain"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1 pt-4">
+            <CardTitle className="text-2xl font-bold tracking-tight text-primary uppercase font-display">
+              Lab <span className="text-secondary">Monitoring</span>
             </CardTitle>
-            <CardDescription className="text-muted-foreground/80 font-medium">
-              Secure Administration Portal
-            </CardDescription>
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-6">
-          <form onSubmit={handleLogin} className="space-y-5">
-            <div className="space-y-2 group">
-              <Label htmlFor="email" className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1 group-focus-within:text-primary transition-colors">
-                Admin Email
+        <CardContent className="space-y-4 px-8 pt-6 pb-8">
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="space-y-1.5 group">
+              <Label htmlFor="email" className="text-[10px] font-bold uppercase tracking-wider text-black/60 ml-1">
+                Email
               </Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-black/40 group-focus-within:text-primary transition-colors" />
                 <Input
                   id="email"
                   type="email"
-                  placeholder="admin@labguardian.io"
+                  placeholder="Enter authorized email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="bg-white/5 border-white/10 pl-10 h-12 transition-all focus:bg-white/10 focus:ring-primary/50"
+                  className="bg-gray-50 border-border pl-11 h-11 transition-all focus:bg-white focus:ring-1 focus:ring-primary rounded-lg font-medium text-black text-sm"
                   required
                 />
               </div>
             </div>
 
-            <div className="space-y-2 group">
-              <Label htmlFor="password" className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1 group-focus-within:text-primary transition-colors">
-                Security Key
+            <div className="space-y-1.5 group">
+              <Label htmlFor="password" className="text-[10px] font-bold uppercase tracking-wider text-black/60 ml-1">
+                Password
               </Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-black/40 group-focus-within:text-primary transition-colors" />
                 <Input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
-                  placeholder="••••••••••••"
+                  placeholder="Enter password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="bg-white/5 border-white/10 pl-10 pr-12 h-12 transition-all focus:bg-white/10 focus:ring-primary/50"
+                  className="bg-gray-50 border-border pl-11 pr-11 h-11 transition-all focus:bg-white focus:ring-1 focus:ring-primary rounded-lg font-medium text-black text-sm"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white transition-colors p-1"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-black/40 hover:text-primary transition-colors p-1"
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                 </button>
               </div>
             </div>
 
-            {/* Modern Math Captcha */}
-            <div className="space-y-3 p-4 rounded-xl bg-white/5 border border-white/5 group">
-              <div className="flex items-center justify-between mb-1">
-                <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                  Human Verification
+            {/* Math Captcha Styled for ITU */}
+            <div className="space-y-2 p-4 rounded-xl bg-gray-50 border border-border group">
+              <div className="flex items-center justify-between">
+                <Label className="text-[9px] font-bold uppercase tracking-widest text-black/40">
+                  Verification Required
                 </Label>
                 <button
                   type="button"
                   onClick={generateCaptcha}
-                  className="text-muted-foreground hover:text-primary transition-all hover:rotate-180 duration-500"
+                  className="text-black/40 hover:text-primary transition-all"
                 >
-                  <RefreshCw className="w-3 h-3" />
+                  <RefreshCw className="w-2.5 h-2.5" />
                 </button>
               </div>
-              <div className="flex items-center gap-4">
-                <div className="flex-1 flex items-center justify-center h-12 rounded-lg bg-black/40 border border-white/10 text-xl font-black text-primary italic tracking-widest select-none">
-                  {captcha.num1} + {captcha.num2} = ?
+              <div className="flex items-center gap-3">
+                <div className="flex-1 flex items-center justify-center h-10 rounded-lg bg-white border border-border text-lg font-bold text-primary tracking-widest select-none font-mono shadow-sm">
+                  {captcha.num1} + {captcha.num2}
                 </div>
                 <Input
                   type="number"
-                  placeholder="Ans"
+                  placeholder="?"
                   value={userCaptcha}
                   onChange={(e) => setUserCaptcha(e.target.value)}
-                  className="w-24 h-12 bg-white/5 border-white/10 text-center font-bold text-lg"
+                  className="w-20 h-10 bg-white border-border text-center font-bold text-lg rounded-lg text-black focus:ring-1 focus:ring-primary"
                   required
                 />
               </div>
@@ -183,28 +176,24 @@ export default function Login() {
 
             <Button
               type="submit"
-              className="w-full h-12 bg-primary hover:bg-primary/90 text-white font-bold text-md shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-all hover:scale-[1.02] active:scale-[0.98]"
+              className="w-full h-11 bg-primary hover:bg-primary/90 text-white font-bold text-xs tracking-widest shadow-md transition-all rounded-lg uppercase"
               disabled={isLoading}
             >
               {isLoading ? (
-                <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
               ) : (
-                <ShieldCheck className="w-5 h-5 mr-2" />
+                <ShieldCheck className="w-4 h-4 mr-2" />
               )}
-              AUTHENTICATE
+              {isLoading ? "Verifying..." : "Get Login"}
             </Button>
           </form>
 
-          <p className="text-center text-[10px] text-muted-foreground uppercase tracking-[0.2em] font-medium opacity-50">
-            Authorized Personnel Only • Encryption Active
-          </p>
+          <div className="pt-3 flex items-center justify-between text-[#8E9AAF] text-[8px] font-bold uppercase tracking-widest">
+            <span>© 2026 Punjab Pk</span>
+            <span>SECURE TERMINAL</span>
+          </div>
         </CardContent>
       </Card>
-
-      {/* Footer Branding */}
-      <div className="absolute bottom-8 text-muted-foreground/30 text-xs font-mono">
-        SYSTEM_ID: LG_V2_PRO
-      </div>
     </div>
   );
 }

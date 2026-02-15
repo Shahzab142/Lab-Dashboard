@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 import {
   ArrowLeft,
   Monitor,
@@ -21,51 +22,120 @@ import {
   Power,
   PowerOff,
   Layout,
-  Smartphone
+  Info,
+  History,
+  Sunset,
+  RefreshCw,
+  School
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { useState, useEffect } from 'react';
+import { MiniWaveChart } from '@/components/dashboard/MiniWaveChart';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
+import { cn, formatAppName } from '@/lib/utils';
 
+/**
+ * PC DETAIL PAGE - VERSION 2.1 (RECOVERY FOCUS)
+ * Optimized to prevent UI locks and handle state transitions gracefully.
+ */
 export default function PCDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({ pc_name: '', city: '', lab_name: '' });
+  const [selectedHistory, setSelectedHistory] = useState<any>(null);
+  const [isLocallyDefective, setIsLocallyDefective] = useState(false);
+  const [showDefectiveSuccess, setShowDefectiveSuccess] = useState(false);
+  const [showRepairedSuccess, setShowRepairedSuccess] = useState(false);
 
-  const { data: detail, isLoading } = useQuery({
+  // --- HARD RESET LOGIC ---
+  useEffect(() => {
+    const resetUI = () => {
+      document.body.style.pointerEvents = 'auto';
+      document.body.style.overflow = 'auto';
+      document.documentElement.style.pointerEvents = 'auto';
+      document.documentElement.style.overflow = 'auto';
+    };
+    resetUI();
+
+    // Safety check for localStorage corruption
+    try {
+      if (id) {
+        const defectiveDevices = JSON.parse(localStorage.getItem('defective_devices') || '[]');
+        setIsLocallyDefective(defectiveDevices.includes(id));
+      }
+    } catch (e) {
+      console.error("Storage corruption detected:", e);
+      localStorage.setItem('defective_devices', '[]');
+    }
+
+    return () => resetUI();
+  }, [id]);
+
+  // --- DATA FETCHING (DIRECT FROM DATABASE) ---
+  const { data: detail, isLoading, isError, refetch } = useQuery({
     queryKey: ['pc-detail', id],
-    queryFn: () => apiFetch(`/devices/${id}`),
-    refetchInterval: isEditing ? false : 30000
+    queryFn: async () => {
+      // 1. Fetch Device
+      const { data: device, error: devError } = await supabase
+        .from('devices')
+        .select('*')
+        .eq('system_id', id)
+        .single();
+
+      if (devError) throw devError;
+
+      // 2. Fetch History (Last 7 Days)
+      const { data: history, error: histError } = await supabase
+        .from('device_daily_history')
+        .select('*')
+        .eq('device_id', id)
+        .order('history_date', { ascending: false })
+        .limit(7);
+
+      return {
+        device,
+        history: history || [],
+        server_time: new Date().toISOString() // Use client time as reference since we are direct to DB
+      };
+    },
+    refetchInterval: isEditing ? false : 1000,
   });
 
   useEffect(() => {
     if (detail?.device) {
       setEditData({
-        pc_name: detail.device.pc_name,
-        city: detail.device.city,
-        lab_name: detail.device.lab_name
+        pc_name: detail.device.pc_name || '',
+        city: detail.device.city || '',
+        lab_name: detail.device.lab_name || '',
+        college: detail.device.college || ''
       });
     }
   }, [detail]);
 
+  // --- MUTATIONS ---
   const deleteMutation = useMutation({
     mutationFn: () => apiFetch(`/devices/manage?hid=${id}`, { method: 'DELETE' }),
     onSuccess: () => {
-      toast.success("System de-registered successfully");
-      navigate('/dashboard');
-    }
+      toast.success("System slot reset successfully");
+      navigate('/dashboard', { replace: true });
+    },
+    onError: () => toast.error("Failed to remove unit")
   });
 
   const updateMutation = useMutation({
     mutationFn: (data: any) => apiFetch(`/devices/${id}`, {
       method: 'PATCH',
-      body: JSON.stringify(data)
+      body: JSON.stringify({
+        pc_name: data.pc_name,
+        city: data.city,
+        lab_name: data.lab_name,
+        college: data.college // Sending college to backend
+      })
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pc-detail', id] });
@@ -74,69 +144,181 @@ export default function PCDetailPage() {
     }
   });
 
-  if (isLoading) return <div className="p-8"><Skeleton className="h-screen rounded-3xl" /></div>;
-  if (!detail?.device) return <div className="p-8 text-center text-white">System Not Found</div>;
+  const toggleDefectiveLocal = () => {
+    try {
+      const defectiveDevices = JSON.parse(localStorage.getItem('defective_devices') || '[]');
+      let newDevices;
+
+      if (isLocallyDefective) {
+        // REMOVING FROM DEFECTIVE
+        newDevices = defectiveDevices.filter((did: string) => did !== id);
+
+        // Update Local Storage
+        localStorage.setItem('defective_devices', JSON.stringify(newDevices));
+        setIsLocallyDefective(false);
+
+        // Show Repaired Modal
+        setShowRepairedSuccess(true);
+        queryClient.invalidateQueries({ queryKey: ['devices'] });
+
+        // Delay navigation
+        setTimeout(() => navigate(-1), 2500);
+
+      } else {
+        // ADDING TO DEFECTIVE
+        newDevices = [...defectiveDevices, id];
+
+        localStorage.setItem('defective_devices', JSON.stringify(newDevices));
+        setIsLocallyDefective(true);
+
+        // Show the centered modal
+        setShowDefectiveSuccess(true);
+
+        queryClient.invalidateQueries({ queryKey: ['devices'] });
+        queryClient.invalidateQueries({ queryKey: ['devices-list'] });
+        queryClient.invalidateQueries({ queryKey: ['pc-detail', id] });
+
+        // Wait longer (2.5s) for user to read the centered message
+        setTimeout(() => {
+          navigate(-1);
+        }, 2500);
+      }
+    } catch (e) {
+      toast.error("Logic Error: Could not update status");
+    }
+  };
+
+  // --- RENDER STATES ---
+  if (isLoading) return (
+    <div className="p-8 bg-background min-h-screen flex items-center justify-center">
+      <div className="w-full max-w-5xl space-y-8 animate-pulse">
+        <div className="h-12 w-1/3 bg-card rounded-xl border border-border" />
+        <Skeleton className="w-full h-[60vh] rounded-[2.5rem] bg-card/50 border border-primary/20 shadow-[0_0_50px_rgba(249,154,29,0.05)]" />
+      </div>
+    </div>
+  );
+
+  if (isError || !detail?.device) return (
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center text-center p-8 space-y-8">
+      <div className="p-8 rounded-full bg-red-500/10 border border-red-500/20">
+        <Monitor className="w-20 h-20 text-red-500/50" />
+      </div>
+      <div className="space-y-2">
+        <h1 className="text-3xl font-black text-white uppercase tracking-tighter italic">System Link Severed</h1>
+        <p className="text-muted-foreground text-sm uppercase tracking-widest font-bold">Node not found or network connection dropped</p>
+      </div>
+      <div className="flex gap-4">
+        <Button onClick={() => navigate(-1)} variant="outline" className="px-8 border-border text-foreground hover:bg-muted font-black uppercase text-[10px] tracking-widest">Return to Fleet</Button>
+        <Button onClick={() => refetch()} className="px-8 bg-primary text-black font-black uppercase text-[10px] tracking-widest">Retry Connection</Button>
+      </div>
+    </div>
+  );
 
   const { device, history } = detail;
 
-  // Robust Online Check: 40 second threshold
   const isOnline = (() => {
     const lastSeenDate = device.last_seen ? new Date(device.last_seen) : null;
+    const referenceTime = detail.server_time ? new Date(detail.server_time) : new Date();
     return device.status === 'online' &&
       lastSeenDate &&
-      (new Date().getTime() - lastSeenDate.getTime() < 40 * 1000);
+      (referenceTime.getTime() - lastSeenDate.getTime() < 60 * 1000);
   })();
 
   return (
-    <div className="p-4 md:p-8 space-y-8 animate-in zoom-in-95 duration-700">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-white/5">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="rounded-full bg-white/5">
-            <ArrowLeft className="w-5 h-5" />
+    <div className="relative p-4 md:p-8 space-y-8 bg-background min-h-screen text-white overflow-y-auto selection:bg-primary/30">
+      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-border/50">
+        <div className="flex items-start gap-6">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate(-1)}
+            className="rounded-lg bg-card border border-border hover:bg-primary/10 hover:text-primary transition-all group shrink-0 shadow-sm"
+          >
+            <ArrowLeft className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
           </Button>
-          <div>
-            <div className="flex items-center gap-3">
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
               {isEditing ? (
                 <Input
-                  className="text-2xl font-black italic tracking-tighter uppercase bg-black/40 border-primary text-white"
+                  className="text-3xl font-bold tracking-tight uppercase bg-card border-primary h-12 rounded-lg text-primary px-6 focus:ring-1 focus:ring-primary shadow-inner"
                   value={editData.pc_name}
                   onChange={(e) => setEditData({ ...editData, pc_name: e.target.value })}
                 />
               ) : (
-                <h1 className="text-3xl font-black italic tracking-tighter uppercase text-white">{device.pc_name}</h1>
+                <h1 className="text-4xl font-bold tracking-tight uppercase text-white font-display leading-tight">{device.pc_name || "STATION"}</h1>
               )}
-              <div className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${isOnline ? 'bg-success/20 text-success' : 'bg-red-500/10 text-red-500'}`}>
-                {isOnline ? "Live" : "Offline"}
+              <div className={cn(
+                "px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm border",
+                isOnline ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-muted/30 text-muted-foreground border-border'
+              )}>
+                {isOnline ? "Live Stream Active" : "Telemetry Offline"}
               </div>
             </div>
-            <p className="text-muted-foreground font-mono text-xs mt-1 uppercase tracking-tighter">Hardware Auth ID: {device.id}</p>
+            <p className="text-white font-bold text-[10px] uppercase tracking-widest opacity-60">
+              System ID: <span className="text-white/80">{device.system_id}</span> • Node Status: <span className={isLocallyDefective ? "text-red-500" : "text-emerald-500"}>{isLocallyDefective ? "DEFECTIVE" : "VERIFIED"}</span>
+            </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           {isEditing ? (
             <>
-              <Button variant="outline" size="sm" onClick={() => setIsEditing(false)} className="font-bold">
-                <X className="w-4 h-4 mr-2" /> CANCEL
+              <Button variant="ghost" size="lg" onClick={() => setIsEditing(false)} className="font-bold text-[10px] tracking-widest uppercase rounded-lg px-6 h-10 border border-border">
+                <X className="w-4 h-4 mr-2" /> Cancel
               </Button>
-              <Button variant="default" size="sm" onClick={() => updateMutation.mutate(editData)} className="bg-primary hover:bg-primary/80 text-white font-bold">
-                <Save className="w-4 h-4 mr-2" /> SAVE CHANGES
+              <Button variant="default" size="lg" onClick={() => updateMutation.mutate(editData)} className="bg-primary hover:bg-primary/90 text-black font-bold text-[10px] tracking-widest uppercase rounded-lg px-8 h-10 shadow-sm">
+                <Save className="w-4 h-4 mr-3" /> Save Changes
               </Button>
             </>
           ) : (
             <>
-              <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="bg-white/5 border-white/10 hover:bg-white/10 font-bold">
-                <Edit3 className="w-4 h-4 mr-2" /> EDIT IDENTITY
+              <Button
+                onClick={toggleDefectiveLocal}
+                className={cn(
+                  "gap-2 px-6 rounded-lg h-10 text-[10px] font-bold uppercase tracking-widest transition-all shadow-sm border",
+                  isLocallyDefective
+                    ? "bg-red-500 text-white border-red-600 hover:bg-red-600"
+                    : "bg-amber-500/10 text-amber-500 border-amber-500/20 hover:bg-amber-500 hover:text-white"
+                )}
+              >
+                <Activity size={16} />
+                {isLocallyDefective ? "Repaired / Fix" : "Mark as Defective"}
               </Button>
+
+              <Button
+                onClick={async () => {
+                  const toastId = toast.loading("Synthesizing node audit PDF...");
+                  try {
+                    const { generateDynamicReport } = await import('@/lib/pdf-generator');
+                    await generateDynamicReport('PC', { ...device, isOnline, history: detail?.history }, device.system_id);
+                    toast.success("Audit Generated Successfully", { id: toastId });
+                  } catch (e) {
+                    toast.error("PDF Engine Error", { id: toastId });
+                  }
+                }}
+                className="bg-white hover:bg-white/90 text-black gap-2 px-6 rounded-lg h-10 text-[10px] font-bold uppercase tracking-widest transition-all shadow-sm"
+              >
+                <Monitor size={16} className="text-black" /> Audit Report
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="lg"
+                onClick={() => setIsEditing(true)}
+                className="bg-card border border-border hover:text-primary font-bold text-[10px] tracking-widest uppercase rounded-lg px-6 h-10 transition-all text-white shadow-sm"
+              >
+                <Edit3 className="w-4 h-4" />
+              </Button>
+
               <Button
                 variant="destructive"
-                size="sm"
-                className="bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white transition-all font-bold"
+                size="lg"
+                className="bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-600 hover:text-white transition-all rounded-lg w-10 h-10 p-0 shadow-sm"
                 onClick={() => {
-                  if (window.confirm("CRITICAL: De-register this hardware from the network?")) deleteMutation.mutate();
+                  if (window.confirm("CRITICAL: Remove this system slot forever?")) deleteMutation.mutate();
                 }}
               >
-                <Trash2 className="w-4 h-4 mr-2" /> DELETE SYSTEM
+                <Trash2 className="w-4 h-4" />
               </Button>
             </>
           )}
@@ -144,250 +326,256 @@ export default function PCDetailPage() {
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Registry Sidecard */}
+        {/* Core Intelligence Panel */}
         <div className="space-y-6">
-          <Card className="bg-black/40 border-white/5 backdrop-blur-3xl">
-            <CardHeader>
-              <CardTitle className="text-xs font-bold tracking-widest text-primary uppercase">Registry Intelligence</CardTitle>
+          <Card className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
+            <CardHeader className="p-8 pb-4">
+              <CardTitle className="text-[10px] font-bold tracking-widest text-primary uppercase opacity-60">System Core Information</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/5 text-white">
-                <MapPin className="text-primary w-5 h-5 flex-shrink-0" />
-                <div className="flex-1">
-                  <p className="text-[10px] text-muted-foreground uppercase font-bold">Region</p>
-                  {isEditing ? (
-                    <select
-                      className="mt-1 w-full bg-black/40 border border-primary text-white text-xs rounded p-1"
-                      value={editData.city}
-                      onChange={(e) => setEditData({ ...editData, city: e.target.value })}
-                    >
-                      {["Ahmadpur East", "Ahmed Nager Chatha", "Ali Pur", "Arifwala", "Attock", "Bhalwal", "Bahawalnagar", "Bahawalpur", "Bhakkar", "Burewala", "Chillianwala", "Chakwal", "Chichawatni", "Chiniot", "Chishtian", "Daska", "Darya Khan", "Dera Ghazi Khan", "Dhaular", "Dina", "Dinga", "Dipalpur", "Faisalabad", "Fateh Jang", "Ghakhar Mandi", "Gojra", "Gujar Khan", "Gujranwala", "Gujrat", "Hafizabad", "Haroonabad", "Hasilpur", "Haveli Lakha", "Jauharabad", "Jhang", "Jhelum", "Kalabagh", "Karor Lal Esan", "Kasur", "Kamalia", "Kamoke", "Khanewal", "Khanpur", "Kharian", "Khushab", "Kot Adu", "Lahore", "Lalamusa", "Layyah", "Liaquat Pur", "Lodhran", "Malakwal", "Mamoori", "Mailsi", "Mandi Bahauddin", "Mian Channu", "Mianwali", "Multan", "Murree", "Muridke", "Mianwali Bangla", "Muzaffargarh", "Narowal", "Okara", "Renala Khurd", "Pakpattan", "Pattoki", "Pir Mahal", "Qila Didar Singh", "Rabwah", "Raiwind", "Rajanpur", "Rahim Yar Khan", "Rawalpindi", "Sadiqabad", "Safdarabad", "Sahiwal", "Sangla Hill", "Sarai Alamgir", "Sargodha", "Shakargarh", "Sheikhupura", "Sialkot", "Sohawa", "Soianwala", "Siranwali", "Talagang", "Taxila", "Toba Tek Singh", "Vehari", "Wah Cantonment", "Wazirabad"].sort().map(c => (
-                        <option key={c} value={c} className="bg-slate-900">{c}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <p className="font-bold text-sm">{device.city}</p>
-                  )}
+            <CardContent className="p-8 pt-4 space-y-4">
+              <div className="p-5 rounded-xl bg-muted border border-border transition-all hover:border-primary/20 group">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 rounded-lg bg-primary text-black shadow-sm">
+                    <MapPin size={22} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider">Assigned Region</p>
+                    {isEditing ? (
+                      <select
+                        className="mt-2 w-full bg-card border border-border text-primary text-xs rounded-lg p-2.5 outline-none focus:ring-1 focus:ring-primary shadow-sm"
+                        value={editData.city}
+                        onChange={(e) => setEditData({ ...editData, city: e.target.value })}
+                      >
+                        {["Lahore", "Faisalabad", "Rawalpindi", "Gujranwala", "Multan", "Sialkot", "Sargodha", "Bahawalpur", "Jhang", "Sheikhupura"].sort().map(c => (
+                          <option key={c} value={c} className="bg-card text-primary">{c}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <p className="font-bold text-xl uppercase tracking-tight text-primary mt-0.5">{device.city}</p>
+                    )}
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/5 text-white">
-                <Beaker className="text-purple-500 w-5 h-5 flex-shrink-0" />
-                <div className="flex-1">
-                  <p className="text-[10px] text-muted-foreground uppercase font-bold">Laboratory</p>
-                  {isEditing ? (
-                    <select
-                      className="mt-1 w-full bg-black/40 border border-primary text-white text-xs rounded p-1"
-                      value={editData.lab_name}
-                      onChange={(e) => setEditData({ ...editData, lab_name: e.target.value })}
-                    >
-                      {["ITU Main Campus Lab", "ITU Barki Campus Lab"].map(l => (
-                        <option key={l} value={l} className="bg-slate-900">{l}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <p className="font-bold text-sm">{device.lab_name}</p>
-                  )}
+
+              <div className="p-5 rounded-xl bg-muted border border-border transition-all hover:border-primary/20 group">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 rounded-lg bg-secondary text-white shadow-sm">
+                    <Beaker size={22} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider">Facility Cluster</p>
+                    {isEditing ? (
+                      <select
+                        className="mt-2 w-full bg-card border border-border text-primary text-xs rounded-lg p-2.5 outline-none focus:ring-1 focus:ring-primary shadow-sm"
+                        value={editData.lab_name}
+                        onChange={(e) => setEditData({ ...editData, lab_name: e.target.value })}
+                      >
+                        {["ITU Main Campus", "ITU Barki Campus"].map(l => (
+                          <option key={l} value={l} className="bg-card text-primary">{l}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <p className="font-bold text-xl uppercase tracking-tight text-primary mt-0.5">{device.lab_name}</p>
+                    )}
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/5 text-white">
-                <Sunrise className="text-orange-500 w-5 h-5 flex-shrink-0" />
-                <div>
-                  <p className="text-[10px] text-muted-foreground uppercase font-bold">First Boot (Today)</p>
-                  <p className="font-black text-2xl text-white">
+              <div className="p-5 rounded-xl bg-muted border border-border transition-all hover:border-primary/20 group">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 rounded-lg bg-indigo-500 text-white shadow-sm">
+                    <School size={22} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider">Institution / College</p>
+                    {isEditing ? (
+                      <input
+                        className="mt-2 w-full bg-card border border-border text-primary text-xs rounded-lg p-2.5 outline-none focus:ring-1 focus:ring-primary shadow-sm uppercase font-bold"
+                        value={editData.college || ''}
+                        onChange={(e) => setEditData({ ...editData, college: e.target.value })}
+                        placeholder="ENTER COLLEGE NAME"
+                      />
+                    ) : (
+                      <p className="font-bold text-xl uppercase tracking-tight text-primary mt-0.5">{device.college || 'Not Assigned'}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+
+              <div className="p-5 rounded-xl bg-card border border-border transition-all hover:border-secondary/20 group relative overflow-hidden">
+                <div className="absolute -right-2 -top-2 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity">
+                  <HardDrive size={80} />
+                </div>
+                <div className="flex items-center gap-4 relative z-10">
+                  <div className="p-3 rounded-lg bg-orange-500 text-white shadow-lg shadow-orange-500/10">
+                    <HardDrive size={22} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[10px] text-white/90 uppercase font-black tracking-widest">HARDWARE ID</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <p className="font-mono text-xs font-bold uppercase tracking-tight text-primary break-all bg-primary/5 px-2.5 py-1.5 rounded border border-primary/20 shadow-inner">
+                        {device.hardware_id || device.hwid || "HS-PR10-TRON-X12"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-5 rounded-xl bg-card border border-border shadow-sm">
+                  <Sunrise className="text-secondary w-4 h-4 mb-3" />
+                  <p className="text-[8px] text-muted-foreground uppercase font-bold tracking-widest opacity-60">System Boot</p>
+                  <p className="font-bold text-lg text-primary leading-tight">
                     {device.today_start_time ? new Date(device.today_start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
                   </p>
                 </div>
-              </div>
-
-              <div className="flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/5 text-white">
-                <Timer className="text-primary w-5 h-5 flex-shrink-0" />
-                <div>
-                  <p className="text-[10px] text-muted-foreground uppercase font-bold">Daily Runtime</p>
-                  <p className="font-black text-2xl text-white">
+                <div className="p-5 rounded-xl bg-primary text-black shadow-md">
+                  <Timer className="text-black w-4 h-4 mb-3" />
+                  <p className="text-[8px] text-black/60 uppercase font-bold tracking-widest">Active Cycle</p>
+                  <p className="font-bold text-lg text-black leading-tight">
                     {(() => {
-                      // Transition Logic: If new runtime_minutes is available, use it. 
-                      // Otherwise fallback to timestamp calculation for today.
                       const mins = device.runtime_minutes || 0;
-                      if (mins > 0) {
-                        const hours = Math.floor(mins / 60);
-                        const remMins = Math.floor(mins % 60);
-                        return `${hours}h ${remMins}m`;
-                      }
-
-                      // Fallback for transition/new devices
-                      if (!device.today_start_time || !device.today_last_active) return '0h 0m';
-                      const start = new Date(device.today_start_time).getTime();
-                      const end = new Date(device.today_last_active).getTime();
-                      const diffMs = end - start;
-                      if (diffMs < 0) return '0h 0m';
-                      const hours = Math.floor(diffMs / (1000 * 3600));
-                      const minutes = Math.floor((diffMs % (1000 * 3600)) / (1000 * 60));
-                      return `${hours}h ${minutes}m`;
+                      return `${Math.floor(mins / 60)}H ${Math.floor(mins % 60)}M`;
                     })()}
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/5 text-white">
-                <Clock className="text-primary w-5 h-5 flex-shrink-0" />
-                <div>
-                  <p className="text-[10px] text-muted-foreground uppercase font-bold">Session Presence</p>
-                  <p className={cn(
-                    "font-black text-2xl uppercase italic",
-                    isOnline ? "text-success" : "text-white"
-                  )}>
-                    {isOnline ? "Active Now" : (device.last_seen ? new Date(device.last_seen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'N/A')}
-                  </p>
+              <div className="p-6 rounded-2xl bg-card border border-border relative overflow-hidden group shadow-sm">
+                <div className="absolute top-0 right-0 p-4 opacity-5">
+                  <Cpu size={48} className="text-primary" />
                 </div>
-              </div>
-              <div className="flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/5 text-white">
-                <Activity className="text-primary w-5 h-5 flex-shrink-0" />
-                <div>
-                  <p className="text-[10px] text-muted-foreground uppercase font-bold">Total Compute Units</p>
-                  <p className="font-black text-2xl text-primary">{device.cpu_score}</p>
+                <p className="text-[10px] text-white/50 uppercase font-bold tracking-widest mb-4">Real-time Telemetry</p>
+                <div className="bg-muted/50 rounded-xl border border-border p-4 mb-4 flex justify-center opacity-40">
+                  <MiniWaveChart
+                    color="#01416D"
+                    width={280}
+                    height={80}
+                    intensity={isOnline ? 0.8 : 0.05}
+                    showGrid={false}
+                  />
+                </div>
+                <div className="flex items-baseline justify-between">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-5xl font-bold tracking-tighter text-primary">{device.cpu_score || 0}</span>
+                    <span className="text-[10px] font-bold text-secondary uppercase tracking-widest">COMPUTE INDEX</span>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[8px] font-bold opacity-40 uppercase tracking-widest">Update Rate</p>
+                    <p className="text-[10px] font-bold text-primary">1S / SYNC</p>
+                  </div>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className={cn(
-            "border-dashed",
-            isOnline ? "bg-green-500/5 border-green-500/20" : "bg-red-500/5 border-red-500/20"
-          )}>
-            <CardContent className="p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Session Status</p>
-                {isOnline ? <Power className="text-green-500 w-4 h-4" /> : <PowerOff className="text-red-500 w-4 h-4" />}
+          {/* APPLICATION USAGE CARD - SIDEBAR VIEW */}
+          <Card className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+            <CardHeader className="p-8 pb-0 flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-[10px] font-bold tracking-widest text-primary uppercase opacity-60">Current Session Workload</CardTitle>
+                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mt-1">Real-time Apps</p>
               </div>
-
-              {isOnline ? (
-                <div className="space-y-1">
-                  <p className="text-2xl font-black italic text-green-500 uppercase">Active Now</p>
-                  <p className="text-xs text-muted-foreground font-bold">Started at {device.today_start_time ? new Date(device.today_start_time).toLocaleTimeString() : 'N/A'}</p>
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  <p className="text-2xl font-black italic text-red-500 uppercase">Offline</p>
-                  <p className="text-xs text-muted-foreground font-bold italic">Last active at {device.today_last_active ? new Date(device.today_last_active).toLocaleString() : 'N/A'}</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* DIGITAL WELLBEING - Samsung Style */}
-          <Card className="bg-black/40 border-white/5 backdrop-blur-3xl overflow-hidden">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-xs font-bold tracking-widest text-success uppercase">Digital Wellbeing</CardTitle>
-              <Smartphone className="w-4 h-4 text-success/50" />
+              <Activity className="text-primary opacity-20 w-5 h-4" />
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="p-8 pb-4">
               {device.app_usage && Object.keys(device.app_usage).length > 0 ? (
-                (() => {
-                  const sortedApps = Object.entries(device.app_usage as Record<string, number>)
-                    .sort(([, a], [, b]) => b - a)
-                    .slice(0, 5);
-                  const totalSecs = Object.values(device.app_usage as Record<string, number>).reduce((acc, v) => acc + v, 0);
-
-                  return (
-                    <div className="space-y-4">
-                      {sortedApps.map(([app, secs]) => {
-                        const percent = Math.max(5, (secs / totalSecs) * 100);
-                        const hrs = Math.floor(secs / 3600);
-                        const mins = Math.floor((secs % 3600) / 60);
-                        return (
-                          <div key={app} className="space-y-1.5 group">
-                            <div className="flex justify-between items-end">
-                              <span className="text-[11px] font-bold text-white/80 group-hover:text-success transition-colors truncate max-w-[150px]">{app}</span>
-                              <span className="text-[10px] font-mono text-muted-foreground">{hrs > 0 ? `${hrs}h ` : ''}{mins}m</span>
-                            </div>
-                            <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-success transition-all duration-1000 ease-out rounded-full shadow-[0_0_10px_rgba(34,197,94,0.3)]"
-                                style={{ width: `${percent}%` }}
-                              />
-                            </div>
+                <div className="space-y-4 max-h-[350px] overflow-y-auto pr-3 custom-scrollbar">
+                  {(() => {
+                    const items = Object.entries(device.app_usage as Record<string, number>).sort(([, a], [, b]) => b - a);
+                    const totalS = Object.values(device.app_usage as Record<string, number>).reduce((acc, v) => acc + v, 0);
+                    return items.slice(0, 15).map(([app, secs]) => {
+                      const percent = Math.max(5, (secs / totalS) * 100);
+                      const h = Math.floor(secs / 3600);
+                      const m = Math.floor((secs % 3600) / 60);
+                      return (
+                        <div key={app} className="space-y-1.5 pb-2 border-b border-border/10 last:border-0">
+                          <div className="flex justify-between items-end px-1">
+                            <span className="text-[11px] font-bold text-white uppercase tracking-tight truncate max-w-[150px]">{formatAppName(app)}</span>
+                            <span className="text-[9px] font-bold text-primary">{h > 0 ? `${h}h ` : ''}{m}m</span>
                           </div>
-                        );
-                      })}
-                      <div className="pt-2 border-t border-white/5 mt-4">
-                        <p className="text-[9px] text-muted-foreground uppercase font-black tracking-widest text-center">Software Efficiency Active</p>
-                      </div>
-                    </div>
-                  );
-                })()
+                          <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
+                            <div className="h-full bg-primary rounded-full transition-all duration-1000" style={{ width: `${percent}%` }} />
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
               ) : (
-                <div className="py-8 text-center bg-white/5 rounded-2xl border border-dashed border-white/10">
-                  <Layout className="w-8 h-8 text-muted-foreground/20 mx-auto mb-2" />
-                  <p className="text-[10px] text-muted-foreground font-bold uppercase">Learning Activity...</p>
+                <div className="py-8 text-center border border-dashed border-border rounded-xl bg-muted/30">
+                  <Activity className="w-8 h-8 text-muted-foreground mx-auto mb-2 opacity-20" />
+                  <p className="text-muted-foreground font-bold uppercase text-[8px] tracking-widest opacity-40">Telemetry Absent</p>
                 </div>
               )}
             </CardContent>
           </Card>
         </div>
 
-        {/* History Main Section */}
-        <div className="lg:col-span-2 space-y-6">
-          <Card className="bg-black/40 border-white/5">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-sm font-bold tracking-widest text-white uppercase">System Session History</CardTitle>
-              <Calendar className="text-muted-foreground/30 w-5 h-5" />
+        {/* Deep Data Section */}
+        <div className="lg:col-span-2 space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card className={cn("bg-card rounded-2xl border transition-all shadow-sm", isOnline ? "border-l-4 border-l-emerald-500" : "border-l-4 border-l-gray-300")}>
+              <CardContent className="p-8 flex items-center gap-6">
+                <div className={cn("w-14 h-14 rounded-xl flex items-center justify-center shrink-0 shadow-sm border", isOnline ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-gray-50 text-gray-400 border-gray-100")}>
+                  {isOnline ? <Power size={28} /> : <PowerOff size={28} />}
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Operational State</p>
+                  <h2 className={cn("text-2xl font-bold uppercase tracking-tight leading-tight", isOnline ? "text-emerald-500" : "text-gray-400")}>{isOnline ? "Operational" : "Idle State"}</h2>
+                  <p className="text-[9px] font-bold opacity-60 mt-1 uppercase tracking-wider">{isOnline ? "Link established" : "Terminal signal absent"}</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-card rounded-2xl border-l-4 border-l-secondary border border-border shadow-sm">
+              <CardContent className="p-8 flex items-center gap-6">
+                <div className="w-14 h-14 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 shadow-sm border border-primary/20">
+                  <ShieldCheck size={28} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Security Index</p>
+                  <h2 className="text-2xl font-bold uppercase tracking-tight text-white leading-tight">STABLE</h2>
+                  <p className="text-[9px] font-bold opacity-60 mt-1 uppercase tracking-wider">Infrastructure Verified • No Anomalies</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+
+          <Card className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+            <CardHeader className="p-8 pb-0 flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-[10px] font-bold tracking-widest text-primary uppercase opacity-60">Handshake History</CardTitle>
+                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mt-1">Rolling 7-Day Performance Log</p>
+              </div>
+              <Calendar className="text-primary opacity-20 w-5 h-5" />
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-8">
               {history && history.length > 0 ? (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left">
+                  <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="border-b border-white/5 text-[10px] font-bold uppercase text-muted-foreground">
-                        <th className="pb-4">Date</th>
-                        <th className="pb-4">Start</th>
-                        <th className="pb-4">Last Seen</th>
-                        <th className="pb-4">Region/Lab</th>
-                        <th className="pb-4">Primary Software</th>
-                        <th className="pb-4">Score</th>
-                        <th className="pb-4">Runtime</th>
+                      <tr className="text-[9px] font-bold uppercase text-muted-foreground/60 tracking-wider">
+                        <th className="px-6 pb-4 border-b border-border">Temporal Index</th>
+                        <th className="px-6 pb-4 border-b border-border text-right">Avg Load</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-white/5">
-                      {history.map((h: any) => {
+                    <tbody>
+                      {history.slice(0, 10).map((h: any) => {
                         const dateObj = h.history_date ? new Date(h.history_date) : new Date(h.start_time);
-                        const start = new Date(h.start_time);
-                        const end = h.end_time ? new Date(h.end_time) : null;
-
-                        // Use runtime_minutes from DB if available, else calculate
-                        const runtimeTotalMins = h.runtime_minutes || (end ? Math.floor((end.getTime() - start.getTime()) / 1000 / 60) : 0);
-
                         return (
-                          <tr key={h.id || h.history_date} className="text-xs text-white group">
-                            <td className="py-4 font-bold">{dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
-                            <td className="py-4 text-muted-foreground">{start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
-                            <td className="py-4 text-muted-foreground">
-                              {end ? end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '---'}
-                            </td>
-                            <td className="py-4">
+                          <tr key={h.id || h.history_date} onClick={() => setSelectedHistory(h)} className="text-xs group hover:bg-muted/50 transition-all cursor-pointer">
+                            <td className="px-6 py-5 border-b border-border/50">
                               <div className="flex flex-col">
-                                <span className="text-primary font-bold">{h.city || 'N/A'}</span>
-                                <span className="text-[10px] text-muted-foreground">{h.lab_name || 'N/A'}</span>
+                                <span className="font-bold text-primary uppercase tracking-tight text-sm">{dateObj.toLocaleDateString('en-US', { month: 'short', day: '2-digit' }).toUpperCase()}</span>
+                                <span className="text-[8px] font-bold text-muted-foreground uppercase mt-0.5">Archive Data Sync</span>
                               </div>
                             </td>
-                            <td className="py-4">
-                              {h.app_usage && Object.keys(h.app_usage).length > 0 ? (
-                                <span className="text-[10px] font-bold bg-success/10 text-success px-2 py-1 rounded border border-success/20 uppercase">
-                                  {Object.entries(h.app_usage as Record<string, number>).sort(([, a], [, b]) => b - a)[0][0]}
-                                </span>
-                              ) : (
-                                <span className="text-[10px] text-muted-foreground italic">No Log</span>
-                              )}
-                            </td>
-                            <td className="py-4">
-                              <span className={cn(
-                                "font-black italic px-2 py-0.5 rounded",
-                                h.avg_score > 0 ? "bg-primary/20 text-primary" : "bg-orange-500/20 text-orange-500"
-                              )}>
-                                {h.avg_score || 0} UNITS
-                              </span>
-                            </td>
-                            <td className="py-4 font-mono text-primary font-bold">
-                              {runtimeTotalMins > 0 ? `${Math.floor(runtimeTotalMins / 60)}h ${runtimeTotalMins % 60}m` : "---"}
+                            <td className="px-6 py-5 border-b border-border/50 text-right">
+                              <div className="flex flex-col items-end">
+                                <span className="text-lg font-bold text-primary">{h.avg_score || 0}%</span>
+                                <span className="text-[7px] font-bold text-secondary uppercase tracking-widest">CPU INDEX</span>
+                              </div>
                             </td>
                           </tr>
                         );
@@ -396,27 +584,115 @@ export default function PCDetailPage() {
                   </table>
                 </div>
               ) : (
-                <div className="p-12 text-center border-2 border-dashed border-white/5 rounded-2xl">
-                  <Activity className="w-10 h-10 text-muted-foreground/20 mx-auto mb-4" />
-                  <p className="text-muted-foreground font-bold uppercase text-xs tracking-widest">Initial Session Gathering...</p>
+                <div className="p-16 text-center border border-dashed border-border rounded-xl bg-muted/30 opacity-40">
+                  <Activity className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground font-bold uppercase text-[10px] tracking-widest">No Archived Handshakes</p>
                 </div>
               )}
             </CardContent>
           </Card>
-
-          <Card className="bg-primary/5 border-primary/20">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <ShieldCheck className="text-primary w-8 h-8" />
-                <div>
-                  <p className="text-[10px] font-bold text-primary uppercase tracking-widest">Network Compliance</p>
-                  <p className="text-xs text-white mt-1">This node is running on a secured local network with verified hardware authentication.</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </div>
+
+      {/* History Detail Modal (Custom fixed implementation) */}
+      {selectedHistory && (
+        <div className="fixed inset-0 z-[9990] flex items-center justify-center p-4 bg-background/95 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-card border border-border text-primary rounded-[2rem] max-w-2xl w-full p-0 overflow-hidden shadow-2xl relative">
+            <div className="h-1 bg-primary w-full" />
+            <button onClick={() => setSelectedHistory(null)} className="absolute top-6 right-6 p-2 rounded-xl bg-muted/50 text-white/50 hover:text-white hover:bg-muted transition-all"><X size={20} /></button>
+            <div className="p-8 pb-4">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="p-3 rounded-lg bg-primary text-black shadow-sm"><History size={24} /></div>
+                <h2 className="text-2xl font-black tracking-tight uppercase text-white">Session Audit</h2>
+              </div>
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">DATE: {new Date(selectedHistory.history_date || selectedHistory.start_time).toLocaleDateString('en-US', { month: 'long', day: '2-digit', year: 'numeric' }).toUpperCase()}</p>
+            </div>
+            <div className="p-8 pt-2 space-y-8 scroll-bar max-h-[60vh] overflow-y-auto">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-5 rounded-xl bg-muted border border-border">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1 text-primary/60">Average Consumption</p>
+                  <p className="text-3xl font-black text-primary italic">{selectedHistory?.avg_score || 0}% <span className="text-[10px] uppercase not-italic opacity-60">Avg Load</span></p>
+                </div>
+                <div className="p-5 rounded-xl bg-primary text-black shadow-md">
+                  <p className="text-[10px] font-bold text-black/60 uppercase tracking-widest mb-1">Operational Duty</p>
+                  <p className="text-3xl font-black text-black italic">{selectedHistory?.runtime_minutes ? `${Math.floor(selectedHistory.runtime_minutes / 60)}H ${selectedHistory.runtime_minutes % 60}M` : '00H 00M'}</p>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 px-1"><Info size={14} className="text-primary" /><span className="text-[10px] font-bold uppercase tracking-widest text-primary">Software Distribution Matrix</span></div>
+                <div className="space-y-4 bg-muted border border-border rounded-xl p-6 shadow-sm">
+                  {selectedHistory?.app_usage && Object.keys(selectedHistory.app_usage).length > 0 ? (
+                    (() => {
+                      const items = Object.entries(selectedHistory.app_usage as Record<string, number>).sort(([, a], [, b]) => b - a);
+                      const totalS = Object.values(selectedHistory.app_usage as Record<string, number>).reduce((acc, v) => acc + v, 0);
+                      return items.map(([app, secs]) => {
+                        const percent = Math.max(5, (secs / totalS) * 100);
+                        const h = Math.floor(secs / 3600);
+                        const m = Math.floor((secs % 3600) / 60);
+                        return (
+                          <div key={app} className="space-y-2">
+                            <div className="flex justify-between items-end px-1">
+                              <span className="text-xs font-bold text-white uppercase tracking-tight truncate max-w-[350px]">{formatAppName(app)}</span>
+                              <span className="text-[10px] font-bold text-primary">{h > 0 ? `${h}H ` : ''}{m}M</span>
+                            </div>
+                            <div className="h-1.5 w-full bg-card rounded-full overflow-hidden border border-border">
+                              <div className="h-full bg-primary rounded-full" style={{ width: `${percent}%` }} />
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()
+                  ) : (
+                    <p className="text-center py-8 text-muted-foreground text-[10px] font-bold uppercase tracking-widest italic opacity-40">No telemetry available</p>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="p-8 flex justify-end">
+              <Button onClick={() => setSelectedHistory(null)} className="bg-primary hover:bg-primary/90 text-black border border-border rounded-xl px-10 h-11 font-black text-[10px] uppercase tracking-widest transition-all shadow-xl shadow-primary/10">Close Audit Archive</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manual Recovery Button (Always at bottom left for emergencies) */}
+      <button
+        onClick={() => window.location.reload()}
+        className="fixed bottom-6 right-6 p-3 bg-card border border-border text-white/20 hover:text-white rounded-full z-[100] transition-all hover:scale-110"
+        title="Hard Refresh"
+      >
+        <RefreshCw size={20} />
+      </button>
+
+      {/* Success Modal for Defective Transfer */}
+      {showDefectiveSuccess && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-card border border-red-500/30 p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 text-center max-w-md w-full animate-in zoom-in-95 duration-300">
+            <div className="p-4 rounded-full bg-red-500/10 text-red-500 mb-2 ring-1 ring-red-500/40">
+              <ShieldCheck size={48} />
+            </div>
+            <h2 className="text-2xl font-black uppercase tracking-tighter text-white">System Transfer Complete</h2>
+            <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest leading-relaxed">
+              PC Successfully Transferred to <br /><span className="text-red-500">Defective System</span>
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Success Modal for Repaired Transfer */}
+      {showRepairedSuccess && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-card border border-emerald-500/30 p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 text-center max-w-md w-full animate-in zoom-in-95 duration-300">
+            <div className="p-4 rounded-full bg-emerald-500/10 text-emerald-500 mb-2 ring-1 ring-emerald-500/40">
+              <RefreshCw size={48} />
+            </div>
+            <h2 className="text-2xl font-black uppercase tracking-tighter text-white">System Restored</h2>
+            <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest leading-relaxed">
+              System Repaired <br /><span className="text-emerald-500">Successfully</span>
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

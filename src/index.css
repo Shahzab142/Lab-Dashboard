@@ -1,97 +1,40 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&family=Outfit:wght@400;600;800&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-  :root {
-    --background: 222 47% 6%;
-    --foreground: 210 40% 98%;
 
-    --card: 222 47% 8%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222 47% 8%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 160 84% 39%;
-    --primary-foreground: 222 47% 6%;
-
-    --secondary: 222 30% 14%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 222 30% 14%;
-    --muted-foreground: 215 20% 55%;
-
-    --accent: 160 84% 39%;
-    --accent-foreground: 222 47% 6%;
-
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
-
-    --success: 160 84% 39%;
-    --success-foreground: 222 47% 6%;
-
-    --warning: 38 92% 50%;
-    --warning-foreground: 222 47% 6%;
-
-    --offline: 350 89% 60%;
-    --offline-foreground: 210 40% 98%;
-
-    --border: 222 30% 18%;
-    --input: 222 30% 18%;
-    --ring: 160 84% 39%;
-
-    --radius: 0.75rem;
-
-    --sidebar-background: 222 47% 5%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 160 84% 39%;
-    --sidebar-primary-foreground: 222 47% 6%;
-    --sidebar-accent: 222 30% 12%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 222 30% 15%;
-    --sidebar-ring: 160 84% 39%;
-  }
-
+  :root,
   .dark {
-    --background: 222 47% 6%;
-    --foreground: 210 40% 98%;
-
-    --card: 222 47% 8%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222 47% 8%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 160 84% 39%;
-    --primary-foreground: 222 47% 6%;
-
-    --secondary: 222 30% 14%;
+    --background: 237 41% 15%;
+    /* Deep Navy #171836 */
+    --foreground: 0 0% 98%;
+    --card: 237 41% 20%;
+    /* Navy Card #1E2048 */
+    --card-foreground: 0 0% 98%;
+    --popover: 237 41% 20%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 34 95% 55%;
+    /* Golden #f99a1d */
+    --primary-foreground: 0 0% 0%;
+    /* Black text for gold buttons */
+    --secondary: 204 98% 22%;
+    /* ITU Blue */
     --secondary-foreground: 210 40% 98%;
-
-    --muted: 222 30% 14%;
-    --muted-foreground: 215 20% 55%;
-
-    --accent: 160 84% 39%;
-    --accent-foreground: 222 47% 6%;
-
+    --accent: 34 95% 55%;
+    --accent-foreground: 0 0% 0%;
+    --muted: 237 41% 25%;
+    --muted-foreground: 215 16% 70%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
-
-    --border: 222 30% 18%;
-    --input: 222 30% 18%;
-    --ring: 160 84% 39%;
-
-    --sidebar-background: 222 47% 5%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 160 84% 39%;
-    --sidebar-primary-foreground: 222 47% 6%;
-    --sidebar-accent: 222 30% 12%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 222 30% 15%;
-    --sidebar-ring: 160 84% 39%;
+    --success: 142 71% 45%;
+    --success-foreground: 210 40% 98%;
+    --border: 237 41% 25%;
+    --input: 237 41% 25%;
+    --ring: 34 95% 55%;
+    --radius: 0.5rem;
   }
 }
 
@@ -101,8 +44,17 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans antialiased;
+    @apply bg-background text-foreground antialiased selection:bg-primary/20;
     font-family: 'Inter', sans-serif;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  .font-display {
+    @apply font-bold tracking-tight text-primary;
+    font-family: 'Outfit', 'Inter', sans-serif;
   }
 
   .font-mono {
@@ -112,29 +64,76 @@
 
 @layer utilities {
   .glass-card {
-    @apply bg-card/50 backdrop-blur-xl border border-border/50;
+    @apply bg-card/60 backdrop-blur-md border border-border/40 shadow-xl transition-all duration-300;
   }
 
-  .glow-success {
-    box-shadow: 0 0 20px hsl(160 84% 39% / 0.3);
+  .premium-border {
+    @apply border border-border hover:border-primary/30 transition-all duration-300;
   }
 
-  .glow-offline {
-    box-shadow: 0 0 20px hsl(350 89% 60% / 0.3);
+  .glow-blue {
+    box-shadow: 0 0 15px rgba(1, 65, 109, 0.1);
+  }
+
+  .glow-gold {
+    box-shadow: 0 0 15px rgba(197, 160, 89, 0.2);
+  }
+
+  .text-glow-gold {
+    text-shadow: 0 0 8px rgba(197, 160, 89, 0.3);
+  }
+
+  .text-glow-blue {
+    text-shadow: 0 0 8px rgba(1, 65, 109, 0.2);
   }
 }
 
-@keyframes pulse-online {
-  0%, 100% {
+@keyframes pulse-blue {
+
+  0%,
+  100% {
     opacity: 1;
     transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(0, 255, 255, 0.4);
   }
+
   50% {
-    opacity: 0.7;
-    transform: scale(1.1);
+    opacity: 0.8;
+    transform: scale(1.05);
+    box-shadow: 0 0 15px 5px rgba(0, 255, 255, 0.2);
   }
 }
 
-.animate-pulse-online {
-  animation: pulse-online 2s ease-in-out infinite;
+@keyframes wave-flow {
+  from {
+    transform: translateX(0%);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-wave-flow {
+  animation: wave-flow 3s linear infinite;
+}
+
+.cyber-grid {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-background;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/20 rounded-full hover:bg-primary/50 transition-colors;
 }

@@ -12,6 +12,8 @@ export function useLabPCs() {
         server_time: resp.server_time
       }));
     },
-    refetchInterval: 5000,
+    refetchInterval: 10000,
+    staleTime: 5000,
+    gcTime: 30000
   });
 }

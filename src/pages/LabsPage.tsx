@@ -2,12 +2,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiFetch } from '@/lib/api';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Monitor, ArrowRight, Building2, Search, MoreVertical, Edit2, Trash2 } from 'lucide-react';
+import { ArrowLeft, Building2, Search, MoreVertical, Edit2, Trash2, ArrowRight } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useState } from 'react';
-import { LineChart, Line, ResponsiveContainer, Tooltip } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { MiniWaveChart } from '@/components/dashboard/MiniWaveChart';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -23,18 +23,21 @@ export default function LabsPage() {
     const city = searchParams.get('city');
     const [searchTerm, setSearchTerm] = useState('');
 
-    const { data: labs = [], isLoading } = useQuery({
+    const { data: response, isLoading } = useQuery({
         queryKey: ['lab-stats', city],
         queryFn: () => apiFetch(`/stats/city/${city}/labs`),
         enabled: !!city,
-        refetchInterval: 10000
+        refetchInterval: 10000,
+        staleTime: 5000,
+        gcTime: 30000
     });
+
+    const labs = response?.labs || [];
 
     const handleRenameLab = async (e: React.MouseEvent, oldName: string) => {
         e.stopPropagation();
         const newName = prompt("Enter new name for lab:", oldName);
         if (!newName || newName === oldName) return;
-
         try {
             await apiFetch('/stats/lab/rename', {
                 method: 'PATCH',
@@ -49,153 +52,147 @@ export default function LabsPage() {
 
     const handleDeleteLab = async (e: React.MouseEvent, labName: string) => {
         e.stopPropagation();
-        if (!confirm(`Are you sure you want to delete ${labName}? This will remove all PCs in this lab.`)) return;
-
+        if (!confirm(`Are you sure you want to delete ${labName}?`)) return;
         try {
             await apiFetch(`/stats/lab/delete?city=${city}&lab=${labName}`, { method: 'DELETE' });
-            toast.success(`${labName} and its nodes deleted.`);
+            toast.success(`${labName} deleted.`);
             queryClient.invalidateQueries({ queryKey: ['lab-stats'] });
         } catch (err) {
             toast.error("Failed to delete lab");
         }
     };
 
-    const filteredLabs = labs.filter((lab: any) =>
-        lab.lab_name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredLabs = labs
+        .filter((lab: any) =>
+            lab.lab_name.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+        .sort((a: any, b: any) => (b.total_pcs || 0) - (a.total_pcs || 0)); // Highest capacity first
 
     return (
-        <div className="p-4 md:p-8 space-y-8 animate-in slide-in-from-right-4 duration-700">
-            <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-white/5">
-                <div>
-                    <div className="flex items-center gap-2 mb-2">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 px-2 text-primary hover:bg-primary/10"
-                            onClick={() => navigate('/dashboard/cities')}
-                        >
-                            <ArrowLeft className="w-4 h-4 mr-1" /> BACK TO CITIES
-                        </Button>
+        <div className="p-4 md:p-8 space-y-8 animate-in slide-in-from-right-4 duration-700 bg-background min-h-screen">
+            <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-border">
+                <div className="space-y-4">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-4 rounded-lg bg-card border border-border text-[9px] font-bold uppercase tracking-widest text-muted-foreground hover:text-primary hover:border-primary transition-all font-display"
+                        onClick={() => navigate('/dashboard/cities')}
+                    >
+                        <ArrowLeft className="w-3 h-3 mr-2" /> Back to Regions
+                    </Button>
+                    <div>
+                        <h1 className="text-3xl font-bold tracking-tight uppercase text-white font-display">
+                            {city?.toUpperCase()} <span className="text-white/80">SYSTEM</span>
+                        </h1>
+                        <p className="text-white font-bold mt-1 uppercase tracking-wider text-[10px]">
+                            Regional Lab Clusters & Facility Inventory
+                        </p>
                     </div>
-                    <h1 className="text-4xl font-black italic tracking-tighter uppercase text-white">
-                        <span className="text-primary">{city?.toUpperCase()}</span> LABS
-                    </h1>
-                    <p className="text-muted-foreground font-medium mt-1 uppercase tracking-widest text-[10px]">
-                        Internal Facility Monitoring & PC Availability
-                    </p>
                 </div>
 
                 <div className="flex flex-col md:flex-row items-center gap-4">
+                    <Button
+                        onClick={async () => {
+                            const toastId = toast.loading(`Synthesizing ${city} infrastructure audit...`);
+                            try {
+                                const { generateDynamicReport } = await import('@/lib/pdf-generator');
+                                await generateDynamicReport('CITY', { labs, city }, city!);
+                                toast.success("City Audit Generated", { id: toastId });
+                            } catch (e) {
+                                console.error(e);
+                                toast.error("Failed to generate audit", { id: toastId });
+                            }
+                        }}
+                        className="bg-white hover:bg-white/90 text-black gap-2 px-6 rounded-lg h-10 text-[10px] font-bold uppercase tracking-widest transition-all shadow-sm"
+                    >
+                        <Building2 size={16} className="text-black" />
+                        Generate City Audit
+                    </Button>
+
                     <div className="relative w-full md:w-80 group">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-all" />
                         <Input
-                            placeholder="SEARCH LABS..."
+                            placeholder="SEARCH FACILITIES..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-11 bg-black/40 border-white/5 focus:border-primary/50 text-[10px] font-bold uppercase tracking-widest h-11 rounded-xl"
+                            className="pl-12 bg-card border-border focus:ring-1 focus:ring-primary text-[10px] font-bold uppercase tracking-wider h-10 rounded-lg transition-all shadow-sm"
                         />
                     </div>
                 </div>
             </header>
 
             {isLoading ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-72 rounded-3xl" />)}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-64 rounded-2xl" />)}
                 </div>
             ) : filteredLabs.length === 0 ? (
-                <Card className="bg-white/5 border-dashed border-white/10 p-20 text-center">
-                    <Building2 className="w-16 h-16 text-muted-foreground mx-auto mb-6 opacity-30" />
-                    <h3 className="text-xl font-black italic text-white uppercase tracking-tighter">
-                        No Labs Found
-                    </h3>
-                    <p className="text-muted-foreground text-sm uppercase font-bold tracking-widest mt-2">
-                        No laboratories are registered in this city yet.
-                    </p>
-                </Card>
+                <div className="p-20 text-center bg-card border border-dashed border-border rounded-2xl shadow-sm">
+                    <Building2 className="w-16 h-16 text-muted-foreground mx-auto mb-6 opacity-20" />
+                    <h3 className="text-xl font-bold text-primary uppercase tracking-tight">No Access Points Detected</h3>
+                </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     {filteredLabs.map((lab: any) => {
-                        const graphData = [
-                            { name: 'Total PCs', val: lab.total_pcs },
-                            { name: 'Online', val: lab.online },
-                            { name: 'Offline', val: lab.offline },
-                        ];
+                        const total = lab.total_pcs || 0;
+                        const online = lab.online || 0;
+                        const onlinePercent = total > 0 ? (online / total) * 100 : 0;
+                        const intensity = Math.max(0.1, onlinePercent / 100);
 
                         return (
                             <Card
                                 key={lab.lab_name}
                                 onClick={() => navigate(`/dashboard/devices?city=${city}&lab=${lab.lab_name}`)}
-                                className="group relative overflow-hidden bg-black/40 border-white/5 backdrop-blur-3xl cursor-pointer hover:border-primary/50 transition-all hover:scale-[1.02]"
+                                className="group relative overflow-hidden bg-card cursor-pointer border border-border hover:border-primary/40 transition-all hover:translate-y-[-4px] shadow-sm hover:shadow-lg rounded-2xl min-h-[200px]"
                             >
-                                <CardContent className="p-8 space-y-6">
-                                    <div className="flex items-start justify-between relative">
-                                        <div className="flex items-center gap-4">
-                                            <div className="p-4 rounded-2xl bg-white/5 text-primary">
-                                                <Building2 size={24} />
+                                <CardContent className="p-6 flex flex-col justify-between h-full space-y-4">
+                                    {/* Name & Control */}
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="flex items-center gap-3 overflow-hidden">
+                                            <div className="p-2.5 rounded-lg bg-primary text-black shrink-0 shadow-sm">
+                                                <Building2 size={16} />
                                             </div>
-                                            <div>
-                                                <h2 className="text-2xl font-black italic tracking-tighter uppercase text-white group-hover:text-primary transition-colors">
-                                                    {lab.lab_name}
-                                                </h2>
-                                                <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Facility Environment</p>
-                                            </div>
+                                            <h2 className="text-lg font-bold tracking-tight uppercase text-white group-hover:text-white/80 transition-colors truncate">
+                                                {lab.lab_name}
+                                            </h2>
                                         </div>
 
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                                <button className="p-2 hover:bg-white/10 rounded-lg transition-colors text-muted-foreground hover:text-white">
-                                                    <MoreVertical size={20} />
+                                                <button className="p-1.5 hover:bg-muted rounded transition-colors text-muted-foreground/30 shrink-0">
+                                                    <MoreVertical size={16} />
                                                 </button>
                                             </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end" className="bg-black/90 border-white/10 backdrop-blur-xl">
-                                                <DropdownMenuItem onClick={(e) => handleRenameLab(e, lab.lab_name)} className="gap-2 text-white hover:bg-white/10 cursor-pointer">
-                                                    <Edit2 size={14} /> Rename Lab
+                                            <DropdownMenuContent align="end" className="bg-card border border-border rounded-lg p-1.5 shadow-xl">
+                                                <DropdownMenuItem onClick={(e) => handleRenameLab(e, lab.lab_name)} className="gap-2 text-[10px] font-bold uppercase p-2 rounded-md transition-colors">
+                                                    <Edit2 size={12} className="text-primary" /> Rename
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={(e) => handleDeleteLab(e, lab.lab_name)} className="gap-2 text-red-500 hover:bg-red-500/10 cursor-pointer">
-                                                    <Trash2 size={14} /> Delete Lab
+                                                <DropdownMenuItem onClick={(e) => handleDeleteLab(e, lab.lab_name)} className="gap-2 text-red-600 text-[10px] font-bold uppercase p-2 rounded-md transition-colors">
+                                                    <Trash2 size={12} /> Delete
                                                 </DropdownMenuItem>
                                             </DropdownMenuContent>
                                         </DropdownMenu>
                                     </div>
 
-                                    {/* PC Availability Graph */}
-                                    <div className="h-24 w-full relative">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <LineChart data={graphData}>
-                                                <Line
-                                                    type="monotone"
-                                                    dataKey="val"
-                                                    stroke="#22c55e"
-                                                    strokeWidth={3}
-                                                    dot={{ fill: '#22c55e', r: 4 }}
-                                                />
-                                                <Tooltip
-                                                    contentStyle={{ background: '#000', border: '1px solid #333', borderRadius: '8px', fontSize: '10px' }}
-                                                    itemStyle={{ color: '#22c55e' }}
-                                                />
-                                            </LineChart>
-                                        </ResponsiveContainer>
+                                    {/* Minimal Graph */}
+                                    <div className="flex justify-center flex-1 items-center opacity-40">
+                                        <MiniWaveChart
+                                            color="#01416D"
+                                            width={180}
+                                            height={40}
+                                            intensity={intensity}
+                                            showGrid={false}
+                                        />
                                     </div>
 
-                                    <div className="grid grid-cols-3 gap-2">
-                                        <div className="p-2 rounded-lg bg-white/5 border border-white/5 text-center">
-                                            <span className="block text-[8px] font-bold text-muted-foreground uppercase">Hosts</span>
-                                            <span className="text-sm font-black text-white">{lab.total_pcs}</span>
+                                    {/* Numeric Readouts */}
+                                    <div className="flex items-end justify-between border-t border-border pt-4">
+                                        <div className="flex items-baseline gap-1.5">
+                                            <span className="text-2xl font-bold text-white tracking-tight">{total}</span>
+                                            <span className="text-[9px] font-bold text-white/60 uppercase tracking-wider">Total Units</span>
                                         </div>
-                                        <div className="p-2 rounded-lg bg-success/5 border border-success/10 text-center">
-                                            <span className="block text-[8px] font-bold text-success uppercase">Active</span>
-                                            <span className="text-sm font-black text-success">{lab.online}</span>
-                                        </div>
-                                        <div className="p-2 rounded-lg bg-red-500/5 border border-red-500/10 text-center">
-                                            <span className="block text-[8px] font-bold text-red-500 uppercase">Idle</span>
-                                            <span className="text-sm font-black text-red-500">{lab.offline}</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="pt-4 border-t border-white/5 flex justify-end">
-                                        <div className="flex items-center gap-1 text-[10px] font-bold text-primary italic opacity-0 group-hover:opacity-100 transition-all transform translate-x-4 group-hover:translate-x-0">
-                                            ACCESS TERMINALS <ArrowRight size={12} />
+                                        <div className="flex items-baseline gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 shadow-sm">
+                                            <span className="text-xl font-bold text-emerald-400 tracking-tight">{online}</span>
+                                            <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider">Live</span>
                                         </div>
                                     </div>
                                 </CardContent>
