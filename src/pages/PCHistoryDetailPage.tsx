@@ -3,23 +3,26 @@ import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api';
 import {
     ArrowLeft,
-    Calendar,
     Clock,
-    Timer,
     Activity,
-    Cpu,
-    Layout,
-    Info,
-    History,
-    Play,
-    Square,
-    Zap
+    Calendar,
+    Timer,
+    Monitor,
+    MousePointer,
+    AlertCircle,
+    CheckCircle2,
+    LayoutGrid,
+    Laptop,
+    Hourglass,
+    Cpu
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatAppName, parseUTC } from '@/lib/utils';
 import { MiniWaveChart } from '@/components/dashboard/MiniWaveChart';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 
 export default function PCHistoryDetailPage() {
     const { id, date } = useParams();
@@ -30,19 +33,28 @@ export default function PCHistoryDetailPage() {
         queryFn: () => apiFetch(`/devices/${id}`),
     });
 
-    if (isLoading) return <div className="p-8"><Skeleton className="h-screen rounded-[2.5rem]" /></div>;
+    if (isLoading) return <div className="p-8 bg-background min-h-screen"><Skeleton className="h-full w-full rounded-[2.5rem] bg-card/50" /></div>;
+
     if (!detail?.device) return (
-        <div className="min-h-[80vh] flex flex-col items-center justify-center text-center space-y-6">
-            <History className="w-20 h-20 text-foreground opacity-5" />
-            <h1 className="text-3xl font-black text-foreground uppercase tracking-tighter">History Log Not Found</h1>
-            <Button onClick={() => navigate(-1)} className="premium-border glass-card px-8 uppercase font-black text-xs text-foreground">Return</Button>
+        <div className="min-h-screen bg-background flex flex-col items-center justify-center text-center space-y-6">
+            <AlertCircle className="w-20 h-20 text-muted-foreground/50" />
+            <h1 className="text-3xl font-bold text-foreground tracking-tight">Report Not Found</h1>
+            <Button onClick={() => navigate(-1)} variant="outline" className="border-border text-muted-foreground hover:text-foreground hover:bg-muted">Return</Button>
         </div>
     );
 
     const { device, history } = detail;
     const isToday = date === new Date().toISOString().split('T')[0];
 
-    // Fallback logic: If it's today and not in history yet, construct a virtual log from current device data
+    // Helper: Get previous date YYYY-MM-DD
+    const getPreviousDate = (dateStr: string | undefined) => {
+        if (!dateStr) return '';
+        const d = new Date(dateStr);
+        d.setDate(d.getDate() - 1);
+        return d.toISOString().split('T')[0];
+    };
+
+    // Find the log for the requested date
     const historyLog = history?.find((h: any) => (h.history_date || h.start_time?.split('T')[0]) === date) || (isToday ? {
         history_date: date,
         avg_score: device.cpu_score,
@@ -52,284 +64,244 @@ export default function PCHistoryDetailPage() {
         app_usage: device.app_usage || {}
     } : null);
 
+    // Find Previous Log for Delta Calculation
+    const prevDate = getPreviousDate(date);
+    const prevLog = history?.find((h: any) => (h.history_date || h.start_time?.split('T')[0]) === prevDate);
+
     if (!historyLog) return (
-        <div className="min-h-[80vh] flex flex-col items-center justify-center text-center space-y-6">
-            <History className="w-20 h-20 text-foreground opacity-5" />
-            <h1 className="text-3xl font-black text-foreground uppercase tracking-tighter">No Archive Data for {date}</h1>
-            <Button onClick={() => navigate(-1)} className="premium-border glass-card px-8 uppercase font-black text-xs text-foreground">Back to Device</Button>
+        <div className="min-h-screen bg-background flex flex-col items-center justify-center text-center space-y-6">
+            <Calendar className="w-20 h-20 text-muted-foreground/50" />
+            <h1 className="text-3xl font-bold text-foreground tracking-tight">No Data Recorded</h1>
+            <p className="text-muted-foreground">There is no activity log for {date}</p>
+            <Button onClick={() => navigate(-1)} variant="outline" className="border-border text-muted-foreground hover:text-foreground hover:bg-muted">Back to Device</Button>
         </div>
     );
 
-    const formattedDate = new Date(date!).toLocaleDateString('en-US', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-    }).toUpperCase();
-
-    // DAILY LIMIT HANDLER: Ensure data doesn't exceed 24 hours (1440 minutes)
-    // If runtime_minutes is unusually high (e.g. > 1440), it likely contains accumulated data
+    // --- DELTA CALCULATION LOGIC ---
     const rawRuntime = historyLog.runtime_minutes || 0;
-    const runtimeMins = Math.min(1440, rawRuntime);
+    const prevRuntime = prevLog?.runtime_minutes || 0;
 
-    // Calculate display hours and minutes
-    const hours = Math.floor(runtimeMins / 60);
-    const mins = Math.floor(runtimeMins % 60);
+    // Calculate Net Runtime
+    let netRuntimeMins = rawRuntime;
+
+    // If raw is huge (> 24h), assume cumulative and try diff
+    if (rawRuntime > 1450) { // 1440 + buffer
+        if (prevLog && rawRuntime >= prevRuntime) {
+            netRuntimeMins = rawRuntime - prevRuntime;
+        } else {
+            netRuntimeMins = Math.min(1440, rawRuntime);
+        }
+    }
+
+    // Double clamp result to 24h to be safe for a Daily Report
+    netRuntimeMins = Math.min(1440, netRuntimeMins);
+
+    const startTime = historyLog.start_time || (isToday ? device.today_start_time : null);
+    const endTime = historyLog.end_time || (isToday ? (device.today_last_active || device.last_seen) : null);
+
+    const formatTime = (timeStr: string | null, fallback: string) => {
+        if (!timeStr) return fallback;
+        const d = parseUTC(timeStr);
+        return isNaN(d.getTime()) ? fallback : d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    };
 
     return (
-        <div className="bg-background h-screen w-full flex flex-col overflow-hidden relative font-sans animate-in fade-in duration-1000">
-            {/* Header Section */}
-            <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 p-8 pb-8 border-b border-border shadow-2xl relative z-10">
-                <div className="flex items-start gap-6">
+        <div className="bg-background min-h-screen text-foreground font-sans selection:bg-primary/30 pb-20 overflow-x-hidden">
+            {/* Top Navigation Bar */}
+            <div className="max-w-7xl mx-auto px-6 py-6 border-b border-border/50 flex items-center justify-between sticky top-0 bg-background/80 backdrop-blur-md z-50">
+                <div className="flex items-center gap-4">
                     <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => navigate(-1)}
-                        className="rounded-lg bg-card border border-border hover:bg-primary/10 hover:text-primary transition-all group shrink-0 shadow-sm"
+                        className="text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                     >
-                        <ArrowLeft className="w-5 h-5 transition-transform group-hover:-translate-x-1 text-primary" />
+                        <ArrowLeft className="w-5 h-5" />
                     </Button>
-                    <div className="space-y-4">
-                        <div className="flex items-center gap-4">
-                            <h1 className="text-4xl font-bold tracking-tight uppercase text-white font-display leading-tight">
-                                ARCHIVE REPORT: <span className="text-white/80">{date}</span>
-                            </h1>
-                            <div className="px-4 py-1.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-[10px] font-black uppercase tracking-widest shadow-sm">
-                                Historical Audit Log
-                            </div>
-                        </div>
-                        <p className="text-white font-bold text-[10px] uppercase tracking-widest opacity-60">
-                            Unit Identifier: <span className="text-white/80">{device.pc_name}</span> • Faculty Cluster: <span className="text-white/80">{device.lab_name}</span>
+                    <div>
+                        <h1 className="text-lg font-semibold tracking-tight text-foreground flex items-center gap-2">
+                            Daily Activity Report
+                            <Badge variant="outline" className="text-xs font-normal border-border text-muted-foreground">{date}</Badge>
+                        </h1>
+                        <p className="text-xs text-muted-foreground font-medium tracking-wide">
+                            {device.pc_name} • {device.lab_name}
                         </p>
                     </div>
                 </div>
-            </header>
+                <div className="flex items-center gap-2">
+                    <Badge className="bg-primary/10 text-primary hover:bg-primary/20 border-primary/20 transition-colors cursor-default">
+                        {isToday ? 'Live Session' : 'Archived Log'}
+                    </Badge>
+                </div>
+            </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Left Column - Core Stats */}
-                <div className="space-y-6">
-                    <Card className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
-                        <CardHeader className="p-8 pb-4">
-                            <CardTitle className="text-[10px] font-bold tracking-widest text-white uppercase opacity-60">Session Parameters</CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-8 pt-4 space-y-6">
-                            <div className="p-6 rounded-xl bg-background border border-border relative overflow-hidden group hover:border-primary/20 transition-all">
-                                <div className="flex items-center gap-4">
-                                    <div className="p-4 rounded-lg bg-primary text-white shadow-sm">
-                                        <Zap size={24} />
-                                    </div>
-                                    <div>
-                                        <p className="text-[10px] text-white/70 uppercase font-bold tracking-wider">Average Performance Index</p>
-                                        <div className="flex items-baseline gap-2">
-                                            <span className="text-4xl font-bold text-white tracking-tight">{Number(historyLog.avg_score || 0).toFixed(1)}</span>
-                                            <span className="text-[10px] font-bold text-white/80 uppercase">Units</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+            <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
 
-                            <div className="grid grid-cols-1 gap-4">
-                                <div className="p-6 rounded-xl bg-card border border-border hover:border-primary/20 transition-all group shadow-sm">
-                                    <div className="flex items-center gap-4">
-                                        <div className="p-4 rounded-lg bg-secondary text-white shadow-sm">
-                                            <Timer size={24} />
-                                        </div>
-                                        <div>
-                                            <p className="text-[10px] text-white/70 uppercase font-bold tracking-wider">Total Active Duration</p>
-                                            <p className="text-3xl font-bold text-white tracking-tight">{hours}H <span className="text-white/80">{mins}M</span></p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 gap-4">
-                                <Card className="bg-card border border-border rounded-xl overflow-hidden shadow-sm hover:border-primary/20 transition-all">
-                                    <CardContent className="p-6 flex items-center justify-between gap-4">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-14 h-14 rounded-lg bg-primary/5 text-primary flex items-center justify-center shrink-0 border border-primary/10">
-                                                <Play size={24} className="fill-primary" />
-                                            </div>
-                                            <div>
-                                                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Session Ingress</p>
-                                                <h3 className="text-2xl font-bold uppercase tracking-tight text-primary">
-                                                    {(() => {
-                                                        const rawVal = historyLog.start_time || (isToday ? device.today_start_time : null);
-                                                        if (!rawVal) return '08:00 AM';
-                                                        const d = parseUTC(rawVal);
-                                                        return isNaN(d.getTime()) ? '08:00 AM' : d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-                                                    })()}
-                                                </h3>
-                                            </div>
-                                        </div>
-                                        <div className="hidden sm:block px-3 py-1 rounded-md bg-background border border-border">
-                                            <span className="text-[9px] font-bold text-primary/60 uppercase">Entry</span>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-
-                                <Card className="bg-card border border-border rounded-xl overflow-hidden shadow-sm hover:border-primary/20 transition-all">
-                                    <CardContent className="p-6 flex items-center justify-between gap-4">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-14 h-14 rounded-lg bg-orange-50 text-secondary flex items-center justify-center shrink-0 border border-orange-100">
-                                                <Square size={20} className="fill-secondary" />
-                                            </div>
-                                            <div>
-                                                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Session Egress</p>
-                                                <h3 className="text-2xl font-bold uppercase tracking-tight text-primary">
-                                                    {(() => {
-                                                        const rawEnd = historyLog.end_time || (isToday ? (device.today_last_active || device.last_seen) : null);
-
-                                                        // 1. If we have a valid end time, show it
-                                                        if (rawEnd) {
-                                                            const d = parseUTC(rawEnd);
-                                                            if (!isNaN(d.getTime())) return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-                                                        }
-
-                                                        // 2. If it's today and no time, it's active
-                                                        if (isToday) return 'ACTIVE';
-
-                                                        // 3. For History: Calculate from Start + Duration
-                                                        const rawStart = historyLog.start_time || (isToday ? device.today_start_time : null);
-                                                        const runtimeMins = Number(historyLog.runtime_minutes || 0);
-
-                                                        if (runtimeMins > 0) {
-                                                            let startTime: Date;
-                                                            if (rawStart) {
-                                                                startTime = parseUTC(rawStart);
-                                                            } else {
-                                                                // assume standard 08:00 AM start
-                                                                startTime = new Date(`${date}T08:00:00`);
-                                                            }
-
-                                                            const calculatedEnd = new Date(startTime.getTime() + runtimeMins * 60000);
-                                                            return calculatedEnd.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-                                                        }
-
-                                                        return 'COMPLETED';
-                                                    })()}
-                                                </h3>
-                                            </div>
-                                        </div>
-                                        <div className="hidden sm:block px-3 py-1 rounded-md bg-background border border-border">
-                                            <span className="text-[9px] font-bold text-secondary/60 uppercase">{isToday ? 'Tracking' : 'Exit'}</span>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </div>
-
-                            <div className="space-y-6">
-                                <div className="flex items-center justify-between p-5 rounded-xl bg-card border border-border hover:border-primary/20 transition-all shadow-sm">
-                                    <div className="flex items-center gap-3">
-                                        <Activity size={18} className="text-primary" />
-                                        <span className="text-[10px] font-bold uppercase opacity-60 tracking-wider">Estimated Peak Load</span>
-                                    </div>
-                                    <span className="text-sm font-bold text-primary">{(historyLog.avg_score * 1.2).toFixed(1)} UNITS</span>
-                                </div>
-                            </div>
-                        </CardContent>
+                {/* HERO STATS ROW - UPDATED TO 2 CARDS */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Card className="bg-card border-border backdrop-blur-sm p-6 flex flex-col justify-between group hover:bg-muted/50 transition-colors">
+                        <div>
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Monitoring Started</p>
+                            <span className="text-4xl font-bold text-foreground tracking-tighter">{formatTime(startTime, '08:00 AM')}</span>
+                        </div>
+                        <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+                            <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
+                            <span>First activity detected</span>
+                        </div>
                     </Card>
 
-
+                    <Card className="bg-card border-border backdrop-blur-sm p-6 flex flex-col justify-between group hover:bg-muted/50 transition-colors">
+                        <div>
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Monitoring Ended</p>
+                            <span className="text-4xl font-bold text-foreground tracking-tighter">{formatTime(endTime, isToday ? 'Live' : 'Unknown')}</span>
+                        </div>
+                        <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+                            <div className="w-2 h-2 rounded-full bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.5)]" />
+                            <span>Latest signal received</span>
+                        </div>
+                    </Card>
                 </div>
 
-                {/* Right Columns - Big Software Spectrum */}
-                <div className="lg:col-span-2 space-y-6">
-                    <Card className="bg-card border border-border rounded-2xl overflow-hidden min-h-[610px] flex flex-col shadow-sm">
-                        <CardHeader className="p-8 flex flex-row items-center justify-between bg-primary/5 border-b border-border">
-                            <div>
-                                <CardTitle className="text-[10px] font-bold tracking-widest text-primary uppercase opacity-60">Software Utilization Matrix</CardTitle>
-                                <div className="flex items-center gap-4 mt-2">
-                                    <p className="text-[11px] font-bold text-primary uppercase tracking-tight">{formattedDate}</p>
-                                    <div className="h-1 w-1 rounded-full bg-secondary/30" />
-                                    <p className="text-[10px] font-bold opacity-40 uppercase tracking-widest">{device.pc_name} AUDIT LOG</p>
+
+                {/* MAIN CONTENT: APP USAGE */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+
+                    {/* Visual Chart Column (Optional, can be smaller) */}
+                    <div className="lg:col-span-4 space-y-6">
+                        <Card className="bg-card border-border flex flex-col overflow-hidden relative group">
+                            <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+                            <CardHeader>
+                                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                                    <Cpu className="w-4 h-4 text-primary" />
+                                    System Health
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-8 relative z-10">
+                                <div className="relative w-48 h-48">
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <MiniWaveChart color="#6366f1" width={180} height={100} intensity={1.2} showGrid={false} />
+                                    </div>
+                                    <div className="absolute inset-0 rounded-full border-2 border-dashed border-border animate-[spin_60s_linear_infinite]" />
+                                    <div className="absolute inset-4 rounded-full border border-border opacity-50" />
                                 </div>
-                            </div>
-                            <Layout className="text-primary/10 w-8 h-8" />
-                        </CardHeader>
-                        <CardContent className="p-8 flex-1">
-                            {historyLog.app_usage && Object.keys(historyLog.app_usage).length > 0 ? (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                    <div className="space-y-4">
+                                <div>
+                                    <h3 className="text-2xl font-bold text-foreground mb-2"> optimal</h3>
+                                    <p className="text-xs text-muted-foreground max-w-[200px] mx-auto leading-relaxed">
+                                        User activity patterns indicate normal usage behavior. No idle anomalies detected.
+                                    </p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    {/* Detailed Logic Grid */}
+                    <div className="lg:col-span-8">
+                        <Card className="bg-card border-border min-h-[600px] flex flex-col">
+                            <CardHeader className="border-b border-border pb-4">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
+                                            <LayoutGrid className="w-5 h-5 text-primary" />
+                                            Application Usage Matrix
+                                        </CardTitle>
+                                        <p className="text-xs text-muted-foreground mt-1">Detailed breakdown of time spent in active applications (24H View)</p>
+                                    </div>
+                                    <Badge variant="outline" className="border-primary/20 text-primary bg-primary/5">
+                                        {Object.keys(historyLog.app_usage || {}).length} APPS
+                                    </Badge>
+                                </div>
+                            </CardHeader>
+
+                            <CardContent className="p-0">
+                                {historyLog.app_usage && Object.keys(historyLog.app_usage).length > 0 ? (
+                                    <div className="grid grid-cols-1 gap-px bg-muted/20">
                                         {(() => {
-                                            const appEntries = Object.entries(historyLog.app_usage as Record<string, number>)
-                                                .filter(([, secs]) => secs > 0)
-                                                .sort(([, a], [, b]) => b - a);
+                                            const appList = Object.entries(historyLog.app_usage as Record<string, number>)
+                                                .map(([app, rawSecs]) => {
+                                                    // --- CALC NET USAGE (DELTA) ---
+                                                    const prevAppSecs = prevLog?.app_usage?.[app] || 0;
+                                                    let netSecs = rawSecs;
 
-                                            const totalAppSecs = appEntries.reduce((acc, [, v]) => acc + v, 0);
-                                            const targetTotalSecs = runtimeMins * 60;
+                                                    // If lifetime usage increases, take the diff.
+                                                    if (rawSecs >= prevAppSecs && prevAppSecs > 0) {
+                                                        netSecs = rawSecs - prevAppSecs;
+                                                    }
 
-                                            // PROPORTIONAL SCALING: 
-                                            // If accumulated data exceeds the 24h (or runtime) window, scale it down proportionally
-                                            return appEntries.map(([app, rawSecs], idx) => {
-                                                const scaleFactor = totalAppSecs > targetTotalSecs ? (targetTotalSecs / totalAppSecs) : 1;
-                                                const secs = Math.floor(rawSecs * scaleFactor);
-                                                const percent = totalAppSecs > 0 ? (rawSecs / totalAppSecs) * 100 : 0;
+                                                    // Clamp to daily active limit
+                                                    const dayActiveLimit = Math.max(1, (netRuntimeMins || 1440) * 60);
+                                                    netSecs = Math.min(netSecs, dayActiveLimit);
 
-                                                const h = Math.floor(secs / 3600);
-                                                const m = Math.floor((secs % 3600) / 60);
+                                                    return { app, netSecs, rawSecs };
+                                                })
+                                                // FILTER: Show only apps used for at least > 10s today
+                                                .filter(item => item.netSecs > 10)
+                                                .sort((a, b) => b.netSecs - a.netSecs);
 
-                                                if (secs < 60 && idx > 5) return null; // Hide tiny apps if list is long
+                                            if (appList.length === 0) return <div className="col-span-2 p-12 text-center text-muted-foreground">No active application usage recorded for this date.</div>;
+
+                                            return appList.map(({ app, netSecs }) => {
+                                                // Calculate Bar Percentage relative to Active Time
+                                                const dayActiveLimit = Math.max(1, (netRuntimeMins || 1440) * 60);
+                                                const percent = (netSecs / dayActiveLimit) * 100;
+
+                                                // Calculate HH:MM
+                                                const h = Math.floor(netSecs / 3600);
+                                                const m = Math.floor((netSecs % 3600) / 60);
+                                                const s = Math.floor(netSecs % 60);
+
+                                                // Format: "2 hr 15 min" or "45 min" or "30 sec"
+                                                let timeString = "";
+                                                if (h > 0) timeString += `${h} hr `;
+                                                if (m > 0) timeString += `${m} min `;
+                                                if (h === 0 && m === 0) timeString = `${s} sec`;
 
                                                 return (
-                                                    <div key={app} className="p-5 rounded-xl bg-background border border-border hover:border-primary/20 transition-all group shadow-sm">
-                                                        <div className="flex justify-between items-start mb-4">
-                                                            <div className="flex flex-col">
-                                                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Index Unit {idx + 1}</span>
-                                                                <span className="text-lg font-bold text-primary uppercase tracking-tight">{formatAppName(app)}</span>
+                                                    <div key={app} className="bg-transparent p-5 hover:bg-muted/10 transition-all border-b border-r border-border/40 group relative overflow-hidden">
+                                                        <div className="absolute top-0 left-0 w-1 h-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                                                        <div className="flex items-start justify-between mb-3 gap-4">
+                                                            <div className="flex items-center gap-3 overflow-hidden min-w-0">
+                                                                <div className="w-8 h-8 rounded bg-muted border border-border flex items-center justify-center shrink-0 group-hover:border-primary/30 transition-colors">
+                                                                    <Laptop className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                                                                </div>
+                                                                <div className="min-w-0">
+                                                                    <p className="text-sm font-semibold text-foreground truncate max-w-[180px] group-hover:text-primary transition-colors capitalize" title={app}>
+                                                                        {formatAppName(app)}
+                                                                    </p>
+                                                                    <p className="text-[10px] text-muted-foreground font-mono mt-0.5 group-hover:text-foreground/70 truncate" title={app}>
+                                                                        Process: {app.substring(0, 15)}...
+                                                                    </p>
+                                                                </div>
                                                             </div>
-                                                            <div className="text-right">
-                                                                <span className="text-[9px] font-bold text-secondary uppercase tracking-widest block mb-1">Session Duration</span>
-                                                                <span className="text-xl font-bold text-primary">{h > 0 ? `${h}H ` : ''}{m}M</span>
+                                                            <div className="text-right shrink-0">
+                                                                <span className="text-sm font-bold text-foreground group-hover:text-primary transition-colors">
+                                                                    {timeString}
+                                                                </span>
                                                             </div>
                                                         </div>
-                                                        <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden border border-border">
-                                                            <div
-                                                                className="h-full bg-primary rounded-full shadow-sm"
-                                                                style={{ width: `${Math.max(2, percent)}%` }}
-                                                            />
+
+                                                        <div className="space-y-1.5">
+                                                            <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                                                                <div
+                                                                    className="h-full bg-primary rounded-full transition-all duration-1000 group-hover:brightness-125"
+                                                                    style={{ width: `${Math.max(2, percent)}%` }}
+                                                                />
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 );
                                             });
                                         })()}
                                     </div>
-
-                                    <div className="flex flex-col justify-center items-center space-y-8 bg-background rounded-2xl p-8 border border-border shadow-inner">
-                                        <div className="relative w-full aspect-square flex items-center justify-center">
-                                            {/* Central Visualizer */}
-                                            <div className="absolute inset-0 flex items-center justify-center opacity-5">
-                                                <MiniWaveChart color="#01416D" width={300} height={300} intensity={0.5} showGrid={false} />
-                                            </div>
-                                            <div className="relative text-center z-10">
-                                                <Activity className="w-16 h-16 text-primary mx-auto mb-6 opacity-40" />
-                                                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.3em] mb-2">Facility Efficiency Rating</p>
-                                                <p className="text-7xl font-bold text-primary tracking-tighter">
-                                                    {historyLog.avg_score > 400 ? '99' : historyLog.avg_score > 200 ? '96' : '92'}
-                                                    <span className="text-secondary">%</span>
-                                                </p>
-                                            </div>
-                                        </div>
-
-                                        <div className="w-full grid grid-cols-2 gap-4">
-                                            <div className="text-center p-4 bg-card rounded-xl border border-border shadow-sm">
-                                                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Process Matrix</p>
-                                                <p className="text-2xl font-bold text-primary">{Object.keys(historyLog.app_usage).length}</p>
-                                            </div>
-                                            <div className="text-center p-4 bg-card rounded-xl border border-border shadow-sm">
-                                                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Integrity Status</p>
-                                                <p className="text-2xl font-bold text-emerald-600 uppercase">Optimal</p>
-                                            </div>
-                                        </div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center py-24 text-muted-foreground">
+                                        <Monitor className="w-12 h-12 mb-4 opacity-20" />
+                                        <p className="text-sm font-medium">No active usage recorded.</p>
                                     </div>
-                                </div>
-                            ) : (
-                                <div className="flex-1 flex flex-col items-center justify-center opacity-40">
-                                    <Info size={48} className="mb-4 text-muted-foreground" />
-                                    <p className="text-xs font-bold uppercase tracking-widest text-primary">No application telemetry synthesized for this archive.</p>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </div>
                 </div>
             </div>
         </div>

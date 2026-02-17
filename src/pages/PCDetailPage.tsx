@@ -11,7 +11,6 @@ import {
   Cpu,
   MapPin,
   Beaker,
-  Clock,
   Calendar,
   Sunrise,
   Timer,
@@ -21,10 +20,6 @@ import {
   Trash2,
   Power,
   PowerOff,
-  Layout,
-  Info,
-  History,
-  Sunset,
   RefreshCw,
   School
 } from 'lucide-react';
@@ -38,8 +33,8 @@ import { toast } from 'sonner';
 import { cn, formatAppName } from '@/lib/utils';
 
 /**
- * PC DETAIL PAGE - VERSION 2.1 (RECOVERY FOCUS)
- * Optimized to prevent UI locks and handle state transitions gracefully.
+ * PC DETAIL PAGE - VERSION 3.0 (FULL PAGE NAVIGATION)
+ * Optimized to navigate to a dedicated history page instead of using modals.
  */
 export default function PCDetailPage() {
   const { id } = useParams();
@@ -47,7 +42,7 @@ export default function PCDetailPage() {
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({ pc_name: '', city: '', lab_name: '' });
-  const [selectedHistory, setSelectedHistory] = useState<any>(null);
+  // selectedHistory state removed as we now navigate to a full page
   const [isLocallyDefective, setIsLocallyDefective] = useState(false);
   const [showDefectiveSuccess, setShowDefectiveSuccess] = useState(false);
   const [showRepairedSuccess, setShowRepairedSuccess] = useState(false);
@@ -223,6 +218,11 @@ export default function PCDetailPage() {
       lastSeenDate &&
       (referenceTime.getTime() - lastSeenDate.getTime() < 60 * 1000);
   })();
+
+  const handleHistoryClick = (dateStr: string) => {
+    // Navigate to the full history detail page
+    navigate(`/dashboard/pc/${id}/history/${dateStr}`);
+  };
 
   return (
     <div className="relative p-4 md:p-8 space-y-8 bg-background min-h-screen text-white overflow-y-auto selection:bg-primary/30">
@@ -482,10 +482,14 @@ export default function PCDetailPage() {
               {device.app_usage && Object.keys(device.app_usage).length > 0 ? (
                 <div className="space-y-4 max-h-[350px] overflow-y-auto pr-3 custom-scrollbar">
                   {(() => {
+                    const runtimeMins = device.runtime_minutes || 1; // Avoid div by zero
+                    const maxSessionSecs = runtimeMins * 60;
                     const items = Object.entries(device.app_usage as Record<string, number>).sort(([, a], [, b]) => b - a);
-                    const totalS = Object.values(device.app_usage as Record<string, number>).reduce((acc, v) => acc + v, 0);
-                    return items.slice(0, 15).map(([app, secs]) => {
-                      const percent = Math.max(5, (secs / totalS) * 100);
+
+                    return items.slice(0, 15).map(([app, rawSecs]) => {
+                      const secs = Math.min(rawSecs, maxSessionSecs);
+                      const percent = maxSessionSecs > 0 ? (secs / maxSessionSecs) * 100 : 0;
+
                       const h = Math.floor(secs / 3600);
                       const m = Math.floor((secs % 3600) / 60);
                       return (
@@ -495,7 +499,7 @@ export default function PCDetailPage() {
                             <span className="text-[9px] font-bold text-primary">{h > 0 ? `${h}h ` : ''}{m}m</span>
                           </div>
                           <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
-                            <div className="h-full bg-primary rounded-full transition-all duration-1000" style={{ width: `${percent}%` }} />
+                            <div className="h-full bg-primary rounded-full transition-all duration-1000" style={{ width: `${Math.max(2, percent)}%` }} />
                           </div>
                         </div>
                       );
@@ -550,7 +554,7 @@ export default function PCDetailPage() {
               </div>
               <Calendar className="text-primary opacity-20 w-5 h-5" />
             </CardHeader>
-            <CardContent className="p-8">
+            <CardContent className="p-8 pb-4">
               {history && history.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
@@ -561,10 +565,40 @@ export default function PCDetailPage() {
                       </tr>
                     </thead>
                     <tbody>
+                      {/* INJECT TODAY'S LIVE SESSION - ONLY IF NOT ALREADY IN HISTORY */}
+                      {(() => {
+                        const today = new Date().toISOString().split('T')[0];
+                        const historyHasToday = history.length > 0 && (history[0].history_date === today || history[0].start_time?.startsWith(today));
+
+                        if (!historyHasToday) {
+                          return (
+                            <tr
+                              onClick={() => handleHistoryClick(today)}
+                              className="text-xs group hover:bg-muted/50 transition-all cursor-pointer bg-primary/5"
+                            >
+                              <td className="px-6 py-5 border-b border-border/50">
+                                <div className="flex flex-col">
+                                  <span className="font-bold text-primary uppercase tracking-tight text-sm">TODAY (LIVE)</span>
+                                  <span className="text-[8px] font-bold text-emerald-500 uppercase mt-0.5 animate-pulse">Active Session</span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-5 border-b border-border/50 text-right">
+                                <div className="flex flex-col items-end">
+                                  <span className="text-lg font-bold text-primary">{Number(device.cpu_score || 0).toFixed(0)}</span>
+                                  <span className="text-[7px] font-bold text-secondary uppercase tracking-widest">CPU CURRENT</span>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        }
+                        return null;
+                      })()}
+
                       {history.slice(0, 10).map((h: any) => {
                         const dateObj = h.history_date ? new Date(h.history_date) : new Date(h.start_time);
+                        const dateArg = h.history_date || h.start_time?.split('T')[0];
                         return (
-                          <tr key={h.id || h.history_date} onClick={() => setSelectedHistory(h)} className="text-xs group hover:bg-muted/50 transition-all cursor-pointer">
+                          <tr key={h.id || h.history_date} onClick={() => handleHistoryClick(dateArg)} className="text-xs group hover:bg-muted/50 transition-all cursor-pointer">
                             <td className="px-6 py-5 border-b border-border/50">
                               <div className="flex flex-col">
                                 <span className="font-bold text-primary uppercase tracking-tight text-sm">{dateObj.toLocaleDateString('en-US', { month: 'short', day: '2-digit' }).toUpperCase()}</span>
@@ -573,8 +607,8 @@ export default function PCDetailPage() {
                             </td>
                             <td className="px-6 py-5 border-b border-border/50 text-right">
                               <div className="flex flex-col items-end">
-                                <span className="text-lg font-bold text-primary">{h.avg_score || 0}%</span>
-                                <span className="text-[7px] font-bold text-secondary uppercase tracking-widest">CPU INDEX</span>
+                                <span className="text-lg font-bold text-primary">{Number(h.avg_score || 0).toFixed(0)}</span>
+                                <span className="text-[7px] font-bold text-secondary uppercase tracking-widest">CPU MEAN</span>
                               </div>
                             </td>
                           </tr>
@@ -593,67 +627,6 @@ export default function PCDetailPage() {
           </Card>
         </div>
       </div>
-
-      {/* History Detail Modal (Custom fixed implementation) */}
-      {selectedHistory && (
-        <div className="fixed inset-0 z-[9990] flex items-center justify-center p-4 bg-background/95 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-card border border-border text-primary rounded-[2rem] max-w-2xl w-full p-0 overflow-hidden shadow-2xl relative">
-            <div className="h-1 bg-primary w-full" />
-            <button onClick={() => setSelectedHistory(null)} className="absolute top-6 right-6 p-2 rounded-xl bg-muted/50 text-white/50 hover:text-white hover:bg-muted transition-all"><X size={20} /></button>
-            <div className="p-8 pb-4">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="p-3 rounded-lg bg-primary text-black shadow-sm"><History size={24} /></div>
-                <h2 className="text-2xl font-black tracking-tight uppercase text-white">Session Audit</h2>
-              </div>
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">DATE: {new Date(selectedHistory.history_date || selectedHistory.start_time).toLocaleDateString('en-US', { month: 'long', day: '2-digit', year: 'numeric' }).toUpperCase()}</p>
-            </div>
-            <div className="p-8 pt-2 space-y-8 scroll-bar max-h-[60vh] overflow-y-auto">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-5 rounded-xl bg-muted border border-border">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1 text-primary/60">Average Consumption</p>
-                  <p className="text-3xl font-black text-primary italic">{selectedHistory?.avg_score || 0}% <span className="text-[10px] uppercase not-italic opacity-60">Avg Load</span></p>
-                </div>
-                <div className="p-5 rounded-xl bg-primary text-black shadow-md">
-                  <p className="text-[10px] font-bold text-black/60 uppercase tracking-widest mb-1">Operational Duty</p>
-                  <p className="text-3xl font-black text-black italic">{selectedHistory?.runtime_minutes ? `${Math.floor(selectedHistory.runtime_minutes / 60)}H ${selectedHistory.runtime_minutes % 60}M` : '00H 00M'}</p>
-                </div>
-              </div>
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 px-1"><Info size={14} className="text-primary" /><span className="text-[10px] font-bold uppercase tracking-widest text-primary">Software Distribution Matrix</span></div>
-                <div className="space-y-4 bg-muted border border-border rounded-xl p-6 shadow-sm">
-                  {selectedHistory?.app_usage && Object.keys(selectedHistory.app_usage).length > 0 ? (
-                    (() => {
-                      const items = Object.entries(selectedHistory.app_usage as Record<string, number>).sort(([, a], [, b]) => b - a);
-                      const totalS = Object.values(selectedHistory.app_usage as Record<string, number>).reduce((acc, v) => acc + v, 0);
-                      return items.map(([app, secs]) => {
-                        const percent = Math.max(5, (secs / totalS) * 100);
-                        const h = Math.floor(secs / 3600);
-                        const m = Math.floor((secs % 3600) / 60);
-                        return (
-                          <div key={app} className="space-y-2">
-                            <div className="flex justify-between items-end px-1">
-                              <span className="text-xs font-bold text-white uppercase tracking-tight truncate max-w-[350px]">{formatAppName(app)}</span>
-                              <span className="text-[10px] font-bold text-primary">{h > 0 ? `${h}H ` : ''}{m}M</span>
-                            </div>
-                            <div className="h-1.5 w-full bg-card rounded-full overflow-hidden border border-border">
-                              <div className="h-full bg-primary rounded-full" style={{ width: `${percent}%` }} />
-                            </div>
-                          </div>
-                        );
-                      });
-                    })()
-                  ) : (
-                    <p className="text-center py-8 text-muted-foreground text-[10px] font-bold uppercase tracking-widest italic opacity-40">No telemetry available</p>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="p-8 flex justify-end">
-              <Button onClick={() => setSelectedHistory(null)} className="bg-primary hover:bg-primary/90 text-black border border-border rounded-xl px-10 h-11 font-black text-[10px] uppercase tracking-widest transition-all shadow-xl shadow-primary/10">Close Audit Archive</Button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Manual Recovery Button (Always at bottom left for emergencies) */}
       <button
