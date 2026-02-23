@@ -30,11 +30,16 @@ export default function LocationsPage() {
         gcTime: 30000
     });
 
+<<<<<<< HEAD
     const tehsils = Array.isArray(response?.tehsils) ? response.tehsils : [];
 
     // DEBUG: Log the fetched data for verification
     console.log("Tehsil Data Fetched:", tehsils);
 
+=======
+    const tehsils = response?.tehsils || [];
+
+>>>>>>> 493bd2413f20752b10e6c3711c7586c04ce205a9
     const handleRenameTehsil = async (e: React.MouseEvent, oldName: string, cityName: string) => {
         e.stopPropagation();
         const newName = prompt("Enter new name for tehsil:", oldName);
@@ -53,12 +58,17 @@ export default function LocationsPage() {
 
     const filteredTehsils = tehsils
         .filter((t: any) => {
+<<<<<<< HEAD
             const tName = (t?.tehsil || '').toLowerCase();
             const cName = (t?.city || '').toLowerCase();
             const sTerm = searchTerm.toLowerCase();
 
             const matchesSearch = tName.includes(sTerm) || cName.includes(sTerm);
 
+=======
+            const matchesSearch = t.tehsil.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                t.city.toLowerCase().includes(searchTerm.toLowerCase());
+>>>>>>> 493bd2413f20752b10e6c3711c7586c04ce205a9
             let matchesStatus = true;
             if (status === 'online') {
                 matchesStatus = (t.online || 0) > 0;
