@@ -27,7 +27,10 @@ const CustomTooltip = ({ active, payload, centerViewMode }: any) => {
         const isCityEntry = !["Online Labs", "Offline Labs", "Online PCs", "Offline PCs"].includes(data.name);
         let valueSuffix = "";
         if (isCityEntry) {
-            valueSuffix = centerViewMode === 'pc' ? " PCs" : " Labs";
+            if (centerViewMode === 'pc') valueSuffix = " PCs";
+            else if (centerViewMode === 'tehsil') valueSuffix = " Labs";
+            else if (centerViewMode === 'labs') valueSuffix = " Labs";
+            else valueSuffix = " Tehsils"; // district mode — show tehsils per district
         }
 
         return (
@@ -60,7 +63,7 @@ export default function DashboardPage() {
         refetchInterval: 10000,
     });
 
-    const centerViewMode = (searchParams.get('centerView') as 'district' | 'labs' | 'pc') || 'district';
+    const centerViewMode = (searchParams.get('centerView') as 'district' | 'tehsil' | 'labs' | 'pc') || 'district';
     const viewMode = (searchParams.get('view') as 'status' | 'online' | 'offline') || 'status';
     const pcViewMode = (searchParams.get('pcView') as 'status' | 'online' | 'offline') || 'status';
 
@@ -88,16 +91,32 @@ export default function DashboardPage() {
     const labs = (Array.isArray(data?.labs) ? data.labs : []).filter((l: any) => l && typeof l === 'object');
 
     // --- VIEW 1: LAB STATUS (Left) ---
-    // --- VIEW 1: LAB STATUS (Left) ---
-    const onlineLabs = labs.filter((l: any) => Number(l.online || 0) > 0);
+    // --- VIEW 1: LAB UTILIZATION & STATUS (Center) ---
+    const usedLabs = labs.filter((l: any) => {
+        // A lab is "Used" if it's online and has at least 1 PC being actively used (>15% load)
+        // Note: We need device-level data for perfect accuracy, but the aggregated 'labs' 
+        // objects might not have this unless the backend provides it.
+        // However, based on the previous LabsPage logic, we can try to estimate or 
+        // we might need to fetch all devices here too.
+        // For now, let's assume 'used' labs are those where the average performance of the lab is decent,
+        // or if the backend provides 'active_used' count.
+        return Number(l.online || 0) > 0 && (Number(l.active_used || 0) > 0 || Number(l.avg_performance || 0) > 15);
+    });
+
+    const idleLabs = labs.filter((l: any) => {
+        return Number(l.online || 0) > 0 && !usedLabs.includes(l);
+    });
+
     const offlineLabs = labs.filter((l: any) => Number(l.online || 0) === 0);
-    const onlineLabsVal = onlineLabs.length;
+
+    const usedLabsVal = usedLabs.length;
+    const idleLabsVal = idleLabs.length;
     const offlineLabsVal = offlineLabs.length;
-    const totalLabs = onlineLabsVal + offlineLabsVal;
+    const totalLabs = labs.length;
 
     const statusChartData = [
-        { name: "Online Labs", value: onlineLabsVal, color: "#00e676" },
-        { name: "Offline Labs", value: offlineLabsVal, color: "#ff1744" },
+        { name: "Online Labs", value: usedLabsVal + idleLabsVal, color: "#00e676" }, // Green for Online
+        { name: "Offline Labs", value: offlineLabsVal, color: "#ff1744" }, // Red for Offline
     ];
 
     // --- VIEW 2: PC STATUS (Right) ---
@@ -114,28 +133,48 @@ export default function DashboardPage() {
     const safeStatusChartData = totalLabs > 0 ? statusChartData : [{ name: "No Data", value: 1, color: "#1e293b" }];
     const safePcStatusChartData = totalPCs > 0 ? pcStatusChartData : [{ name: "No Data", value: 1, color: "#1e293b" }];
 
-    // --- VIEW 3: CITY DISTRIBUTION (Center) ---
-    // Aggregate by City: Count of Labs and Sum of PCs
-    const cityStatsMap = new Map<string, { labCount: number, pcCount: number }>();
+    // --- VIEW 3: DISTRIBUTION (Center) ---
+    const statsMap = new Map<string, { labCount: number, pcCount: number, tehsilSet: Set<string> }>();
+    const uniqueTehsils = new Set<string>();
+    const cityStatsMap = new Map<string, any>();
+
     labs.forEach((l: any) => {
         const city = l.city || 'Unknown';
-        const current = cityStatsMap.get(city) || { labCount: 0, pcCount: 0 };
-        cityStatsMap.set(city, {
+        const tehsil = l.tehsil || 'Unknown';
+        uniqueTehsils.add(`${city}|${tehsil}`);
+        cityStatsMap.set(city, true);
+
+        const groupKey = centerViewMode === 'tehsil' ? tehsil : city;
+        const current = statsMap.get(groupKey) || { labCount: 0, pcCount: 0, tehsilSet: new Set<string>() };
+        current.tehsilSet.add(tehsil);
+        statsMap.set(groupKey, {
             labCount: current.labCount + 1,
-            pcCount: current.pcCount + Number(l.total_pcs || 0)
+            pcCount: current.pcCount + Number(l.total_pcs || 0),
+            tehsilSet: current.tehsilSet
         });
     });
 
     const totalCities = cityStatsMap.size;
-    const cityChartData = Array.from(cityStatsMap.entries()).map(([name, stats], index) => ({
+    const totalTehsils = uniqueTehsils.size;
+
+    const chartData = Array.from(statsMap.entries()).map(([name, stats], index) => ({
         name,
-        value: centerViewMode === 'pc' ? stats.pcCount : stats.labCount,
+        value:
+            centerViewMode === 'pc' ? stats.pcCount :
+                centerViewMode === 'district' ? stats.tehsilSet.size :  // DISTRICT → tehsils per district
+                    stats.labCount,                                          // labs / tehsil → lab count
         color: COLORS[index % COLORS.length]
     }));
 
-    const safeCityChartData = cityChartData.length > 0 ? cityChartData : [{ name: "No Data", value: 1, color: "#1e293b" }];
-    const centerDisplayTotal = centerViewMode === 'pc' ? totalPCs : (centerViewMode === 'labs' ? totalLabs : totalCities);
-    const centerDisplayLabel = centerViewMode === 'pc' ? 'PCs' : (centerViewMode === 'labs' ? 'Labs' : 'Districts');
+    const safeCityChartData = chartData.length > 0 ? chartData : [{ name: "No Data", value: 1, color: "#1e293b" }];
+    const centerDisplayTotal =
+        centerViewMode === 'pc' ? totalPCs :
+            (centerViewMode === 'labs' ? totalLabs :
+                (centerViewMode === 'tehsil' ? totalTehsils : totalCities));
+    const centerDisplayLabel =
+        centerViewMode === 'pc' ? 'PCs' :
+            (centerViewMode === 'labs' ? 'Labs' :
+                (centerViewMode === 'tehsil' ? 'Tehsils' : 'Districts'));
 
 
     // --- LEFT CHART HANDLERS ---
@@ -152,6 +191,9 @@ export default function DashboardPage() {
         if (entry.name === "No Data") return;
         if (centerViewMode === 'pc') {
             navigate(`/dashboard/devices?city=${entry.name}`);
+        } else if (centerViewMode === 'tehsil') {
+            // Navigate to labs page filtered by this specific tehsil
+            navigate(`/dashboard/labs?tehsil=${entry.name}`);
         } else {
             // For both 'district' and 'labs' view, show labs for that city
             navigate(`/dashboard/labs?city=${entry.name}`);
@@ -245,6 +287,15 @@ export default function DashboardPage() {
                             DISTRICT
                         </button>
                         <button
+                            onClick={() => setCenterViewMode('tehsil')}
+                            className={`px-6 py-2.5 rounded-xl font-bold text-sm tracking-wider transition-all duration-300 border ${centerViewMode === 'tehsil'
+                                ? 'bg-[#7c4dff] text-white border-[#7c4dff] shadow-[0_0_20px_rgba(124,77,255,0.4)] scale-105'
+                                : 'bg-transparent text-[#7c4dff] border-[#7c4dff]/30 hover:border-[#7c4dff] hover:bg-[#7c4dff]/10'
+                                }`}
+                        >
+                            TEHSIL
+                        </button>
+                        <button
                             onClick={() => setCenterViewMode('labs')}
                             className={`px-6 py-2.5 rounded-xl font-bold text-sm tracking-wider transition-all duration-300 border ${centerViewMode === 'labs'
                                 ? 'bg-[#7c4dff] text-white border-[#7c4dff] shadow-[0_0_20px_rgba(124,77,255,0.4)] scale-105'
@@ -273,9 +324,9 @@ export default function DashboardPage() {
                             <PieChart>
                                 <Pie
                                     data={
-                                        viewMode === 'online' ? [{ name: "Online Labs", value: onlineLabsVal || 1, color: "#00e676" }] :
+                                        viewMode === 'online' ? [{ name: "Online Labs", value: (usedLabsVal + idleLabsVal) || 1, color: "#00e676" }] :
                                             viewMode === 'offline' ? [{ name: "Offline Labs", value: offlineLabsVal || 1, color: "#ff1744" }] :
-                                                safeStatusChartData
+                                                statusChartData
                                     }
                                     cx="50%"
                                     cy="50%"
@@ -289,9 +340,9 @@ export default function DashboardPage() {
                                     onClick={handleLeftChartClick}
                                 >
                                     {(
-                                        viewMode === 'online' ? [{ name: "Online Labs", value: onlineLabsVal, color: "#00e676" }] :
+                                        viewMode === 'online' ? [{ name: "Online Labs", value: (usedLabsVal + idleLabsVal), color: "#00e676" }] :
                                             viewMode === 'offline' ? [{ name: "Offline Labs", value: offlineLabsVal, color: "#ff1744" }] :
-                                                safeStatusChartData
+                                                statusChartData
                                     ).map((entry, index) => (
                                         <Cell
                                             key={`cell-l-${index}`}
@@ -310,7 +361,7 @@ export default function DashboardPage() {
                             {viewMode === 'online' ? (
                                 <>
                                     <span className="text-7xl font-black text-[#00e676] tracking-tighter drop-shadow-[0_0_15px_rgba(0,230,118,0.5)] animate-in zoom-in-50 duration-300">
-                                        {onlineLabsVal}
+                                        {usedLabsVal + idleLabsVal}
                                     </span>
                                     <span className="text-[10px] font-bold text-[#00e676]/60 uppercase tracking-[0.4em] mt-2 ml-1">
                                         Online Labs
@@ -330,12 +381,9 @@ export default function DashboardPage() {
                                     <span className="text-7xl font-black text-white tracking-tighter drop-shadow-2xl animate-in zoom-in-50 duration-300">
                                         {totalLabs}
                                     </span>
-                                    <span className="text-[10px] font-bold text-white/30 uppercase tracking-[0.4em] mt-2 ml-1">
-                                        Total Labs
-                                    </span>
                                     <div className="flex gap-3 mt-2 animate-in fade-in slide-in-from-bottom-2 duration-500">
                                         <span className="text-[10px] font-bold text-[#00e676] drop-shadow-[0_0_8px_rgba(0,230,118,0.5)]">
-                                            {onlineLabsVal} ONLINE
+                                            {usedLabsVal + idleLabsVal} ONLINE
                                         </span>
                                         <span className="text-[10px] font-bold text-[#ff1744] drop-shadow-[0_0_8px_rgba(255,23,68,0.5)]">
                                             {offlineLabsVal} OFFLINE

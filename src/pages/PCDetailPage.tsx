@@ -41,7 +41,7 @@ export default function PCDetailPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
-  const [editData, setEditData] = useState({ pc_name: '', city: '', lab_name: '' });
+  const [editData, setEditData] = useState({ pc_name: '', city: '', lab_name: '', tehsil: '' });
   // selectedHistory state removed as we now navigate to a full page
   const [isLocallyDefective, setIsLocallyDefective] = useState(false);
   const [showDefectiveSuccess, setShowDefectiveSuccess] = useState(false);
@@ -107,7 +107,7 @@ export default function PCDetailPage() {
         pc_name: detail.device.pc_name || '',
         city: detail.device.city || '',
         lab_name: detail.device.lab_name || '',
-        college: detail.device.college || ''
+        tehsil: detail.device.tehsil || ''
       });
     }
   }, [detail]);
@@ -129,7 +129,7 @@ export default function PCDetailPage() {
         pc_name: data.pc_name,
         city: data.city,
         lab_name: data.lab_name,
-        college: data.college // Sending college to backend
+        tehsil: data.tehsil // Sending tehsil to backend
       })
     }),
     onSuccess: () => {
@@ -339,7 +339,7 @@ export default function PCDetailPage() {
                     <MapPin size={22} />
                   </div>
                   <div className="flex-1">
-                    <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider">Assigned Region</p>
+                    <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider">DISTRICT</p>
                     {isEditing ? (
                       <select
                         className="mt-2 w-full bg-card border border-border text-primary text-xs rounded-lg p-2.5 outline-none focus:ring-1 focus:ring-primary shadow-sm"
@@ -363,7 +363,7 @@ export default function PCDetailPage() {
                     <Beaker size={22} />
                   </div>
                   <div className="flex-1">
-                    <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider">Facility Cluster</p>
+                    <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider">LAB NAME</p>
                     {isEditing ? (
                       <select
                         className="mt-2 w-full bg-card border border-border text-primary text-xs rounded-lg p-2.5 outline-none focus:ring-1 focus:ring-primary shadow-sm"
@@ -386,16 +386,16 @@ export default function PCDetailPage() {
                     <School size={22} />
                   </div>
                   <div className="flex-1">
-                    <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider">Institution / College</p>
+                    <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider">Tehsil</p>
                     {isEditing ? (
                       <input
                         className="mt-2 w-full bg-card border border-border text-primary text-xs rounded-lg p-2.5 outline-none focus:ring-1 focus:ring-primary shadow-sm uppercase font-bold"
-                        value={editData.college || ''}
-                        onChange={(e) => setEditData({ ...editData, college: e.target.value })}
-                        placeholder="ENTER COLLEGE NAME"
+                        value={editData.tehsil || ''}
+                        onChange={(e) => setEditData({ ...editData, tehsil: e.target.value })}
+                        placeholder="ENTER TEHSIL NAME"
                       />
                     ) : (
-                      <p className="font-bold text-xl uppercase tracking-tight text-primary mt-0.5">{device.college || 'Not Assigned'}</p>
+                      <p className="font-bold text-xl uppercase tracking-tight text-primary mt-0.5">{device.tehsil || 'Not Assigned'}</p>
                     )}
                   </div>
                 </div>
@@ -457,9 +457,10 @@ export default function PCDetailPage() {
                 </div>
                 <div className="flex items-end justify-between">
                   <div className="flex flex-col">
-                    <span className="text-5xl font-bold tracking-tighter text-emerald-500 animate-in fade-in zoom-in duration-500">
-                      {device.app_usage?.['__current_cpu__'] || 0}%
+                    <span className="text-7xl font-bold tracking-tighter text-emerald-500 animate-in fade-in zoom-in duration-500">
+                      {device.app_usage?.['__current_cpu__'] || 0}
                     </span>
+
                     <span className="text-[10px] font-bold text-emerald-500/60 uppercase tracking-widest mt-1">REAL-TIME LOAD</span>
                   </div>
 
@@ -578,6 +579,17 @@ export default function PCDetailPage() {
                         // Robust check: Compare date strings directly
                         const historyHasToday = history.some((h: any) => h.history_date === today || h.start_time?.startsWith(today));
 
+                        const getNormalizedScore = (val: any) => {
+                          let score = parseFloat(val) || 0;
+                          // Heuristic: If value is absurdly high (accumulated), divide by 100 as per user request
+                          if (score > 100) {
+                            score = score / 100;
+                          }
+                          // Hard cap to ensure it never exceeds or equals 100%
+                          if (score >= 100) score = 99.9;
+                          return score.toFixed(1);
+                        };
+
                         if (!historyHasToday) {
                           return (
                             <tr
@@ -592,19 +604,30 @@ export default function PCDetailPage() {
                               </td>
                               <td className="px-6 py-5 border-b border-border/50 text-right">
                                 <div className="flex flex-col items-end">
-                                  <span className="text-lg font-bold text-primary">{Number(device.cpu_score || 0).toFixed(1)}%</span>
+                                  <span className="text-lg font-bold text-primary">{getNormalizedScore(device.cpu_score)}%</span>
                                   <span className="text-[7px] font-bold text-secondary uppercase tracking-widest">DAILY AVG</span>
                                 </div>
                               </td>
                             </tr>
                           );
                         }
+
+                        // Helper available for the map loop below as well if we scope it correctly, 
+                        // but since we are inside an IIFE, we can't export it easily.
+                        // Instead, let's just return the single row here, and handle the map separately or 
+                        // redefine the helper in the map.
+                        // To keep code clean in this replace_block, I'll inline the logic in the map below.
                         return null;
                       })()}
 
                       {history.slice(0, 10).map((h: any) => {
                         const dateObj = h.history_date ? new Date(h.history_date) : new Date(h.start_time);
                         const dateArg = h.history_date || h.start_time?.split('T')[0];
+
+                        let score = parseFloat(h.avg_score || 0);
+                        if (score > 100) score = score / 100;
+                        if (score >= 100) score = 99.9;
+
                         return (
                           <tr key={h.id || h.history_date} onClick={() => handleHistoryClick(dateArg)} className="text-xs group hover:bg-muted/50 transition-all cursor-pointer">
                             <td className="px-6 py-5 border-b border-border/50">
@@ -615,7 +638,7 @@ export default function PCDetailPage() {
                             </td>
                             <td className="px-6 py-5 border-b border-border/50 text-right">
                               <div className="flex flex-col items-end">
-                                <span className="text-lg font-bold text-primary">{Number(h.avg_score || 0).toFixed(1)}%</span>
+                                <span className="text-lg font-bold text-primary">{score.toFixed(1)}%</span>
                                 <span className="text-[7px] font-bold text-secondary uppercase tracking-widest">AVG %</span>
                               </div>
                             </td>

@@ -14,9 +14,9 @@ import DevicesPage from "./pages/DevicesPage";
 import PCDetailPage from "./pages/PCDetailPage";
 import PCHistoryDetailPage from "./pages/PCHistoryDetailPage";
 
-import LabDashboard from "./pages/LabDashboard";
 import LabSummaryPage from "./pages/LabSummaryPage";
 import DashboardPage from "./pages/DashboardPage";
+import TehsilsPage from "./pages/TehsilsPage";
 import NotFound from "./pages/NotFound";
 import { GlobalFailsafe } from "@/components/GlobalFailsafe";
 
@@ -41,8 +41,9 @@ const App = () => (
                 </ProtectedRoute>
               }
             >
-              <Route index element={<LabDashboard />} />
+              <Route index element={<Navigate to="analytics" replace />} />
               <Route path="cities" element={<LocationsPage />} />
+              <Route path="tehsils" element={<TehsilsPage />} />
               <Route path="labs" element={<LabsPage />} />
               <Route path="devices" element={<DevicesPage />} />
               <Route path="overview" element={<DashboardOverview />} />
