@@ -2,18 +2,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiFetch } from '@/lib/api';
 import { Skeleton } from '@/components/ui/skeleton';
-<<<<<<< HEAD
 import { MapPin, Search, MoreVertical, Edit2, Globe } from 'lucide-react';
-=======
-import { MapPin, Search, MoreVertical, Edit2 } from 'lucide-react';
->>>>>>> 66ae7c1203dc72ac37ef8ba3c0744ac73f438bfd
 import { Card, CardContent } from '@/components/ui/card';
 import { useState, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
-<<<<<<< HEAD
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
-=======
->>>>>>> 66ae7c1203dc72ac37ef8ba3c0744ac73f438bfd
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -42,11 +35,7 @@ export default function LocationsPage() {
     const tehsils = Array.isArray(response?.tehsils) ? response.tehsils : [];
 
     // DEBUG: Log the fetched data for verification
-<<<<<<< HEAD
     // console.log("Tehsil Data Fetched:", tehsils);
-=======
-    console.log("Tehsil Data Fetched:", tehsils);
->>>>>>> 66ae7c1203dc72ac37ef8ba3c0744ac73f438bfd
 
     const handleRenameTehsil = async (e: React.MouseEvent, oldName: string, cityName: string) => {
         e.stopPropagation();
