@@ -1,12 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { apiFetch } from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Monitor, Wifi, WifiOff, Terminal, ArrowRight, Target, Zap, FileText } from "lucide-react";
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from "@/lib/utils";
-import { MiniWaveChart } from '@/components/dashboard/MiniWaveChart';
+import { AddDeviceDialog } from "@/components/dashboard/AddDeviceDialog";
 
 const LabSummaryPage = () => {
     const { city, lab } = useParams();
@@ -14,19 +15,29 @@ const LabSummaryPage = () => {
 
     const { data: labsResponse, isLoading } = useQuery({
         queryKey: ['city-labs', city],
-        queryFn: () => apiFetch(`/stats/city/${city}/labs`),
+        queryFn: () => apiFetch(`/stats/city/${encodeURIComponent(city || '')}/labs`),
         enabled: !!city,
         refetchInterval: 5000,
     });
 
-    const { data: devicesResponse } = useQuery({
+    const { data: devicesResponse, isLoading: devicesLoading } = useQuery({
         queryKey: ['lab-inventory', city, lab],
-        queryFn: () => apiFetch(`/devices?city=${city}&lab=${lab}`),
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('devices')
+                .select('*')
+                .ilike('city', city || '')
+                .ilike('lab_name', lab || '');
+
+            if (error) throw error;
+            return { devices: data || [], server_time: new Date().toISOString() };
+        },
         enabled: !!city && !!lab,
         refetchInterval: 5000,
     });
 
-    const labData = labsResponse?.labs?.find((l: any) => l.lab_name === lab);
+    const normalize = (name: string) => (name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const labData = labsResponse?.labs?.find((l: any) => normalize(l.lab_name) === normalize(lab || ''));
     const devices = devicesResponse?.devices || [];
     const serverTime = devicesResponse?.server_time || new Date().toISOString();
 
@@ -64,7 +75,7 @@ const LabSummaryPage = () => {
 
     const stats = [
         {
-            label: "Total PC Assets",
+            label: "Total System",
             value: totalCount,
             icon: Monitor,
             color: "text-primary",
@@ -72,11 +83,11 @@ const LabSummaryPage = () => {
             borderColor: "border-primary/20",
             waveColor: "#01416D",
             filter: "all",
-            subtitle: "Global Node Inventory",
+            subtitle: "Total System Inventory",
             intensity: 0.8
         },
         {
-            label: "Online Terminals",
+            label: "Online System",
             value: onlineCount,
             icon: Wifi,
             color: "text-emerald-500",
@@ -88,7 +99,7 @@ const LabSummaryPage = () => {
             intensity: getIntensity(onlineCount, totalCount || 1)
         },
         {
-            label: "Offline Units",
+            label: "Offline System",
             value: offlineCount,
             icon: WifiOff,
             color: "text-red-500",
@@ -138,11 +149,11 @@ const LabSummaryPage = () => {
         }
     ];
 
-    if (isLoading) {
+    if (isLoading || devicesLoading) {
         return (
             <div className="p-8 space-y-8 animate-in fade-in duration-500 max-w-7xl mx-auto">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-20">
-                    {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-64 rounded-2xl bg-card" />)}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 pt-20">
+                    {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-40 rounded-2xl bg-card" />)}
                 </div>
             </div>
         );
@@ -165,10 +176,10 @@ const LabSummaryPage = () => {
                         <div className="flex items-center gap-3 mb-1">
                             <span className="text-[10px] font-bold text-white uppercase tracking-widest">Lab Overview</span>
                             <div className="w-1 h-1 bg-secondary rounded-full" />
-                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{city} District</span>
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{labData?.city || city} District</span>
                         </div>
                         <h1 className="text-3xl font-bold tracking-tight uppercase text-white font-display leading-tight">
-                            {lab} <span className="text-white/80">Summary</span>
+                            {labData?.lab_name || lab} <span className="text-white/80">Summary</span>
                         </h1>
                     </div>
                 </div>
@@ -182,6 +193,12 @@ const LabSummaryPage = () => {
                         <ArrowRight size={13} />
                         View All Systems
                     </Button>
+
+                    <AddDeviceDialog
+                        defaultCity={labData?.city || city}
+                        defaultLab={labData?.lab_name || lab}
+                        defaultTehsil={labData?.tehsil || labData?.norm_tehsil}
+                    />
                     <Button
                         onClick={() => navigate(`/dashboard/devices?city=${city}&lab=${lab}&status=online`)}
                         variant="outline"
@@ -219,7 +236,7 @@ const LabSummaryPage = () => {
                         className="bg-white hover:bg-white/90 text-black gap-2 px-4 rounded-lg h-9 text-[9px] font-bold uppercase tracking-widest transition-all shadow-lg"
                     >
                         <FileText size={13} />
-                        Generate Excel
+                        Generate PPTX
                     </Button>
                 </div>
             </div>
@@ -231,49 +248,46 @@ const LabSummaryPage = () => {
                         <Card
                             key={i}
                             onClick={() => navigate(`/dashboard/devices?city=${city}&lab=${lab}&status=${stat.filter}`)}
-                            className="bg-card border border-border rounded-2xl p-6 cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-md group overflow-hidden relative flex flex-col justify-between min-h-[200px]"
+                            className="group relative overflow-hidden bg-card cursor-pointer border border-border hover:border-primary/40 transition-all hover:translate-y-[-4px] shadow-sm hover:shadow-lg rounded-2xl min-h-[160px]"
                         >
-                            <div className="flex items-start justify-between mb-6">
-                                <div className={cn(
-                                    "p-4 rounded-xl shadow-sm transition-all duration-300 group-hover:scale-110",
-                                    stat.bg,
-                                    stat.borderColor,
-                                    "border"
-                                )}>
-                                    <stat.icon size={24} className={stat.color} />
-                                    {i >= 3 && <div className="absolute -top-1 -right-1 bg-secondary text-white text-[8px] font-bold px-2 py-0.5 rounded shadow-sm">ALERT</div>}
+                            <CardContent className="p-6 flex flex-col justify-between h-full space-y-4">
+                                <div className="flex items-start justify-between">
+                                    <div className="space-y-1">
+                                        <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-[0.2em]">
+                                            Infrastructure Node
+                                        </h3>
+                                        <h2 className="text-sm font-bold tracking-tight text-white group-hover:text-white/80 transition-colors uppercase">
+                                            {stat.label}
+                                        </h2>
+                                    </div>
+                                    <div className={cn(
+                                        "p-2 rounded-lg bg-background border border-border shadow-inner transition-colors group-hover:border-primary/30",
+                                        stat.color
+                                    )}>
+                                        <stat.icon size={16} />
+                                    </div>
                                 </div>
-                                <div className="bg-background p-2 rounded-lg border border-border shadow-inner">
-                                    <MiniWaveChart
-                                        color={stat.waveColor}
-                                        width={100}
-                                        height={40}
-                                        intensity={stat.intensity}
-                                        showGrid={false}
-                                    />
-                                </div>
-                            </div>
 
-                            <div className="relative z-10">
-                                <div className={cn("border-l-2 pl-3 mb-2 transition-all", stat.borderColor)}>
-                                    <p className={cn("text-[10px] font-bold uppercase tracking-widest mb-1", stat.color)}>
-                                        {stat.label}
-                                    </p>
-                                </div>
-                                <div className="flex items-baseline gap-3">
-                                    <h2 className="text-4xl font-bold tracking-tight text-primary leading-none">
-                                        {stat.value}
-                                    </h2>
-                                    <div className="flex flex-col">
+                                <div className="flex items-end justify-between border-t border-border pt-4">
+                                    <div className="flex items-baseline gap-1.5">
+                                        <span className="text-3xl font-bold text-white tracking-tight leading-none">{stat.value}</span>
+                                        <span className="text-[9px] font-bold text-white/50 uppercase tracking-widest">
+                                            {i === 0 ? "Total Units" : i === 1 ? "Live Sync" : i === 2 ? "Down Time" : "Alert Nodes"}
+                                        </span>
+                                    </div>
+                                    <div className={cn(
+                                        "flex items-baseline gap-1.5 px-3 py-1 rounded-full border shadow-sm transition-all",
+                                        i >= 3 ? "bg-red-500/10 border-red-500/20" : "bg-emerald-500/10 border-emerald-500/20"
+                                    )}>
                                         <span className={cn(
-                                            "text-[9px] font-bold uppercase tracking-widest",
-                                            i >= 3 ? "text-red-500" : "text-emerald-500"
+                                            "text-[9px] font-bold uppercase tracking-wider",
+                                            i >= 3 ? "text-red-400" : "text-emerald-400"
                                         )}>
                                             {i >= 3 ? "Critical" : "Nominal"}
                                         </span>
                                     </div>
                                 </div>
-                            </div>
+                            </CardContent>
                         </Card>
                     ))}
                 </div>

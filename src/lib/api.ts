@@ -15,15 +15,22 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
     };
 
     try {
-        const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:5050/api";
+        const baseUrl = import.meta.env.VITE_API_URL || "https://lab-systems-monitoring-server-kt3b.onrender.com/api";
         const res = await fetch(
             `${baseUrl}${path}`,
             finalOptions
         );
 
         if (!res.ok) {
-            console.error(`API Error: ${res.status} ${res.statusText} for ${path}`);
-            throw new Error(`API error ${res.status}`);
+            let errorMessage = `HTTP ${res.status}`;
+            try {
+                const errorData = await res.json();
+                errorMessage = errorData.error || errorData.message || errorMessage;
+            } catch (e) {
+                // Not a JSON error response
+            }
+            console.error(`API Error: ${res.status} ${res.statusText} for ${path}. Detail: ${errorMessage}`);
+            throw new Error(errorMessage);
         }
 
         return await res.json();

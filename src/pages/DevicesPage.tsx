@@ -32,9 +32,29 @@ export default function DevicesPage() {
     queryFn: async () => {
       let query = supabase.from('devices').select('*');
 
-      if (cityParam) query = query.eq('city', cityParam);
-      if (tehsilParam) query = query.eq('tehsil', tehsilParam);
-      if (labParam) query = query.eq('lab_name', labParam);
+      if (cityParam) {
+        if (cityParam.toUpperCase() === 'UNKNOWN') {
+          query = query.or('city.is.null,city.eq.Unknown,city.eq.UNKNOWN,city.eq.pending');
+        } else {
+          query = query.ilike('city', `%${cityParam}%`);
+        }
+      }
+
+      if (tehsilParam) {
+        if (tehsilParam.toUpperCase() === 'UNKNOWN' || tehsilParam.toUpperCase() === 'PENDING ASSIGNMENT') {
+          query = query.or('tehsil.is.null,tehsil.eq.Unknown,tehsil.eq.UNKNOWN,tehsil.eq.pending,tehsil.eq.""');
+        } else {
+          query = query.ilike('tehsil', `%${tehsilParam}%`);
+        }
+      }
+
+      if (labParam) {
+        if (labParam.toUpperCase() === 'UNKNOWN' || labParam.toUpperCase() === 'UNASSIGNED LAB') {
+          query = query.or('lab_name.is.null,lab_name.eq.Unknown,lab_name.eq.UNKNOWN,lab_name.eq.""');
+        } else {
+          query = query.ilike('lab_name', `%${labParam}%`);
+        }
+      }
 
       // Handle base status filter from DB
       if (statusFilter === 'online') query = query.eq('status', 'online');

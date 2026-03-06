@@ -52,7 +52,7 @@ const LabDashboard = () => {
 
     const { data: labsResponse, isLoading: labsLoading } = useQuery({
         queryKey: ['city-labs', selectedCity],
-        queryFn: () => apiFetch(`/stats/city/${selectedCity}/labs`),
+        queryFn: () => apiFetch(`/stats/city/${encodeURIComponent(selectedCity || '')}/labs`),
         enabled: !!selectedCity,
         refetchInterval: 5000,
     });

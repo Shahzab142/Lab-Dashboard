@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useMemo, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 
 export default function TehsilsPage() {
     const navigate = useNavigate();
@@ -49,6 +50,11 @@ export default function TehsilsPage() {
     const filteredTehsils = tehsils.filter((t: any) =>
         t.tehsil.toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+    const maxLabsInTehsil = useMemo(() => {
+        if (!tehsils || tehsils.length === 0) return 10;
+        return Math.max(...tehsils.map(t => t.total_labs || 0), 5);
+    }, [tehsils]);
 
     return (
         <div className="p-4 md:p-8 space-y-8 animate-in slide-in-from-right-4 duration-700 bg-background min-h-screen">
@@ -99,37 +105,74 @@ export default function TehsilsPage() {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     {filteredTehsils.map((t: any) => {
+                        const gaugeData = [
+                            { name: 'Labs', value: t.total_labs },
+                            { name: 'Remaining', value: Math.max(0, maxLabsInTehsil - t.total_labs) }
+                        ];
+
                         return (
                             <Card
-                                key={t.tehsil}
+                                key={`${t.city || city}-${t.tehsil}`}
                                 onClick={() => navigate(`/dashboard/labs?city=${city}&tehsil=${t.tehsil}`)}
-                                className="group relative overflow-hidden bg-card cursor-pointer border border-border hover:border-primary/40 transition-all hover:translate-y-[-4px] shadow-sm hover:shadow-lg rounded-2xl"
+                                className="group relative overflow-hidden bg-card cursor-pointer border border-border hover:border-primary/40 transition-all hover:translate-y-[-4px] shadow-sm hover:shadow-lg rounded-2xl min-h-[200px] flex flex-col"
                             >
-                                <CardContent className="p-6 flex flex-col justify-between h-full space-y-4">
-                                    <div className="flex items-center gap-4">
-                                        <div className="p-3 rounded-lg bg-secondary text-white shadow-sm group-hover:bg-primary group-hover:text-black transition-colors">
-                                            <Landmark size={20} />
-                                        </div>
-                                        <div className="flex-1 overflow-hidden">
-                                            <h2 className="text-lg font-bold tracking-tight uppercase text-white truncate">
+                                <CardContent className="p-5 flex flex-col justify-between flex-1 gap-4">
+                                    <div className="flex items-start justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 rounded-lg bg-secondary text-white shadow-sm group-hover:bg-primary group-hover:text-black transition-colors shrink-0">
+                                                <Landmark size={14} />
+                                            </div>
+                                            <h2 className="text-sm font-bold tracking-tight uppercase text-white truncate font-display">
                                                 {t.tehsil}
                                             </h2>
-                                            <div className="flex items-center gap-1.5 mt-0.5 opacity-60">
-                                                <MapPin size={10} />
-                                                <span className="text-[10px] font-bold uppercase tracking-widest">{t.city}</span>
-                                            </div>
                                         </div>
-                                        <ChevronRight size={18} className="text-white/20 group-hover:text-primary transition-colors" />
+                                        <ChevronRight size={14} className="text-white/20 group-hover:text-primary transition-colors shrink-0" />
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-4 mt-2">
-                                        <div className="p-3 rounded-xl bg-muted/50 border border-border">
-                                            <p className="text-[9px] font-bold text-white/40 uppercase tracking-widest mb-1">Labs</p>
-                                            <p className="text-xl font-bold text-white leading-none">{t.total_labs}</p>
+                                    {/* Gauge Section */}
+                                    <div className="flex-1 flex flex-col items-center justify-end relative h-24 mt-2">
+                                        <div className="h-24 w-full">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <PieChart width={100} height={100}>
+                                                    <defs>
+                                                        <linearGradient id="gaugeGradientTehsil" x1="0" y1="0" x2="1" y2="0">
+                                                            <stop offset="0%" stopColor="#f99a1d" stopOpacity={0.6} />
+                                                            <stop offset="100%" stopColor="#f99a1d" stopOpacity={1} />
+                                                        </linearGradient>
+                                                    </defs>
+                                                    <Pie
+                                                        data={gaugeData}
+                                                        cx="50%"
+                                                        cy="100%"
+                                                        startAngle={180}
+                                                        endAngle={0}
+                                                        innerRadius={45}
+                                                        outerRadius={60}
+                                                        paddingAngle={0}
+                                                        dataKey="value"
+                                                        stroke="none"
+                                                    >
+                                                        <Cell fill="url(#gaugeGradientTehsil)" className="drop-shadow-[0_0_8px_rgba(249,154,29,0.3)]" />
+                                                        <Cell fill="rgba(255, 255, 255, 0.03)" />
+                                                    </Pie>
+                                                </PieChart>
+                                            </ResponsiveContainer>
                                         </div>
-                                        <div className="p-3 rounded-xl bg-muted/50 border border-border">
-                                            <p className="text-[9px] font-bold text-white/40 uppercase tracking-widest mb-1">Active</p>
-                                            <p className="text-xl font-bold text-emerald-400 leading-none">{t.online}</p>
+                                        <div className="absolute bottom-1 left-1/2 -translate-x-1/2 text-center pointer-events-none">
+                                            <div className="text-2xl font-black text-white leading-none">
+                                                {t.total_labs}
+                                            </div>
+                                            <div className="text-[7px] font-black text-white/30 uppercase tracking-[0.2em] mt-0.5">
+                                                TOTAL LABS
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-end border-t border-white/5 pt-3 mt-1">
+                                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-400/5 border border-emerald-400/10 group-hover:bg-emerald-400/10 transition-all">
+                                            <div className="w-1 h-1 rounded-full bg-emerald-400 shadow-[0_0_5px_rgba(52,211,153,0.5)]" />
+                                            <span className="text-lg font-bold text-emerald-400 tracking-tight leading-none">{t.online}</span>
+                                            <span className="text-[8px] font-black text-emerald-400/40 uppercase tracking-widest">LIVE</span>
                                         </div>
                                     </div>
                                 </CardContent>
