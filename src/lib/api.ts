@@ -15,7 +15,12 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
     };
 
     try {
+<<<<<<< HEAD
         const baseUrl = import.meta.env.VITE_API_URL || "https://lab-systems-monitoring-server-kt3b.onrender.com/api";
+=======
+        // PRODUCTION SERVER: lab-systems-monitoring-server-kt3b.onrender.com
+        const baseUrl = "https://lab-systems-monitoring-server-kt3b.onrender.com/api";
+>>>>>>> 66ae7c1203dc72ac37ef8ba3c0744ac73f438bfd
         const res = await fetch(
             `${baseUrl}${path}`,
             finalOptions
