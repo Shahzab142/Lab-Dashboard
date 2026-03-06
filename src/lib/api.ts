@@ -17,10 +17,9 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
     try {
         // Force the correct backend URL (ignoring stale Netlify variables if any)
         const baseUrl = "https://lab-systems-monitoring-server-kt3b.onrender.com/api";
-        const res = await fetch(
-            `${baseUrl}${path}`,
-            finalOptions
-        );
+        const url = new URL(`${baseUrl}${path}`);
+        url.searchParams.append("_t", String(Date.now()));
+        const res = await fetch(url.toString(), finalOptions);
 
         if (!res.ok) {
             let errorMessage = `HTTP ${res.status}`;
