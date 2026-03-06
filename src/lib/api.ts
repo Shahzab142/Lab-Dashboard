@@ -15,7 +15,8 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
     };
 
     try {
-        const baseUrl = import.meta.env.VITE_API_URL || "https://lab-systems-monitoring-server-kt3b.onrender.com/api";
+        // Force the correct backend URL (ignoring stale Netlify variables if any)
+        const baseUrl = "https://lab-systems-monitoring-server-kt3b.onrender.com/api";
         const res = await fetch(
             `${baseUrl}${path}`,
             finalOptions
