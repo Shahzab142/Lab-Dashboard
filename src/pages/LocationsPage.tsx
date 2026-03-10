@@ -2,10 +2,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiFetch } from '@/lib/api';
 import { Skeleton } from '@/components/ui/skeleton';
-import { MapPin, Search, MoreVertical, Edit2 } from 'lucide-react';
+import { MapPin, Search, MoreVertical, Edit2, Globe } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
+import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -19,6 +20,8 @@ export default function LocationsPage() {
     const queryClient = useQueryClient();
     const [searchTerm, setSearchTerm] = useState('');
     const [searchParams] = useSearchParams();
+    const cityParam = searchParams.get('city');
+    const tehsilParam = searchParams.get('tehsil');
     const status = searchParams.get('status');
 
     const { data: response, isLoading } = useQuery({
@@ -32,7 +35,7 @@ export default function LocationsPage() {
     const tehsils = Array.isArray(response?.tehsils) ? response.tehsils : [];
 
     // DEBUG: Log the fetched data for verification
-    console.log("Tehsil Data Fetched:", tehsils);
+    // console.log("Tehsil Data Fetched:", tehsils);
 
     const handleRenameTehsil = async (e: React.MouseEvent, oldName: string, cityName: string) => {
         e.stopPropagation();
@@ -64,9 +67,25 @@ export default function LocationsPage() {
             } else if (status === 'offline') {
                 matchesStatus = (t.online || 0) === 0;
             }
-            return matchesSearch && matchesStatus;
+
+            let matchesTehsilParam = true;
+            if (tehsilParam) {
+                matchesTehsilParam = tName === tehsilParam.toLowerCase();
+            }
+
+            let matchesCityParam = true;
+            if (cityParam) {
+                matchesCityParam = cName === cityParam.toLowerCase();
+            }
+
+            return matchesSearch && matchesStatus && matchesTehsilParam && matchesCityParam;
         })
         .sort((a: any, b: any) => (b.total_labs || 0) - (a.total_labs || 0));
+
+    const maxLabsInTehsil = useMemo(() => {
+        if (!filteredTehsils || filteredTehsils.length === 0) return 10;
+        return Math.max(...filteredTehsils.map((t: any) => t.total_labs || 0), 5);
+    }, [filteredTehsils]);
 
     return (
         <div className="p-4 md:p-8 space-y-8 animate-in slide-in-from-right-4 duration-700 bg-background min-h-screen">
@@ -105,53 +124,92 @@ export default function LocationsPage() {
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {filteredTehsils.map((t: any) => {
+                    {filteredTehsils.map((t: any, index: number) => {
                         const totalLabs = t.total_labs || 0;
                         const online = t.online || 0;
+                        const pieData = [
+                            { name: 'Labs', value: totalLabs },
+                            { name: 'Remaining', value: Math.max(0, maxLabsInTehsil - totalLabs) }
+                        ];
 
                         return (
                             <Card
-                                key={`${t.city}-${t.tehsil}`}
+                                key={`${t.city}-${t.tehsil}-${index}`}
                                 onClick={() => navigate(`/dashboard/labs?city=${t.city}&tehsil=${t.tehsil}`)}
-                                className="group relative overflow-hidden bg-card cursor-pointer border border-border hover:border-primary/40 transition-all hover:translate-y-[-4px] shadow-sm hover:shadow-lg rounded-2xl min-h-[200px]"
+                                className="group relative overflow-hidden bg-card cursor-pointer border border-border hover:border-primary/40 transition-all hover:translate-y-[-4px] shadow-sm hover:shadow-lg rounded-2xl min-h-[220px] flex flex-col"
                             >
-                                <CardContent className="p-6 flex flex-col justify-between h-full space-y-4">
-                                    <div className="flex items-start justify-between gap-3">
+                                <CardContent className="p-5 flex flex-col justify-between flex-1 space-y-2">
+                                    <div className="flex items-start justify-between">
                                         <div className="flex items-center gap-3 overflow-hidden">
-                                            <div className="p-2.5 rounded-lg bg-primary text-black shrink-0 shadow-sm">
-                                                <MapPin size={16} />
+                                            <div className="p-2 rounded-lg bg-primary text-black shrink-0 transition-transform group-hover:scale-110">
+                                                <MapPin size={14} />
                                             </div>
                                             <div className="overflow-hidden">
-                                                <h2 className="text-lg font-bold tracking-tight uppercase text-white transition-colors truncate">
+                                                <h2 className="text-md font-bold tracking-tight uppercase text-white group-hover:text-white/80 transition-colors truncate font-display">
                                                     {t.tehsil}
                                                 </h2>
-                                                <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">{t.city}</p>
+                                                <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em]">{t.city}</p>
                                             </div>
                                         </div>
 
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                                <button className="p-1.5 hover:bg-muted rounded transition-colors text-white/30 shrink-0">
-                                                    <MoreVertical size={16} />
+                                                <button className="p-1.5 hover:bg-white/5 rounded transition-colors text-white/20 shrink-0">
+                                                    <MoreVertical size={14} />
                                                 </button>
                                             </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end" className="bg-card border border-border rounded-lg p-1.5 shadow-xl">
-                                                <DropdownMenuItem onClick={(e) => handleRenameTehsil(e, t.tehsil, t.city)} className="gap-2 text-[10px] font-bold uppercase p-2 rounded-md transition-colors text-white">
-                                                    <Edit2 size={12} className="text-primary" /> Rename Tehsil
+                                            <DropdownMenuContent align="end" className="bg-card border border-border rounded-xl p-1.5 shadow-2xl backdrop-blur-xl">
+                                                <DropdownMenuItem onClick={(e) => handleRenameTehsil(e, t.tehsil, t.city)} className="gap-2 text-[10px] font-bold uppercase p-2.5 rounded-lg transition-all focus:bg-primary focus:text-black">
+                                                    <Edit2 size={12} className="text-primary group-focus:text-black" /> Rename
                                                 </DropdownMenuItem>
                                             </DropdownMenuContent>
                                         </DropdownMenu>
                                     </div>
 
-
-                                    <div className="flex items-end justify-between border-t border-border pt-4">
-                                        <div className="flex items-baseline gap-1.5">
-                                            <span className="text-2xl font-bold text-white tracking-tight">{totalLabs}</span>
-                                            <span className="text-[9px] font-bold text-white/60 uppercase tracking-wider">Total Labs</span>
+                                    {/* Gauge Section */}
+                                    <div className="flex-1 flex flex-col items-center justify-end relative h-24 my-1">
+                                        <div className="h-24 w-full">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <PieChart width={100} height={100}>
+                                                    <defs>
+                                                        <linearGradient id="gaugeGradientTehsil" x1="0" y1="0" x2="1" y2="0">
+                                                            <stop offset="0%" stopColor="#f99a1d" stopOpacity={0.6} />
+                                                            <stop offset="100%" stopColor="#f99a1d" stopOpacity={1} />
+                                                        </linearGradient>
+                                                    </defs>
+                                                    <Pie
+                                                        data={pieData}
+                                                        cx="50%"
+                                                        cy="100%"
+                                                        startAngle={180}
+                                                        endAngle={0}
+                                                        innerRadius={45}
+                                                        outerRadius={60}
+                                                        paddingAngle={0}
+                                                        dataKey="value"
+                                                        stroke="none"
+                                                    >
+                                                        <Cell fill="url(#gaugeGradientTehsil)" className="drop-shadow-[0_0_8px_rgba(249,154,29,0.3)]" />
+                                                        <Cell fill="rgba(255, 255, 255, 0.03)" />
+                                                    </Pie>
+                                                </PieChart>
+                                            </ResponsiveContainer>
                                         </div>
-                                        <div className="flex items-baseline gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 shadow-sm">
-                                            <span className="text-xl font-bold text-emerald-400 tracking-tight">{online}</span>
-                                            <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider">Live</span>
+                                        <div className="absolute bottom-1 left-1/2 -translate-x-1/2 text-center pointer-events-none">
+                                            <div className="text-2xl font-black text-white leading-none">
+                                                {totalLabs}
+                                            </div>
+                                            <div className="text-[7px] font-black text-white/30 uppercase tracking-[0.2em] mt-0.5">
+                                                LABS
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-end border-t border-white/5 pt-3 mt-1">
+                                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-400/5 border border-emerald-400/10 group-hover:bg-emerald-400/10 transition-all">
+                                            <div className="w-1 h-1 rounded-full bg-emerald-400 shadow-[0_0_5px_rgba(52,211,153,0.5)]" />
+                                            <span className="text-lg font-bold text-emerald-400 tracking-tight leading-none">{online}</span>
+                                            <span className="text-[8px] font-black text-emerald-400/40 uppercase tracking-widest">LIVE</span>
                                         </div>
                                     </div>
                                 </CardContent>

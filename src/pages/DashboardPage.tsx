@@ -18,35 +18,37 @@ const COLORS = [
     "#1de9b6", // Vibrant Teal
 ];
 
-const CustomTooltip = ({ active, payload, centerViewMode }: any) => {
+const CustomTooltip = ({ active, payload, viewMode }: any) => {
     if (active && payload && payload.length) {
         const data = payload[0].payload;
         if (data.name === "No Data") return null;
 
-        // Determine if this is a city entry (not one of the known status keys)
-        const isCityEntry = !["Online Labs", "Offline Labs", "Online PCs", "Offline PCs"].includes(data.name);
-        let valueSuffix = "";
-        if (isCityEntry) {
-            if (centerViewMode === 'pc') valueSuffix = " PCs";
-            else if (centerViewMode === 'tehsil') valueSuffix = " Labs";
-            else if (centerViewMode === 'labs') valueSuffix = " Labs";
-            else valueSuffix = " Tehsils"; // district mode — show tehsils per district
-        }
+        let label = "Units";
+        if (viewMode === 'district') label = "Total Tehsils";
+        else if (viewMode === 'tehsil') label = "Total Labs";
+        else if (viewMode === 'labs') label = "Total Labs";
+        else if (viewMode === 'pc') label = "Total PCs";
 
         return (
-            <div className="bg-background/90 backdrop-blur-xl border border-white/10 px-6 py-4 rounded-2xl shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)] animate-in zoom-in-95 duration-200">
-                <div className="flex items-center gap-3 mb-2">
+            <div className="bg-background/95 backdrop-blur-2xl border border-white/10 px-8 py-6 rounded-[2rem] shadow-[0_0_80px_-12px_rgba(0,0,0,0.8)] animate-in zoom-in-95 duration-200 min-w-[220px]">
+                <div className="flex items-center gap-3 mb-6 border-b border-white/5 pb-4">
                     <div
-                        className="w-2 h-2 rounded-full shadow-[0_0_10px_currentColor]"
+                        className="w-2.5 h-2.5 rounded-full shadow-[0_0_15px_currentColor]"
                         style={{ color: data.color, backgroundColor: data.color }}
                     />
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                    <span className="text-sm font-black text-white uppercase tracking-[0.2em] italic">
                         {data.name}
                     </span>
                 </div>
-                <p className="text-4xl font-black text-white leading-none tracking-tight">
-                    {data.value}{valueSuffix}
-                </p>
+
+                <div className="flex justify-between items-center gap-8">
+                    <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.3em]">
+                        {label}
+                    </span>
+                    <p className="text-4xl font-black text-white leading-none tracking-tighter italic">
+                        {data.value}
+                    </p>
+                </div>
             </div>
         );
     }
@@ -182,7 +184,7 @@ export default function DashboardPage() {
         if (entry.name === "Online Labs") {
             navigate('/dashboard/labs?status=online');
         } else if (entry.name === "Offline Labs") {
-            navigate('/dashboard/labs?status=offline');
+            navigate('/dashboard/labs?status=all_offline');
         }
     };
 
@@ -194,8 +196,11 @@ export default function DashboardPage() {
         } else if (centerViewMode === 'tehsil') {
             // Navigate to labs page filtered by this specific tehsil
             navigate(`/dashboard/labs?tehsil=${entry.name}`);
+        } else if (centerViewMode === 'district') {
+            // Navigate to tehsils page filtered by this specific district
+            navigate(`/dashboard/cities?city=${entry.name}`);
         } else {
-            // For both 'district' and 'labs' view, show labs for that city
+            // For 'labs' view, show labs for that city
             navigate(`/dashboard/labs?city=${entry.name}`);
         }
     };
@@ -234,10 +239,11 @@ export default function DashboardPage() {
 
                 {/* --- LEFT: CITY DISTRIBUTION (Dynamic) --- */}
                 <div className="flex flex-col items-center gap-8 w-full max-w-[400px]">
-                    <div className="relative w-full aspect-square group shrink-0">
+                    <h2 className="text-2xl md:text-3xl font-black uppercase tracking-[0.2em] drop-shadow-2xl z-20 bg-clip-text text-transparent bg-gradient-to-r from-violet-400 to-fuchsia-400">TotalDistrict</h2>
+                    <div className="relative w-full aspect-square group shrink-0" style={{ minHeight: '300px' }}>
                         <div className="absolute inset-0 rounded-full border border-white/5 scale-[0.85] opacity-0 group-hover:opacity-100 transition-all duration-700 ease-out" />
                         <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
+                            <PieChart width={300} height={300}>
                                 <Pie
                                     data={safeCityChartData}
                                     cx="50%"
@@ -260,7 +266,7 @@ export default function DashboardPage() {
                                         />
                                     ))}
                                 </Pie>
-                                <Tooltip content={<CustomTooltip centerViewMode={centerViewMode} />} cursor={false} />
+                                <Tooltip content={<CustomTooltip viewMode={centerViewMode} />} cursor={false} />
                             </PieChart>
                         </ResponsiveContainer>
 
@@ -318,10 +324,11 @@ export default function DashboardPage() {
 
                 {/* --- CENTER: LAB STATUS --- */}
                 <div className="flex flex-col items-center gap-8 w-full max-w-[400px] animate-in zoom-in-95 duration-700 delay-100">
-                    <div className="relative w-full aspect-square group shrink-0">
+                    <h2 className="text-2xl md:text-3xl font-black uppercase tracking-[0.2em] drop-shadow-2xl z-20 bg-clip-text text-transparent bg-gradient-to-r from-amber-400 to-orange-500">TotalLabs</h2>
+                    <div className="relative w-full aspect-square group shrink-0" style={{ minHeight: '300px' }}>
                         <div className="absolute inset-0 rounded-full border border-white/5 scale-[0.85] opacity-0 group-hover:opacity-100 transition-all duration-700 ease-out" />
                         <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
+                            <PieChart width={300} height={300}>
                                 <Pie
                                     data={
                                         viewMode === 'online' ? [{ name: "Online Labs", value: (usedLabsVal + idleLabsVal) || 1, color: "#00e676" }] :
@@ -352,7 +359,7 @@ export default function DashboardPage() {
                                         />
                                     ))}
                                 </Pie>
-                                <Tooltip content={<CustomTooltip centerViewMode={centerViewMode} />} cursor={false} />
+                                <Tooltip content={<CustomTooltip viewMode={centerViewMode} />} cursor={false} />
                             </PieChart>
                         </ResponsiveContainer>
 
@@ -428,10 +435,11 @@ export default function DashboardPage() {
 
                 {/* --- RIGHT: PC STATUS --- */}
                 <div className="flex flex-col items-center gap-8 w-full max-w-[400px] animate-in slide-in-from-right-10 duration-700 delay-200">
-                    <div className="relative w-full aspect-square group shrink-0">
+                    <h2 className="text-2xl md:text-3xl font-black uppercase tracking-[0.2em] drop-shadow-2xl z-20 bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-cyan-400">TotalPc</h2>
+                    <div className="relative w-full aspect-square group shrink-0" style={{ minHeight: '300px' }}>
                         <div className="absolute inset-0 rounded-full border border-white/5 scale-[0.85] opacity-0 group-hover:opacity-100 transition-all duration-700 ease-out" />
                         <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
+                            <PieChart width={300} height={300}>
                                 <Pie
                                     data={
                                         pcViewMode === 'online' ? [{ name: "Online PCs", value: onlinePCs || 1, color: "#00e676" }] :
@@ -462,7 +470,7 @@ export default function DashboardPage() {
                                         />
                                     ))}
                                 </Pie>
-                                <Tooltip content={<CustomTooltip centerViewMode={centerViewMode} />} cursor={false} />
+                                <Tooltip content={<CustomTooltip viewMode={centerViewMode} />} cursor={false} />
                             </PieChart>
                         </ResponsiveContainer>
 

@@ -1,142 +1,153 @@
 import { format } from 'date-fns';
 import { apiFetch } from './api';
+import pptxgen from "pptxgenjs";
 import * as XLSX from 'xlsx';
-
 type ReportType = 'GLOBAL' | 'CITY' | 'LAB' | 'SYSTEM' | 'PC';
 
 export async function generateDynamicReport(type: ReportType, data: any, context?: string) {
     try {
         const fileTimestamp = format(new Date(), 'yyyy-MM-dd_HH-mm');
+        const pres = new pptxgen();
+        let fileName = 'Audit_Report';
+
+        // Professional Theme Colors
+        const THEME_BLUE = "1e293b";
+        const THEME_ORANGE = "f99a1d";
+        const TEXT_WHITE = "FFFFFF";
 
         // Helper to get score safely
         const getScore = (item: any) => {
             const val = item.avg_performance ?? item.avg_score ?? item.cpu_score ?? 0;
-            return parseFloat(String(val)) || 0;
+            let score = parseFloat(String(val)) || 0;
+            if (score > 100) score = score / 100;
+            if (score >= 100) score = 99.9;
+            return score;
         };
 
-        // EXCEL DATA PREPARATION
-        const workbook = XLSX.utils.book_new();
-        let fileName = 'Audit_Report';
+        const addHeader = (slide: any, title: string) => {
+            slide.addShape(pres.ShapeType.rect, { x: 0, y: 0, w: '100%', h: 1.0, fill: { color: THEME_BLUE } });
+            slide.addText(title, { x: 0.5, y: 0.2, w: '90%', h: 0.6, fontSize: 24, fontFace: "Segoe UI", color: THEME_ORANGE, bold: true });
+            slide.addText(`GENERATE DATE: ${format(new Date(), 'yyyy-MM-dd HH:mm')}`, { x: 0.5, y: 0.7, w: '90%', h: 0.2, fontSize: 10, color: TEXT_WHITE, italic: true });
+        };
 
         if (type === 'GLOBAL') {
             const locations = data.locations || [];
-            fileName = `Global_Level_Report_${fileTimestamp}`;
+            fileName = `Global_Infrastructure_Report_${fileTimestamp}`;
 
-            const excelData = locations.map((loc: any) => ({
-                "City / Region": loc.city,
-                "Total Labs": loc.total_labs,
-                "Total PCs": loc.total_pcs,
-                "Online": loc.online,
-                "Offline": loc.offline,
-                "Performance Score (%)": getScore(loc).toFixed(1)
-            }));
+            const slide = pres.addSlide();
+            addHeader(slide, "PROVINCIAL INFRASTRUCTURE OVERVIEW");
 
-            const ws = XLSX.utils.json_to_sheet(excelData);
-            XLSX.utils.book_append_sheet(workbook, ws, "Regional_Distribution");
+            const rows = locations.map((loc: any) => [
+                { text: loc.city },
+                { text: String(loc.total_labs) },
+                { text: String(loc.total_pcs) },
+                { text: String(loc.online) },
+                { text: `${getScore(loc).toFixed(1)}%` }
+            ]);
+
+            slide.addTable([
+                ["DISTRICT", "TOTAL LABS", "TOTAL PCS", "LIVE", "PERFORMANCE"],
+                ...rows
+            ], {
+                x: 0.5, y: 1.2, w: 9,
+                border: { pt: 1, color: "dddddd" },
+                fill: { color: "F1F1F1" },
+                fontSize: 12,
+                headerRow: true,
+                headerProps: { fill: THEME_BLUE, color: TEXT_WHITE, bold: true }
+            });
         }
         else if (type === 'CITY' || (type === 'SYSTEM' && context && !data.devices)) {
             const labs = data.labs || [];
             const cityName = context || data.city || 'TOTAL SYSTEM';
-            fileName = `City_Level_Report_${(cityName || 'Unknown').replace(/\s+/g, '_')}_${fileTimestamp}`;
+            fileName = `City_Audit_${(cityName || 'Unknown').replace(/\s+/g, '_')}_${fileTimestamp}`;
 
-            const excelData = labs.map((l: any) => ({
-                "Lab Facility Name": l.lab_name,
-                "Total PCs": l.total_pcs,
-                "Online": l.online,
-                "Offline": l.offline,
-                "Performance Score Total": (getScore(l) * (l.total_pcs || 1)).toFixed(0),
-                "Health (%)": getScore(l).toFixed(1)
-            }));
+            const slide = pres.addSlide();
+            addHeader(slide, `${cityName.toUpperCase()} - LAB INFRASTRUCTURE`);
 
-            const ws = XLSX.utils.json_to_sheet(excelData);
-            XLSX.utils.book_append_sheet(workbook, ws, "Lab_Cluster_Details");
+            const rows = labs.map((l: any) => [
+                { text: l.lab_name },
+                { text: String(l.total_pcs) },
+                { text: String(l.online) },
+                { text: (getScore(l) * (l.total_pcs || 1)).toFixed(0) },
+                { text: `${getScore(l).toFixed(1)}%` }
+            ]);
+
+            slide.addTable([
+                ["LAB FACILITY", "PCS", "LIVE", "LOAD SCORE", "HEALTH"],
+                ...rows
+            ], {
+                x: 0.5, y: 1.2, w: 9,
+                border: { pt: 1, color: "dddddd" },
+                fontSize: 11,
+                headerRow: true,
+                headerProps: { fill: THEME_BLUE, color: TEXT_WHITE, bold: true }
+            });
         }
         else if (type === 'LAB' || (type === 'SYSTEM' && data.devices)) {
             const devices = data.devices || [];
             const labName = context || data.lab || 'GLOBAL FLEET';
-            fileName = `Lab_Level_Report_${(labName || 'Unknown').replace(/\s+/g, '_')}_${fileTimestamp}`;
-            if (type === 'SYSTEM') fileName = `All_Systems_Report_${fileTimestamp}`;
+            fileName = `Lab_Audit_${(labName || 'Unknown').replace(/\s+/g, '_')}_${fileTimestamp}`;
 
-            // Prepare Summary Sheet
+            // Slide 1: Summary
+            const slide1 = pres.addSlide();
+            addHeader(slide1, `${labName.toUpperCase()} - SUMMARY`);
+
             const totalPcs = data.total_pcs ?? devices.length;
             const onlineCount = data.online ?? devices.filter((d: any) => d.status === 'online').length;
-            const offlineCount = data.offline ?? (totalPcs - onlineCount);
+            const offlineCount = totalPcs - onlineCount;
 
-            const summaryData = [{
-                "Metric": "Total PCs", "Value": totalPcs
-            }, {
-                "Metric": "Online", "Value": onlineCount
-            }, {
-                "Metric": "Offline", "Value": offlineCount
-            }];
-            const wsSummary = XLSX.utils.json_to_sheet(summaryData);
-            XLSX.utils.book_append_sheet(workbook, wsSummary, "Summary");
+            slide1.addText(`Total Infrastructure Nodes: ${totalPcs}`, { x: 1, y: 2, fontSize: 18, color: "333333" });
+            slide1.addText(`Active Systems: ${onlineCount}`, { x: 1, y: 2.5, fontSize: 18, color: "2ea043", bold: true });
+            slide1.addText(`Offline Systems: ${offlineCount}`, { x: 1, y: 3.0, fontSize: 18, color: "cf222e" });
 
-            // Prepare Inventory Sheet
+            // Slide 2: Inventory
             if (devices.length > 0) {
-                const excelData = devices.map((d: any) => ({
-                    "Station Name": d.pc_name || 'Station',
-                    "Status": (d.status || 'offline').toUpperCase(),
-                    "CPU Load (%)": getScore(d).toFixed(1),
-                    "Last Seen": d.last_seen ? format(new Date(d.last_seen), 'yyyy-MM-dd HH:mm:ss') : 'N/A',
-                    "Application Usage": d.app_usage ? JSON.stringify(d.app_usage) : "{}"
-                }));
-                const ws = XLSX.utils.json_to_sheet(excelData);
-                XLSX.utils.book_append_sheet(workbook, ws, "Node_Inventory");
+                const slide2 = pres.addSlide();
+                addHeader(slide2, `${labName.toUpperCase()} - NODE INVENTORY`);
+                const rows = devices.slice(0, 15).map((d: any) => [
+                    d.pc_name || 'Station',
+                    (d.status || 'offline').toUpperCase(),
+                    `${getScore(d).toFixed(1)}%`,
+                    d.last_seen ? format(new Date(d.last_seen), 'HH:mm') : 'N/A'
+                ]);
+
+                slide2.addTable([
+                    ["STATION", "STATUS", "CPU LOAD", "LAST SEEN"],
+                    ...rows
+                ], { x: 0.5, y: 1.2, w: 9, fontSize: 10, headerProps: { fill: THEME_BLUE, color: TEXT_WHITE } });
             }
         }
         else if (type === 'PC') {
             const device = data;
-            const history = data.history || [];
-            fileName = `PC_Report_${(data.pc_name || 'System').replace(/\s+/g, '_')}_${fileTimestamp}`;
+            fileName = `System_Profile_${(device.pc_name || 'System').replace(/\s+/g, '_')}_${fileTimestamp}`;
 
-            // Sheet 1: Profile
-            const profileData = [{
-                "Property": "System ID", "Value": device.system_id
-            }, {
-                "Property": "PC Name", "Value": device.pc_name
-            }, {
-                "Property": "Region", "Value": device.city?.toUpperCase() || 'N/A'
-            }, {
-                "Property": "Facility", "Value": device.lab_name?.toUpperCase() || 'N/A'
-            }, {
-                "Property": "Status", "Value": device.isOnline ? 'ONLINE' : 'OFFLINE'
-            }, {
-                "Property": "Health Score", "Value": `${getScore(device).toFixed(1)}%`
-            }];
-            const wsProfile = XLSX.utils.json_to_sheet(profileData);
-            XLSX.utils.book_append_sheet(workbook, wsProfile, "Profile");
+            const slide = pres.addSlide();
+            addHeader(slide, `SYSTEM PROFILE: ${device.pc_name}`);
 
-            // Sheet 2: App Usage
-            if (device.app_usage) {
-                const appUsageData = Object.entries(device.app_usage as Record<string, number>)
-                    .sort(([, a], [, b]) => b - a)
-                    .map(([app, secs]) => ({
-                        "Application": app,
-                        "Duration (Seconds)": secs,
-                        "Duration (Formatted)": `${Math.floor(secs / 3600)}h ${Math.floor((secs % 3600) / 60)}m`
-                    }));
-                const wsApps = XLSX.utils.json_to_sheet(appUsageData);
-                XLSX.utils.book_append_sheet(workbook, wsApps, "App_Usage");
-            }
+            const profileData = [
+                ["Property", "Value"],
+                ["System ID", device.system_id],
+                ["Region", device.city?.toUpperCase() || 'N/A'],
+                ["Facility", device.lab_name?.toUpperCase() || 'N/A'],
+                ["Status", device.isOnline ? 'ONLINE' : 'OFFLINE'],
+                ["Health Score", `${getScore(device).toFixed(1)}%`]
+            ];
 
-            // Sheet 3: History
-            const historyData = history.map((h: any) => ({
-                "Date": h.history_date || format(new Date(h.start_time), 'yyyy-MM-dd'),
-                "Avg Performance (%)": getScore(h).toFixed(1),
-                "Runtime Minutes": h.runtime_minutes || 0,
-                "Runtime (Hours)": ((h.runtime_minutes || 0) / 60).toFixed(2),
-                "Raw App Usage Data": h.app_usage ? JSON.stringify(h.app_usage) : "{}"
-            }));
-            const wsHistory = XLSX.utils.json_to_sheet(historyData);
-            XLSX.utils.book_append_sheet(workbook, wsHistory, "History_Archive");
+            slide.addTable(profileData, {
+                x: 0.5, y: 1.5, w: 5,
+                border: { pt: 1, color: "dddddd" },
+                fontSize: 14,
+                headerRow: true,
+                headerProps: { fill: THEME_BLUE, color: TEXT_WHITE }
+            });
         }
 
-        // SAVE EXCEL
-        XLSX.writeFile(workbook, `${fileName}.xlsx`);
+        // SAVE POWERPOINT
+        await pres.writeFile({ fileName: `${fileName}.pptx` });
         return true;
     } catch (error) {
-        console.error("Excel Generation Error:", error);
+        console.error("PowerPoint Generation Error:", error);
         throw error;
     }
 }
@@ -146,85 +157,217 @@ export const generateDailyReport = (stats: any, locations: any[]) => generateDyn
 export async function generateCustomMultiLabReport(selectedData: { city: string, labs: string[], pcs?: Record<string, string[]> }[]) {
     try {
         const fileTimestamp = format(new Date(), 'yyyy-MM-dd_HH-mm');
-        const fileName = `Custom_Audit_Report_${fileTimestamp}`;
-
-        // Prepare Excel Workbook
-        const excelWorkbook = XLSX.utils.book_new();
-        let hasExcelData = false;
-
-        const excelRows: any[] = [];
+        const pres = new pptxgen();
+        const fileName = `Bulk_Report_${fileTimestamp}`;
+        let hasData = false;
 
         for (const cityData of selectedData) {
             for (const labName of cityData.labs) {
-
-                // Fetch data for this specific lab
                 const response = await apiFetch(`/devices?city=${cityData.city}&lab=${labName}`);
                 let devices = response?.devices || [];
 
-                // Filter by specific PCs if provided
                 const selectedPcsForLab = cityData.pcs?.[labName];
                 if (selectedPcsForLab && selectedPcsForLab.length > 0) {
                     devices = devices.filter((d: any) => selectedPcsForLab.includes(d.system_id));
                 }
 
-                // Fetch detailed history for each device
-                const detailedDevices = await Promise.all(devices.map(async (d: any) => {
-                    try {
-                        const detail = await apiFetch(`/devices/${d.system_id}`);
-                        return { ...d, history: detail?.history || [] };
-                    } catch (e) {
-                        return d;
-                    }
-                }));
+                if (devices.length > 0) {
+                    hasData = true;
+                    const slide = pres.addSlide();
 
-                if (detailedDevices.length > 0) {
-                    detailedDevices.forEach((d: any) => {
-                        if (d.history && d.history.length > 0) {
-                            // Sort history by date descending
-                            const sortedHistory = [...d.history].sort((a: any, b: any) => {
-                                return new Date(b.history_date || b.start_time).getTime() - new Date(a.history_date || a.start_time).getTime();
-                            });
+                    // Header
+                    slide.addShape(pres.ShapeType.rect, { x: 0, y: 0, w: '100%', h: 1.0, fill: { color: "000000" } });
+                    slide.addText(`Bulk Report: ${labName}`, { x: 0.5, y: 0.3, w: '90%', h: 0.4, fontSize: 18, color: "f99a1d", bold: true });
+                    slide.addText(`CITY: ${cityData.city} | DATE: ${fileTimestamp}`, { x: 0.5, y: 0.7, w: '90%', h: 0.2, fontSize: 8, color: "FFFFFF" });
 
-                            sortedHistory.forEach((h: any) => {
-                                excelRows.push({
-                                    "City": cityData.city,
-                                    "Lab": labName,
-                                    "PC Name": d.pc_name,
-                                    "Hardware ID": d.hardware_id || d.id,
-                                    "Date": h.history_date || format(new Date(h.start_time), 'yyyy-MM-dd'),
-                                    "CPU Performance (%)": (parseFloat(h.avg_score) || 0).toFixed(1),
-                                    "Runtime (Hours)": ((h.runtime_minutes || 0) / 60).toFixed(2),
-                                    "App Usage Data": JSON.stringify(h.app_usage || {})
-                                });
-                            });
-                        } else {
-                            // Current Data Fallback
-                            excelRows.push({
-                                "City": cityData.city,
-                                "Lab": labName,
-                                "PC Name": d.pc_name,
-                                "Hardware ID": d.hardware_id || d.id,
-                                "Date": "Current (Live)",
-                                "CPU Performance (%)": (parseFloat(d.avg_performance || d.cpu_score) || 0).toFixed(1),
-                                "App Usage Data": JSON.stringify(d.app_usage || {})
-                            });
-                        }
+                    const rows = devices.slice(0, 15).map((d: any) => {
+                        let score = parseFloat(d.avg_performance || d.cpu_score) || 0;
+                        if (score > 100) score = score / 100;
+                        if (score >= 100) score = 99.9;
+
+                        return [
+                            d.pc_name,
+                            d.hardware_id?.substring(0, 12) || 'N/A',
+                            d.status?.toUpperCase() || 'N/A',
+                            `${score.toFixed(1)}%`
+                        ];
                     });
-                    hasExcelData = true;
+
+                    const tableHeader = [
+                        { text: "PC NAME", options: { fill: "000000", color: "FFFFFF", bold: true, fontSize: 12 } },
+                        { text: "ID", options: { fill: "000000", color: "FFFFFF", bold: true, fontSize: 12 } },
+                        { text: "STATUS", options: { fill: "000000", color: "FFFFFF", bold: true, fontSize: 12 } },
+                        { text: "CPU PERFORMANCE", options: { fill: "000000", color: "FFFFFF", bold: true, fontSize: 12 } }
+                    ];
+
+                    slide.addTable([
+                        tableHeader as any,
+                        ...rows
+                    ], {
+                        x: 0.5, y: 1.2, w: 9,
+                        border: { pt: 1, color: "cccccc" },
+                        fontSize: 10,
+                    });
                 }
             }
         }
 
-        if (hasExcelData) {
-            const ws = XLSX.utils.json_to_sheet(excelRows);
-            const safeSheetName = `Consolidated_Report`;
-            XLSX.utils.book_append_sheet(excelWorkbook, ws, safeSheetName);
-            XLSX.writeFile(excelWorkbook, `${fileName}.xlsx`);
+        if (hasData) {
+            await pres.writeFile({ fileName: `${fileName}.pptx` });
+            return true;
         } else {
-            console.warn("No data found to generate Excel report.");
+            console.warn("No data found to generate PowerPoint report.");
+            return false;
+        }
+    } catch (error) {
+        console.error("Custom PowerPoint Generation Error:", error);
+        throw error;
+    }
+}
+
+export async function generateDynamicExcelReport(type: ReportType, data: any, context?: string) {
+    try {
+        const fileTimestamp = format(new Date(), 'yyyy-MM-dd_HH-mm');
+        let fileName = 'Audit_Report';
+        let excelData: any[] = [];
+
+        const getScoreStr = (item: any) => {
+            const val = item.avg_performance ?? item.avg_score ?? item.cpu_score ?? 0;
+            let score = parseFloat(String(val)) || 0;
+            if (score > 100) score = score / 100;
+            if (score >= 100) score = 99.9;
+            return `${score.toFixed(1)}%`;
+        };
+        const getScoreRaw = (item: any) => {
+            const val = item.avg_performance ?? item.avg_score ?? item.cpu_score ?? 0;
+            let score = parseFloat(String(val)) || 0;
+            if (score > 100) score = score / 100;
+            if (score >= 100) score = 99.9;
+            return score;
+        };
+
+        if (type === 'GLOBAL') {
+            const locations = data.locations || [];
+            fileName = `Global_Infrastructure_Report_${fileTimestamp}`;
+            excelData.push(["DISTRICT", "TOTAL LABS", "TOTAL PCS", "LIVE", "PERFORMANCE"]);
+            locations.forEach((loc: any) => {
+                excelData.push([loc.city, loc.total_labs, loc.total_pcs, loc.online, getScoreStr(loc)]);
+            });
+        }
+        else if (type === 'CITY' || (type === 'SYSTEM' && context && !data.devices)) {
+            const labs = data.labs || [];
+            const cityName = context || data.city || 'TOTAL SYSTEM';
+            fileName = `City_Audit_${(cityName || 'Unknown').replace(/\s+/g, '_')}_${fileTimestamp}`;
+            excelData.push(["LAB FACILITY", "PCS", "LIVE", "LOAD SCORE", "HEALTH"]);
+            labs.forEach((l: any) => {
+                excelData.push([l.lab_name, l.total_pcs, l.online, (getScoreRaw(l) * (l.total_pcs || 1)).toFixed(0), getScoreStr(l)]);
+            });
+        }
+        else if (type === 'LAB' || (type === 'SYSTEM' && data.devices)) {
+            const devices = data.devices || [];
+            const labName = context || data.lab || 'GLOBAL FLEET';
+            fileName = `Lab_Audit_${(labName || 'Unknown').replace(/\s+/g, '_')}_${fileTimestamp}`;
+
+            const totalPcs = data.total_pcs ?? devices.length;
+            const onlineCount = data.online ?? devices.filter((d: any) => d.status === 'online').length;
+            const offlineCount = totalPcs - onlineCount;
+
+            excelData.push([`${labName.toUpperCase()} - SUMMARY`]);
+            excelData.push(["Total Infrastructure Nodes", totalPcs]);
+            excelData.push(["Active Systems", onlineCount]);
+            excelData.push(["Offline Systems", offlineCount]);
+            excelData.push([]);
+
+            if (devices.length > 0) {
+                excelData.push(["STATION", "STATUS", "CPU LOAD", "LAST SEEN"]);
+                devices.forEach((d: any) => {
+                    excelData.push([
+                        d.pc_name || 'Station',
+                        (d.status || 'offline').toUpperCase(),
+                        getScoreStr(d),
+                        d.last_seen ? format(new Date(d.last_seen), 'HH:mm') : 'N/A'
+                    ]);
+                });
+            }
+        }
+        else if (type === 'PC') {
+            const device = data;
+            fileName = `System_Profile_${(device.pc_name || 'System').replace(/\s+/g, '_')}_${fileTimestamp}`;
+            excelData.push(["Property", "Value"]);
+            excelData.push(["System ID", device.system_id]);
+            excelData.push(["Region", device.city?.toUpperCase() || 'N/A']);
+            excelData.push(["Facility", device.lab_name?.toUpperCase() || 'N/A']);
+            excelData.push(["Status", device.isOnline ? 'ONLINE' : 'OFFLINE']);
+            excelData.push(["Health Score", getScoreStr(device)]);
         }
 
+        const ws = XLSX.utils.aoa_to_sheet(excelData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Audit Report");
+        XLSX.writeFile(wb, `${fileName}.xlsx`);
         return true;
+    } catch (error) {
+        console.error("Excel Generation Error:", error);
+        throw error;
+    }
+}
+
+export async function generateCustomMultiLabExcelReport(selectedData: { city: string, labs: string[], pcs?: Record<string, string[]> }[]) {
+    try {
+        const fileTimestamp = format(new Date(), 'yyyy-MM-dd_HH-mm');
+        const fileName = `Bulk_Report_${fileTimestamp}`;
+        let hasData = false;
+        let excelData: any[] = [];
+
+        const getScoreStr = (d: any) => {
+            let score = parseFloat(d.avg_performance || d.cpu_score) || 0;
+            if (score > 100) score = score / 100;
+            if (score >= 100) score = 99.9;
+            return `${score.toFixed(1)}%`;
+        };
+
+        for (const cityData of selectedData) {
+            for (const labName of cityData.labs) {
+                const response = await apiFetch(`/devices?city=${cityData.city}&lab=${labName}`);
+                let devices = response?.devices || [];
+
+                const selectedPcsForLab = cityData.pcs?.[labName];
+                if (selectedPcsForLab && selectedPcsForLab.length > 0) {
+                    devices = devices.filter((d: any) => selectedPcsForLab.includes(d.system_id));
+                }
+
+                if (devices.length > 0) {
+                    hasData = true;
+                    excelData.push([`Bulk Report: ${labName}`]);
+                    excelData.push([`CITY: ${cityData.city}`, `DATE: ${fileTimestamp}`]);
+                    excelData.push([]);
+                    excelData.push(["PC NAME", "ID", "STATUS", "CPU PERFORMANCE"]);
+
+                    devices.forEach((d: any) => {
+                        excelData.push([
+                            d.pc_name,
+                            d.hardware_id?.substring(0, 12) || 'N/A',
+                            d.status?.toUpperCase() || 'N/A',
+                            getScoreStr(d)
+                        ]);
+                    });
+
+                    excelData.push([]); // blank line between datasets
+                    excelData.push([]);
+                }
+            }
+        }
+
+        if (hasData) {
+            const ws = XLSX.utils.aoa_to_sheet(excelData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Bulk Audit Report");
+            XLSX.writeFile(wb, `${fileName}.xlsx`);
+            return true;
+        } else {
+            console.warn("No data found to generate Excel report.");
+            return false;
+        }
     } catch (error) {
         console.error("Custom Excel Generation Error:", error);
         throw error;

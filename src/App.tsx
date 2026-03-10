@@ -16,7 +16,15 @@ import PCHistoryDetailPage from "./pages/PCHistoryDetailPage";
 
 import LabSummaryPage from "./pages/LabSummaryPage";
 import DashboardPage from "./pages/DashboardPage";
+import Dashboard4 from "./pages/Dashboard4";
+import Dashboard5 from "./pages/Dashboard5";
 import TehsilsPage from "./pages/TehsilsPage";
+import TehsilPerformancePage from "./pages/TehsilPerformancePage";
+import UtilizationPage from "./pages/UtilizationPage";
+import TerminalCommandCenter from "./pages/TerminalCommandCenter";
+import MaintenanceHub from "./pages/MaintenanceHub";
+import LabHeatmap from "./pages/LabHeatmap";
+
 import NotFound from "./pages/NotFound";
 import { GlobalFailsafe } from "@/components/GlobalFailsafe";
 
@@ -28,7 +36,7 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <GlobalFailsafe />
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -42,12 +50,20 @@ const App = () => (
               }
             >
               <Route index element={<Navigate to="analytics" replace />} />
+              <Route path="analytics" element={<DashboardPage />} />
+              <Route path="dashboard_4" element={<Dashboard4 />} />
+              <Route path="dashboard_5" element={<Dashboard5 />} />
+              <Route path="utilization" element={<UtilizationPage />} />
               <Route path="cities" element={<LocationsPage />} />
               <Route path="tehsils" element={<TehsilsPage />} />
+              <Route path="tehsil-performance" element={<TehsilPerformancePage />} />
               <Route path="labs" element={<LabsPage />} />
               <Route path="devices" element={<DevicesPage />} />
               <Route path="overview" element={<DashboardOverview />} />
-              <Route path="analytics" element={<DashboardPage />} />
+              <Route path="terminal" element={<TerminalCommandCenter />} />
+              <Route path="maintenance" element={<MaintenanceHub />} />
+              <Route path="heatmap" element={<LabHeatmap />} />
+
               <Route path="lab-summary/:city/:lab" element={<LabSummaryPage />} />
               <Route path="pc/:id" element={<PCDetailPage />} />
               <Route path="pc/:id/history/:date" element={<PCHistoryDetailPage />} />

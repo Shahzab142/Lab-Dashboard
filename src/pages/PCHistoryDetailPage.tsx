@@ -30,7 +30,7 @@ export default function PCHistoryDetailPage() {
 
     const { data: detail, isLoading } = useQuery({
         queryKey: ['pc-detail', id],
-        queryFn: () => apiFetch(`/devices/${id}`),
+        queryFn: () => apiFetch(`/devices/${encodeURIComponent(id || '')}`),
     });
 
     if (isLoading) return <div className="p-8 bg-background min-h-screen"><Skeleton className="h-full w-full rounded-[2.5rem] bg-card/50" /></div>;

@@ -8,10 +8,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { apiFetch } from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
-import { MiniWaveChart } from './MiniWaveChart';
 
 interface DeviceCardProps {
   device: any;
@@ -40,13 +39,21 @@ export function DeviceCard({ device, serverTime }: DeviceCardProps) {
 
   const handleDeletePC = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm(`Are you sure you want to delete ${device.pc_name}?`)) return;
+    if (!confirm(`CRITICAL: Are you sure you want to PERMANENTLY delete ${device.pc_name}? This cannot be undone.`)) return;
     try {
-      await apiFetch(`/devices/manage?hid=${device.system_id}`, { method: 'DELETE' });
-      toast.success("PC slot reset successfully");
+      const { error } = await supabase
+        .from('devices')
+        .delete()
+        .eq('system_id', device.system_id);
+
+      if (error) throw error;
+
+      toast.success("PC Deleted Permanently");
       queryClient.invalidateQueries({ queryKey: ['devices-list'] });
+      queryClient.invalidateQueries({ queryKey: ['global-lab-stats'] });
     } catch (err) {
-      toast.error("Failed to reset PC slot");
+      console.error(err);
+      toast.error("Failed to delete PC");
     }
   };
 
@@ -129,19 +136,11 @@ export function DeviceCard({ device, serverTime }: DeviceCardProps) {
 
         {/* Technical Telemetry Graph */}
         <div className="bg-background rounded-xl border border-border p-3 flex flex-col items-center gap-2">
-          <MiniWaveChart
-            color={isOnline ? "#01416D" : "#9CA3AF"}
-            width={160}
-            height={30}
-            intensity={isOnline ? cpuIntensity : 0.05}
-            showGrid={false}
-            isOnline={isOnline || false}
-          />
-          <div className="w-full flex justify-between items-center text-[8px] font-bold uppercase tracking-wider text-white/60">
-            <span>TELEMETRY</span>
+          <div className="w-full flex justify-between items-center text-[10px] font-bold uppercase tracking-[0.2em] text-white/80">
+            <span>NETWORK STATUS</span>
             <div className="flex items-center gap-1.5">
-              <span className={cn(isOnline ? "text-emerald-600" : "text-gray-400")}>{isOnline ? "LINKED" : "OFFLINE"}</span>
-              <div className={cn("w-1 h-1 rounded-full", isOnline ? "bg-emerald-600 animate-pulse" : "bg-gray-300")} />
+              <span className={cn(isOnline ? "text-emerald-500" : "text-gray-500")}>{isOnline ? "LINKED" : "OFFLINE"}</span>
+              <div className={cn("w-1.5 h-1.5 rounded-full", isOnline ? "bg-emerald-500 animate-pulse" : "bg-gray-400")} />
             </div>
           </div>
         </div>

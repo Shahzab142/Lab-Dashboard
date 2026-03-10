@@ -15,16 +15,22 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
     };
 
     try {
-        // PRODUCTION SERVER: lab-systems-monitoring-server-kt3b.onrender.com
-        const baseUrl = "https://lab-systems-monitoring-server-kt3b.onrender.com/api";
-        const res = await fetch(
-            `${baseUrl}${path}`,
-            finalOptions
-        );
+        // Force the correct backend URL (ignoring stale Netlify variables if any)
+        const baseUrl = import.meta.env.VITE_API_URL || "https://lab-systems-monitoring-server-1.onrender.com/api";
+        const url = new URL(`${baseUrl}${path}`);
+        url.searchParams.append("_t", String(Date.now()));
+        const res = await fetch(url.toString(), finalOptions);
 
         if (!res.ok) {
-            console.error(`API Error: ${res.status} ${res.statusText} for ${path}`);
-            throw new Error(`API error ${res.status}`);
+            let errorMessage = `HTTP ${res.status}`;
+            try {
+                const errorData = await res.json();
+                errorMessage = errorData.error || errorData.message || errorMessage;
+            } catch (e) {
+                // Not a JSON error response
+            }
+            console.error(`API Error: ${res.status} ${res.statusText} for ${path}. Detail: ${errorMessage}`);
+            throw new Error(errorMessage);
         }
 
         return await res.json();

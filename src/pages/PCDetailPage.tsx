@@ -114,16 +114,27 @@ export default function PCDetailPage() {
 
   // --- MUTATIONS ---
   const deleteMutation = useMutation({
-    mutationFn: () => apiFetch(`/devices/manage?hid=${id}`, { method: 'DELETE' }),
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from('devices')
+        .delete()
+        .eq('system_id', id);
+      if (error) throw error;
+    },
     onSuccess: () => {
-      toast.success("System slot reset successfully");
+      toast.success("PC Record Permanently Erased");
+      queryClient.invalidateQueries({ queryKey: ['devices-list'] });
+      queryClient.invalidateQueries({ queryKey: ['global-lab-stats'] });
       navigate('/dashboard', { replace: true });
     },
-    onError: () => toast.error("Failed to remove unit")
+    onError: (error: any) => {
+      console.error(error);
+      toast.error("Failed to delete system record");
+    }
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: any) => apiFetch(`/devices/${id}`, {
+    mutationFn: (data: any) => apiFetch(`/devices/${encodeURIComponent(id || '')}`, {
       method: 'PATCH',
       body: JSON.stringify({
         pc_name: data.pc_name,
@@ -287,18 +298,18 @@ export default function PCDetailPage() {
 
               <Button
                 onClick={async () => {
-                  const toastId = toast.loading("Synthesizing node audit Excel report...");
+                  const toastId = toast.loading("Synthesizing node audit PowerPoint report...");
                   try {
                     const { generateDynamicReport } = await import('@/lib/pdf-generator');
                     await generateDynamicReport('PC', { ...device, isOnline, history: detail?.history }, device.system_id);
-                    toast.success("Audit Generated Successfully", { id: toastId });
+                    toast.success("PowerPoint Audit Generated", { id: toastId });
                   } catch (e) {
-                    toast.error("Excel Engine Error", { id: toastId });
+                    toast.error("PowerPoint Engine Error", { id: toastId });
                   }
                 }}
                 className="bg-white hover:bg-white/90 text-black gap-2 px-6 rounded-lg h-10 text-[10px] font-bold uppercase tracking-widest transition-all shadow-sm"
               >
-                <Monitor size={16} className="text-black" /> Audit Report
+                <Monitor size={16} className="text-black" /> Audit Report (PPTX)
               </Button>
 
               <Button
