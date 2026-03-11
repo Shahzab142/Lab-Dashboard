@@ -197,8 +197,8 @@ export default function DashboardPage() {
             // Navigate to labs page filtered by this specific tehsil
             navigate(`/dashboard/labs?tehsil=${entry.name}`);
         } else if (centerViewMode === 'district') {
-            // Navigate to tehsils page filtered by this specific district
-            navigate(`/dashboard/cities?city=${entry.name}`);
+            // Navigate to DistrictWise overview page
+            navigate(`/dashboard/overview`);
         } else {
             // For 'labs' view, show labs for that city
             navigate(`/dashboard/labs?city=${entry.name}`);
