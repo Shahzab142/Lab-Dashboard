@@ -1,7 +1,8 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, updateDeviceStatus } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
+import { Device, DeviceDailyHistory } from '@/types';
 import {
   ArrowLeft,
   Monitor,
@@ -57,16 +58,8 @@ export default function PCDetailPage() {
     };
     resetUI();
 
-    // Safety check for localStorage corruption
-    try {
-      if (id) {
-        const defectiveDevices = JSON.parse(localStorage.getItem('defective_devices') || '[]');
-        setIsLocallyDefective(defectiveDevices.includes(id));
-      }
-    } catch (e) {
-      console.error("Storage corruption detected:", e);
-      localStorage.setItem('defective_devices', '[]');
-    }
+    // Safety check for localStorage corruption - REDUNDANT in Phase 7 (Moved to Server)
+    // setIsLocallyDefective(detail?.device?.is_defective || false);
 
     return () => resetUI();
   }, [id]);
@@ -134,7 +127,7 @@ export default function PCDetailPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: any) => apiFetch(`/devices/${encodeURIComponent(id || '')}`, {
+    mutationFn: (data: Partial<Device>) => apiFetch(`/devices/${encodeURIComponent(id || '')}`, {
       method: 'PATCH',
       body: JSON.stringify({
         pc_name: data.pc_name,
@@ -150,48 +143,28 @@ export default function PCDetailPage() {
     }
   });
 
-  const toggleDefectiveLocal = () => {
-    try {
-      const defectiveDevices = JSON.parse(localStorage.getItem('defective_devices') || '[]');
-      let newDevices;
-
-      if (isLocallyDefective) {
-        // REMOVING FROM DEFECTIVE
-        newDevices = defectiveDevices.filter((did: string) => did !== id);
-
-        // Update Local Storage
-        localStorage.setItem('defective_devices', JSON.stringify(newDevices));
-        setIsLocallyDefective(false);
-
-        // Show Repaired Modal
-        setShowRepairedSuccess(true);
-        queryClient.invalidateQueries({ queryKey: ['devices'] });
-
-        // Delay navigation
-        setTimeout(() => navigate(-1), 2500);
-
-      } else {
-        // ADDING TO DEFECTIVE
-        newDevices = [...defectiveDevices, id];
-
-        localStorage.setItem('defective_devices', JSON.stringify(newDevices));
-        setIsLocallyDefective(true);
-
-        // Show the centered modal
+  const statusMutation = useMutation({
+    mutationFn: (isDefective: boolean) => updateDeviceStatus(id || '', isDefective),
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['pc-detail', id] });
+      queryClient.invalidateQueries({ queryKey: ['devices-list'] });
+      
+      if (data.is_defective) {
         setShowDefectiveSuccess(true);
-
-        queryClient.invalidateQueries({ queryKey: ['devices'] });
-        queryClient.invalidateQueries({ queryKey: ['devices-list'] });
-        queryClient.invalidateQueries({ queryKey: ['pc-detail', id] });
-
-        // Wait longer (2.5s) for user to read the centered message
-        setTimeout(() => {
-          navigate(-1);
-        }, 2500);
+        setTimeout(() => navigate(-1), 2500);
+      } else {
+        setShowRepairedSuccess(true);
+        setTimeout(() => navigate(-1), 2500);
       }
-    } catch (e) {
-      toast.error("Logic Error: Could not update status");
+    },
+    onError: () => {
+      toast.error("Failed to update system status");
     }
+  });
+
+  const toggleDefectiveStatus = () => {
+    if (!detail?.device) return;
+    statusMutation.mutate(!detail.device.is_defective);
   };
 
   // --- RENDER STATES ---
@@ -266,7 +239,12 @@ export default function PCDetailPage() {
               </div>
             </div>
             <p className="text-white font-bold text-[10px] uppercase tracking-widest opacity-60">
-              System ID: <span className="text-white/80">{device.system_id}</span> • Node Status: <span className={isLocallyDefective ? "text-red-500" : "text-emerald-500"}>{isLocallyDefective ? "DEFECTIVE" : "VERIFIED"}</span>
+              System ID: <span className="text-white/80">{device.system_id}</span> • Node Status: <span className={device.is_defective ? "text-red-500" : "text-emerald-500"}>{device.is_defective ? "DEFECTIVE" : "VERIFIED"}</span>
+              {device.health_score < 100 && (
+                <span className="ml-2 px-2 py-0.5 bg-red-500/20 text-red-400 rounded-sm border border-red-500/30">
+                  HEALTH ALERT: {device.health_score}%
+                </span>
+              )}
             </p>
           </div>
         </div>
@@ -284,16 +262,17 @@ export default function PCDetailPage() {
           ) : (
             <>
               <Button
-                onClick={toggleDefectiveLocal}
+                onClick={toggleDefectiveStatus}
+                disabled={statusMutation.isPending}
                 className={cn(
                   "gap-2 px-6 rounded-lg h-10 text-[10px] font-bold uppercase tracking-widest transition-all shadow-sm border",
-                  isLocallyDefective
+                  device.is_defective
                     ? "bg-red-500 text-white border-red-600 hover:bg-red-600"
                     : "bg-amber-500/10 text-amber-500 border-amber-500/20 hover:bg-amber-500 hover:text-white"
                 )}
               >
-                <Activity size={16} />
-                {isLocallyDefective ? "Repaired / Fix" : "Mark as Defective"}
+                {statusMutation.isPending ? <RefreshCw className="animate-spin" size={16} /> : <Activity size={16} />}
+                {device.is_defective ? "Repaired / Fix" : "Mark as Defective"}
               </Button>
 
               <Button
@@ -415,19 +394,32 @@ export default function PCDetailPage() {
 
               <div className="p-5 rounded-xl bg-card border border-border transition-all hover:border-secondary/20 group relative overflow-hidden">
                 <div className="absolute -right-2 -top-2 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity">
-                  <HardDrive size={80} />
+                  <Monitor size={80} />
                 </div>
                 <div className="flex items-center gap-4 relative z-10">
                   <div className="p-3 rounded-lg bg-orange-500 text-white shadow-lg shadow-orange-500/10">
-                    <HardDrive size={22} />
+                    <Monitor size={22} />
                   </div>
                   <div className="flex-1">
-                    <p className="text-[10px] text-white/90 uppercase font-black tracking-widest">HARDWARE ID</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <p className="font-mono text-xs font-bold uppercase tracking-tight text-primary break-all bg-primary/5 px-2.5 py-1.5 rounded border border-primary/20 shadow-inner">
-                        {device.hardware_id || device.hwid || "HS-PR10-TRON-X12"}
-                      </p>
-                    </div>
+                    <p className="text-[10px] text-white/90 uppercase font-black tracking-widest">OS INFORMATION</p>
+                    <p className="font-bold text-sm text-primary mt-1 line-clamp-1">{device.os_info || "Windows Core Terminal"}</p>
+                    <p className="text-[8px] text-white/40 uppercase tracking-widest mt-0.5">Hardware ID: {device.hardware_id}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-5 rounded-xl bg-card border border-border transition-all hover:border-blue-500/20 group relative overflow-hidden">
+                <div className="absolute -right-2 -top-2 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity">
+                  <ShieldCheck size={80} />
+                </div>
+                <div className="flex items-center gap-4 relative z-10">
+                  <div className="p-3 rounded-lg bg-blue-500 text-white shadow-lg shadow-blue-500/10">
+                    <ShieldCheck size={22} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[10px] text-white/90 uppercase font-black tracking-widest">NETWORK INTERFACE</p>
+                    <p className="font-mono text-xs font-bold text-primary mt-1">{device.local_ip || "127.0.0.1"}</p>
+                    <p className="text-[8px] text-white/40 uppercase tracking-widest mt-0.5 font-bold">Encrypted VPN Tunnel Stable</p>
                   </div>
                 </div>
               </div>
@@ -449,6 +441,46 @@ export default function PCDetailPage() {
                       return `${Math.floor(mins / 60)}H ${Math.floor(mins % 60)}M`;
                     })()}
                   </p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <p className="text-[10px] font-black text-primary uppercase tracking-widest opacity-40">Professional Hardware Spec</p>
+                <div className="grid grid-cols-1 gap-3">
+                  <div className="flex items-center justify-between p-3 bg-muted rounded-lg border border-border">
+                    <div className="flex items-center gap-2">
+                      <Cpu size={14} className="text-secondary" />
+                      <span className="text-[10px] font-bold text-white/70 uppercase">Processor</span>
+                    </div>
+                    <span className="text-[10px] font-mono font-bold text-primary truncate max-w-[150px]">{device.cpu_model || "X86-64 GENERIC"}</span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between p-3 bg-muted rounded-lg border border-border">
+                    <div className="flex items-center gap-2">
+                      <Activity size={14} className="text-secondary" />
+                      <span className="text-[10px] font-bold text-white/70 uppercase">Total Memory</span>
+                    </div>
+                    <span className="text-[10px] font-mono font-bold text-primary">{device.ram_total || "0.0 GB"}</span>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 bg-muted rounded-lg border border-border">
+                    <div className="flex items-center gap-2">
+                      <HardDrive size={14} className="text-secondary" />
+                      <span className="text-[10px] font-bold text-white/70 uppercase">Storage Cluster</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] font-mono font-bold text-primary block">{device.disk_free} FREE</span>
+                      <span className="text-[8px] font-bold text-white/40 block">OF {device.disk_total}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 bg-muted rounded-lg border border-border">
+                    <div className="flex items-center gap-2">
+                      <Monitor size={14} className="text-secondary" />
+                      <span className="text-[10px] font-bold text-white/70 uppercase">Graphic Core</span>
+                    </div>
+                    <span className="text-[10px] font-mono font-bold text-primary truncate max-w-[150px]">{device.gpu_model || "INTEGRATED"}</span>
+                  </div>
                 </div>
               </div>
 
@@ -590,8 +622,8 @@ export default function PCDetailPage() {
                         // Robust check: Compare date strings directly
                         const historyHasToday = history.some((h: any) => h.history_date === today || h.start_time?.startsWith(today));
 
-                        const getNormalizedScore = (val: any) => {
-                          let score = parseFloat(val) || 0;
+                        const getNormalizedScore = (val: number | null | undefined) => {
+                          let score = Number(val) || 0;
                           // Heuristic: If value is absurdly high (accumulated), divide by 100 as per user request
                           if (score > 100) {
                             score = score / 100;
@@ -631,11 +663,11 @@ export default function PCDetailPage() {
                         return null;
                       })()}
 
-                      {history.slice(0, 10).map((h: any) => {
-                        const dateObj = h.history_date ? new Date(h.history_date) : new Date(h.start_time);
-                        const dateArg = h.history_date || h.start_time?.split('T')[0];
+                      {history.slice(0, 10).map((h: DeviceDailyHistory) => {
+                        const dateObj = h.history_date ? new Date(h.history_date) : new Date(h.start_time || "");
+                        const dateArg = h.history_date || (h.start_time ? h.start_time.split('T')[0] : "");
 
-                        let score = parseFloat(h.avg_score || 0);
+                        let score = Number(h.avg_score || 0);
                         if (score > 100) score = score / 100;
                         if (score >= 100) score = 99.9;
 

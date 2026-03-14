@@ -40,3 +40,10 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
         throw error;
     }
 }
+
+export async function updateDeviceStatus(hid: string, isDefective: boolean) {
+    return apiFetch(`/devices/${hid}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ is_defective: isDefective }),
+    });
+}
