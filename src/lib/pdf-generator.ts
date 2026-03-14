@@ -1,329 +1,375 @@
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
-
+import { apiFetch } from './api';
+import pptxgen from "pptxgenjs";
+import * as XLSX from 'xlsx';
 type ReportType = 'GLOBAL' | 'CITY' | 'LAB' | 'SYSTEM' | 'PC';
 
 export async function generateDynamicReport(type: ReportType, data: any, context?: string) {
     try {
-        const doc = new jsPDF();
-        const timestamp = format(new Date(), 'yyyy-MM-dd HH:mm:ss');
-        const dateStr = format(new Date(), 'yyyy-MM-dd');
+        const fileTimestamp = format(new Date(), 'yyyy-MM-dd_HH-mm');
+        const pres = new pptxgen();
+        let fileName = 'Audit_Report';
 
-        // Colors
-        const colors = {
-            navy: [15, 23, 42] as [number, number, number],
-            primary: [59, 130, 246] as [number, number, number],
-            success: [34, 197, 94] as [number, number, number],
-            danger: [239, 68, 68] as [number, number, number],
-            muted: [100, 116, 139] as [number, number, number],
-            border: [226, 232, 240] as [number, number, number],
-            bg: [248, 250, 252] as [number, number, number],
-            alert: [245, 158, 11] as [number, number, number] // Amber for warnings
-        };
-
-        // Professional Header
-        doc.setFillColor(colors.navy[0], colors.navy[1], colors.navy[2]);
-        doc.rect(0, 0, 210, 45, 'F');
-
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(24);
-        doc.setFont('helvetica', 'bold');
-        doc.text('LAB GUARDIAN PRO', 15, 20);
-
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'normal');
-        doc.text('SYSTEMS MONITORING & INFRASTRUCTURE MANAGEMENT', 15, 27);
-
-        doc.setFillColor(colors.primary[0], colors.primary[1], colors.primary[2]);
-        doc.roundedRect(140, 15, 55, 10, 2, 2, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'bold');
-        doc.text(`${type} LEVEL AUDIT`, 145, 21.5);
-
-        doc.setTextColor(200, 200, 200);
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'normal');
-        doc.text(`ID: LG-AUDIT-${format(new Date(), 'YMMddHHmmss')}`, 140, 32);
-        doc.text(`DATE: ${timestamp}`, 140, 37);
-        doc.text(`STATUS: VERIFIED`, 140, 42);
-
-        let startY = 60;
+        // Professional Theme Colors
+        const THEME_BLUE = "1e293b";
+        const THEME_ORANGE = "f99a1d";
+        const TEXT_WHITE = "FFFFFF";
 
         // Helper to get score safely
         const getScore = (item: any) => {
             const val = item.avg_performance ?? item.avg_score ?? item.cpu_score ?? 0;
-            return parseFloat(String(val)) || 0;
+            let score = parseFloat(String(val)) || 0;
+            if (score > 100) score = score / 100;
+            if (score >= 100) score = 99.9;
+            return score;
+        };
+
+        const addHeader = (slide: any, title: string) => {
+            slide.addShape(pres.ShapeType.rect, { x: 0, y: 0, w: '100%', h: 1.0, fill: { color: THEME_BLUE } });
+            slide.addText(title, { x: 0.5, y: 0.2, w: '90%', h: 0.6, fontSize: 24, fontFace: "Segoe UI", color: THEME_ORANGE, bold: true });
+            slide.addText(`GENERATE DATE: ${format(new Date(), 'yyyy-MM-dd HH:mm')}`, { x: 0.5, y: 0.7, w: '90%', h: 0.2, fontSize: 10, color: TEXT_WHITE, italic: true });
         };
 
         if (type === 'GLOBAL') {
             const locations = data.locations || [];
-            const totalLabs = locations.reduce((acc: number, l: any) => acc + (l.total_labs || 0), 0);
-            const totalPcs = locations.reduce((acc: number, l: any) => acc + (l.total_pcs || 0), 0);
-            const totalOnlinePcs = locations.reduce((acc: number, l: any) => acc + (l.online || 0), 0);
+            fileName = `Global_Infrastructure_Report_${fileTimestamp}`;
 
-            drawSummaryBox(doc, 15, startY, [
-                { label: 'TOTAL CITIES', value: locations.length },
-                { label: 'TOTAL LABS', value: totalLabs },
-                { label: 'TOTAL SYSTEMS', value: totalPcs },
-                { label: 'LIVE NODES', value: totalOnlinePcs }
-            ], colors);
+            const slide = pres.addSlide();
+            addHeader(slide, "PROVINCIAL INFRASTRUCTURE OVERVIEW");
 
-            startY += 35;
-            doc.setTextColor(colors.navy[0], colors.navy[1], colors.navy[2]);
-            doc.setFontSize(14); doc.setFont('helvetica', 'bold');
-            doc.text('REGIONAL INFRASTRUCTURE DISTRIBUTION', 15, startY);
+            const rows = locations.map((loc: any) => [
+                { text: loc.city },
+                { text: String(loc.total_labs) },
+                { text: String(loc.total_pcs) },
+                { text: String(loc.online) },
+                { text: `${getScore(loc).toFixed(1)}%` }
+            ]);
 
-            autoTable(doc, {
-                startY: startY + 5,
-                head: [['CITY / REGION', 'LABS', 'TOTAL PCS', 'ONLINE', 'OFFLINE', 'PERFORMANCE']],
-                body: locations.map((loc: any) => [
-                    loc.city?.toUpperCase(),
-                    loc.total_labs,
-                    loc.total_pcs,
-                    { content: loc.online, styles: { textColor: colors.success } },
-                    { content: loc.offline, styles: { textColor: colors.danger } },
-                    `${getScore(loc).toFixed(1)}%`
-                ]),
-                theme: 'striped',
-                headStyles: { fillColor: colors.navy, fontSize: 9 },
-                styles: { fontSize: 8, cellPadding: 4, halign: 'center' },
-                columnStyles: { 0: { halign: 'left', fontStyle: 'bold' } }
+            slide.addTable([
+                ["DISTRICT", "TOTAL LABS", "TOTAL PCS", "LIVE", "PERFORMANCE"],
+                ...rows
+            ], {
+                x: 0.5, y: 1.2, w: 9,
+                border: { pt: 1, color: "dddddd" },
+                fill: { color: "F1F1F1" },
+                fontSize: 12,
+                headerRow: true,
+                headerProps: { fill: THEME_BLUE, color: TEXT_WHITE, bold: true }
             });
         }
         else if (type === 'CITY' || (type === 'SYSTEM' && context && !data.devices)) {
             const labs = data.labs || [];
             const cityName = context || data.city || 'TOTAL SYSTEM';
+            fileName = `City_Audit_${(cityName || 'Unknown').replace(/\s+/g, '_')}_${fileTimestamp}`;
 
-            const totalPcs = labs.reduce((acc: number, l: any) => acc + (l.total_pcs || 0), 0);
-            const totalOnlinePcs = labs.reduce((acc: number, l: any) => acc + (l.online || 0), 0);
-            const onlineLabsCount = labs.filter((l: any) => l.online > 0).length;
-            const offlineLabsCount = labs.length - onlineLabsCount;
+            const slide = pres.addSlide();
+            addHeader(slide, `${cityName.toUpperCase()} - LAB INFRASTRUCTURE`);
 
-            const totalScoreSum = labs.reduce((acc: number, l: any) => acc + (getScore(l) * (l.total_pcs || 1)), 0);
-            const avgPerf = totalPcs > 0 ? (totalScoreSum / totalPcs).toFixed(1) : '0.0';
+            const rows = labs.map((l: any) => [
+                { text: l.lab_name },
+                { text: String(l.total_pcs) },
+                { text: String(l.online) },
+                { text: (getScore(l) * (l.total_pcs || 1)).toFixed(0) },
+                { text: `${getScore(l).toFixed(1)}%` }
+            ]);
 
-            drawSummaryBox(doc, 15, startY, [
-                { label: 'CITY NAME', value: cityName.toUpperCase() },
-                { label: 'LABS ACTIVE', value: `${onlineLabsCount} / ${labs.length}` },
-                { label: 'TOTAL NODES', value: totalPcs },
-                { label: 'CITY HEALTH', value: `${avgPerf}%` }
-            ], colors);
-
-            startY += 35;
-            doc.setTextColor(colors.navy[0], colors.navy[1], colors.navy[2]);
-            doc.setFontSize(14); doc.setFont('helvetica', 'bold');
-            doc.text(`LAB CLUSTER DETAILS: ${cityName.toUpperCase()}`, 15, startY);
-
-            autoTable(doc, {
-                startY: startY + 5,
-                head: [['LAB FACILITY NAME', 'PCS', 'ONLINE', 'OFFLINE', 'PERF SCORE', 'HEALTH']],
-                body: labs.map((l: any) => [
-                    l.lab_name.toUpperCase(),
-                    l.total_pcs,
-                    { content: l.online, styles: { textColor: colors.success } },
-                    { content: l.offline, styles: { textColor: colors.danger } },
-                    (getScore(l) * (l.total_pcs || 1)).toFixed(0),
-                    `${getScore(l).toFixed(1)}%`
-                ]),
-                theme: 'striped',
-                headStyles: { fillColor: colors.primary, fontSize: 9 },
-                styles: { fontSize: 8, cellPadding: 4, halign: 'center' },
-                columnStyles: { 0: { halign: 'left', fontStyle: 'bold' } }
+            slide.addTable([
+                ["LAB FACILITY", "PCS", "LIVE", "LOAD SCORE", "HEALTH"],
+                ...rows
+            ], {
+                x: 0.5, y: 1.2, w: 9,
+                border: { pt: 1, color: "dddddd" },
+                fontSize: 11,
+                headerRow: true,
+                headerProps: { fill: THEME_BLUE, color: TEXT_WHITE, bold: true }
             });
         }
         else if (type === 'LAB' || (type === 'SYSTEM' && data.devices)) {
             const devices = data.devices || [];
             const labName = context || data.lab || 'GLOBAL FLEET';
-            const cityName = data.city || 'NETWORK HUB';
+            fileName = `Lab_Audit_${(labName || 'Unknown').replace(/\s+/g, '_')}_${fileTimestamp}`;
 
-            // Stats from data object if available, otherwise calculate from devices
+            // Slide 1: Summary
+            const slide1 = pres.addSlide();
+            addHeader(slide1, `${labName.toUpperCase()} - SUMMARY`);
+
             const totalPcs = data.total_pcs ?? devices.length;
             const onlineCount = data.online ?? devices.filter((d: any) => d.status === 'online').length;
-            const offlineCount = data.offline ?? (totalPcs - onlineCount);
+            const offlineCount = totalPcs - onlineCount;
 
-            const offline7d = data.offline_7d ?? 0;
-            const offline30d = data.offline_30d ?? 0;
+            slide1.addText(`Total Infrastructure Nodes: ${totalPcs}`, { x: 1, y: 2, fontSize: 18, color: "333333" });
+            slide1.addText(`Active Systems: ${onlineCount}`, { x: 1, y: 2.5, fontSize: 18, color: "2ea043", bold: true });
+            slide1.addText(`Offline Systems: ${offlineCount}`, { x: 1, y: 3.0, fontSize: 18, color: "cf222e" });
 
-            const totalScoreSum = devices.reduce((acc: number, d: any) => acc + getScore(d), 0);
-            const avgPerf = totalPcs > 0 ? (totalScoreSum / totalPcs).toFixed(1) : (getScore(data).toFixed(1) || '0.0');
-
-            // Two rows of summary for LAB to include 7d/30d offline
-            drawSummaryBox(doc, 15, startY, [
-                { label: 'LOCATION', value: `${cityName} / ${labName}`.toUpperCase() },
-                { label: 'TOTAL PC', value: totalPcs },
-                { label: 'ONLINE', value: onlineCount },
-                { label: 'OFFLINE', value: offlineCount }
-            ], colors);
-
-            startY += 30;
-            drawSummaryBox(doc, 15, startY, [
-                { label: '7+ DAYS OFFLINE', value: offline7d },
-                { label: '30+ DAYS OFFLINE', value: offline30d },
-                { label: 'SECURITY STATUS', value: 'ENCRYPTED' },
-                { label: 'LAB HEALTH', value: `${avgPerf}%` }
-            ], colors);
-
-            startY += 35;
-            doc.setTextColor(colors.navy[0], colors.navy[1], colors.navy[2]);
-            doc.setFontSize(14); doc.setFont('helvetica', 'bold');
-            doc.text(`DETAILED NODE INVENTORY: ${labName.toUpperCase()}`, 15, startY);
-
+            // Slide 2: Inventory
             if (devices.length > 0) {
-                autoTable(doc, {
-                    startY: startY + 5,
-                    head: [['STATION NAME', 'SYSTEM ID', 'STATUS', 'CPU LOAD', 'TOTAL SCORE', 'TIMESTAMP']],
-                    body: devices.map((d: any) => [
-                        d.pc_name?.toUpperCase() || 'STATION',
-                        d.system_id,
-                        {
-                            content: (d.status || 'offline').toUpperCase(),
-                            styles: { textColor: d.status === 'online' ? colors.success : colors.danger, fontStyle: 'bold' }
-                        },
-                        `${getScore(d).toFixed(1)}%`,
-                        getScore(d).toFixed(0),
-                        d.last_seen ? format(new Date(d.last_seen), 'HH:mm:ss') : 'N/A'
-                    ]),
-                    theme: 'grid',
-                    headStyles: { fillColor: colors.navy, fontSize: 8 },
-                    styles: { fontSize: 7, cellPadding: 3, halign: 'center' },
-                    columnStyles: { 0: { halign: 'left', fontStyle: 'bold' } }
-                });
-            } else {
-                doc.setFontSize(10);
-                doc.setTextColor(colors.muted[0], colors.muted[1], colors.muted[2]);
-                doc.text('No detailed node inventory available for this cluster.', 15, startY + 15);
+                const slide2 = pres.addSlide();
+                addHeader(slide2, `${labName.toUpperCase()} - NODE INVENTORY`);
+                const rows = devices.slice(0, 15).map((d: any) => [
+                    d.pc_name || 'Station',
+                    (d.status || 'offline').toUpperCase(),
+                    `${getScore(d).toFixed(1)}%`,
+                    d.last_seen ? format(new Date(d.last_seen), 'HH:mm') : 'N/A'
+                ]);
+
+                slide2.addTable([
+                    ["STATION", "STATUS", "CPU LOAD", "LAST SEEN"],
+                    ...rows
+                ], { x: 0.5, y: 1.2, w: 9, fontSize: 10, headerProps: { fill: THEME_BLUE, color: TEXT_WHITE } });
             }
         }
         else if (type === 'PC') {
             const device = data;
-            const history = data.history || [];
+            fileName = `System_Profile_${(device.pc_name || 'System').replace(/\s+/g, '_')}_${fileTimestamp}`;
 
-            doc.setTextColor(colors.navy[0], colors.navy[1], colors.navy[2]);
-            doc.setFontSize(18);
-            doc.text(`STATION PROFILE: ${device.pc_name?.toUpperCase() || 'STATION'}`, 15, startY);
+            const slide = pres.addSlide();
+            addHeader(slide, `SYSTEM PROFILE: ${device.pc_name}`);
 
-            startY += 10;
-            const info = [
-                ['System ID', device.system_id],
-                ['Region', device.city?.toUpperCase() || 'N/A'],
-                ['Facility', device.lab_name?.toUpperCase() || 'N/A'],
-                ['Architecture', 'x86_64 / Pro Agent'],
-                ['Current Status', device.isOnline ? 'OPERATIONAL (ONLINE)' : 'IDLE (OFFLINE)'],
-                ['Boot Time Today', device.today_start_time ? format(new Date(device.today_start_time), 'HH:mm:ss') : 'N/A'],
-                ['Total Runtime', `${Math.floor((device.runtime_minutes || 0) / 60)}H ${(device.runtime_minutes || 0) % 60}M`],
-                ['Health Score', `${getScore(device).toFixed(1)}% Units`]
+            const profileData = [
+                ["Property", "Value"],
+                ["System ID", device.system_id],
+                ["Region", device.city?.toUpperCase() || 'N/A'],
+                ["Facility", device.lab_name?.toUpperCase() || 'N/A'],
+                ["Status", device.isOnline ? 'ONLINE' : 'OFFLINE'],
+                ["Health Score", `${getScore(device).toFixed(1)}%`]
             ];
 
-            autoTable(doc, {
-                startY: startY,
-                body: info,
-                theme: 'plain',
-                styles: { fontSize: 10, cellPadding: 2 },
-                columnStyles: { 0: { fontStyle: 'bold', textColor: colors.muted, cellWidth: 40 } }
+            slide.addTable(profileData, {
+                x: 0.5, y: 1.5, w: 5,
+                border: { pt: 1, color: "dddddd" },
+                fontSize: 14,
+                headerRow: true,
+                headerProps: { fill: THEME_BLUE, color: TEXT_WHITE }
             });
-
-            startY = (doc as any).lastAutoTable.finalY + 15;
-
-            if (device.app_usage && Object.keys(device.app_usage).length > 0) {
-                doc.setFontSize(12); doc.setFont('helvetica', 'bold');
-                doc.text('SOFTWARE SPECTRUM (TOP USAGE)', 15, startY);
-                const apps = Object.entries(device.app_usage as Record<string, number>).sort(([, a], [, b]) => b - a).slice(0, 10);
-                autoTable(doc, {
-                    startY: startY + 5,
-                    head: [['APPLICATION', 'DURATION', 'PERCENTAGE']],
-                    body: apps.map(([app, secs]) => {
-                        const total = Object.values(device.app_usage as Record<string, number>).reduce((a, b) => a + b, 0);
-                        return [app, `${Math.floor(secs / 3600)}H ${Math.floor((secs % 3600) / 60)}M`, `${((secs / total) * 100).toFixed(1)}%`];
-                    }),
-                    theme: 'striped',
-                    headStyles: { fillColor: colors.muted },
-                    styles: { fontSize: 8 }
-                });
-                startY = (doc as any).lastAutoTable.finalY + 15;
-            }
-
-            if (history.length > 0) {
-                doc.setFontSize(12); doc.setFont('helvetica', 'bold');
-                doc.text('TELEMETRY ARCHIVE (7 DAYS)', 15, startY);
-                autoTable(doc, {
-                    startY: startY + 5,
-                    head: [['DATE', 'AVG PERFORMANCE', 'RUNTIME', 'PEAK SIGNAL']],
-                    body: history.slice(0, 7).map((h: any) => [
-                        h.history_date || format(new Date(h.start_time), 'yyyy-MM-dd'),
-                        `${getScore(h).toFixed(1)}%`,
-                        `${Math.floor((h.runtime_minutes || 0) / 60)}H ${(h.runtime_minutes || 0) % 60}M`,
-                        'STABLE'
-                    ]),
-                    theme: 'striped',
-                    styles: { fontSize: 8 }
-                });
-            }
         }
 
-        const pageCount = doc.getNumberOfPages();
-        for (let i = 1; i <= pageCount; i++) {
-            doc.setPage(i);
-            doc.setDrawColor(colors.border[0], colors.border[1], colors.border[2]);
-            doc.line(15, 275, 195, 275);
-            doc.setFontSize(7);
-            doc.setTextColor(colors.muted[0], colors.muted[1], colors.muted[2]);
-            doc.text('LAB GUARDIAN - PROFESSIONAL INFRASTRUCTURE AUDIT TOOL', 15, 282);
-            doc.text(`CONFIDENTIAL - SYSTEM GENERATED DOCUMENT - ${timestamp}`, 15, 286);
-            doc.text(`PAGE ${i} OF ${pageCount}`, 195, 282, { align: 'right' });
-        }
-
-        // Generate dynamic filename based on user request
-        let fileName = 'Audit_Report';
-        const fileTimestamp = format(new Date(), 'yyyy-MM-dd_HH-mm');
-
-        switch (type) {
-            case 'GLOBAL':
-                fileName = `Global_Level_Report_${fileTimestamp}`;
-                break;
-            case 'CITY':
-                fileName = `City_Level_Report_${(context || 'Unknown').replace(/\s+/g, '_')}_${fileTimestamp}`;
-                break;
-            case 'LAB':
-                fileName = `Lab_Level_Report_${(context || 'Unknown').replace(/\s+/g, '_')}_${fileTimestamp}`;
-                break;
-            case 'SYSTEM':
-                fileName = `All_Systems_Report_${fileTimestamp}`;
-                break;
-            case 'PC':
-                fileName = `PC_Report_${(data.pc_name || 'System').replace(/\s+/g, '_')}_${fileTimestamp}`;
-                break;
-        }
-
-        doc.save(`${fileName}.pdf`);
+        // SAVE POWERPOINT
+        await pres.writeFile({ fileName: `${fileName}.pptx` });
         return true;
     } catch (error) {
-        console.error("Professional PDF Generation Error:", error);
+        console.error("PowerPoint Generation Error:", error);
         throw error;
     }
 }
 
-function drawSummaryBox(doc: jsPDF, x: number, y: number, items: { label: string, value: any }[], colors: any) {
-    const width = 180;
-    const height = 25;
-    doc.setFillColor(colors.bg[0], colors.bg[1], colors.bg[2]);
-    doc.setDrawColor(colors.border[0], colors.border[1], colors.border[2]);
-    doc.roundedRect(x, y, width, height, 1, 1, 'FD');
-    const itemWidth = width / items.length;
-    items.forEach((item, i) => {
-        const itemX = x + (i * itemWidth);
-        if (i > 0) {
-            doc.setDrawColor(colors.border[0], colors.border[1], colors.border[2]);
-            doc.line(itemX, y + 5, itemX, y + 20);
+export const generateDailyReport = (stats: any, locations: any[]) => generateDynamicReport('GLOBAL', { locations });
+
+export async function generateCustomMultiLabReport(selectedData: { city: string, labs: string[], pcs?: Record<string, string[]> }[]) {
+    try {
+        const fileTimestamp = format(new Date(), 'yyyy-MM-dd_HH-mm');
+        const pres = new pptxgen();
+        const fileName = `Bulk_Report_${fileTimestamp}`;
+        let hasData = false;
+
+        for (const cityData of selectedData) {
+            for (const labName of cityData.labs) {
+                const response = await apiFetch(`/devices?city=${cityData.city}&lab=${labName}`);
+                let devices = response?.devices || [];
+
+                const selectedPcsForLab = cityData.pcs?.[labName];
+                if (selectedPcsForLab && selectedPcsForLab.length > 0) {
+                    devices = devices.filter((d: any) => selectedPcsForLab.includes(d.system_id));
+                }
+
+                if (devices.length > 0) {
+                    hasData = true;
+                    const slide = pres.addSlide();
+
+                    // Header
+                    slide.addShape(pres.ShapeType.rect, { x: 0, y: 0, w: '100%', h: 1.0, fill: { color: "000000" } });
+                    slide.addText(`Bulk Report: ${labName}`, { x: 0.5, y: 0.3, w: '90%', h: 0.4, fontSize: 18, color: "f99a1d", bold: true });
+                    slide.addText(`CITY: ${cityData.city} | DATE: ${fileTimestamp}`, { x: 0.5, y: 0.7, w: '90%', h: 0.2, fontSize: 8, color: "FFFFFF" });
+
+                    const rows = devices.slice(0, 15).map((d: any) => {
+                        let score = parseFloat(d.avg_performance || d.cpu_score) || 0;
+                        if (score > 100) score = score / 100;
+                        if (score >= 100) score = 99.9;
+
+                        return [
+                            d.pc_name,
+                            d.hardware_id?.substring(0, 12) || 'N/A',
+                            d.status?.toUpperCase() || 'N/A',
+                            `${score.toFixed(1)}%`
+                        ];
+                    });
+
+                    const tableHeader = [
+                        { text: "PC NAME", options: { fill: "000000", color: "FFFFFF", bold: true, fontSize: 12 } },
+                        { text: "ID", options: { fill: "000000", color: "FFFFFF", bold: true, fontSize: 12 } },
+                        { text: "STATUS", options: { fill: "000000", color: "FFFFFF", bold: true, fontSize: 12 } },
+                        { text: "CPU PERFORMANCE", options: { fill: "000000", color: "FFFFFF", bold: true, fontSize: 12 } }
+                    ];
+
+                    slide.addTable([
+                        tableHeader as any,
+                        ...rows
+                    ], {
+                        x: 0.5, y: 1.2, w: 9,
+                        border: { pt: 1, color: "cccccc" },
+                        fontSize: 10,
+                    });
+                }
+            }
         }
-        doc.setTextColor(colors.muted[0], colors.muted[1], colors.muted[2]);
-        doc.setFontSize(7); doc.setFont('helvetica', 'bold');
-        doc.text(item.label, itemX + (itemWidth / 2), y + 8, { align: 'center' });
-        doc.setTextColor(colors.navy[0], colors.navy[1], colors.navy[2]);
-        doc.setFontSize(10); doc.setFont('helvetica', 'bold');
-        doc.text(String(item.value), itemX + (itemWidth / 2), y + 18, { align: 'center' });
-    });
+
+        if (hasData) {
+            await pres.writeFile({ fileName: `${fileName}.pptx` });
+            return true;
+        } else {
+            console.warn("No data found to generate PowerPoint report.");
+            return false;
+        }
+    } catch (error) {
+        console.error("Custom PowerPoint Generation Error:", error);
+        throw error;
+    }
 }
 
-export const generateDailyReport = (stats: any, locations: any[]) => generateDynamicReport('GLOBAL', { locations });
+export async function generateDynamicExcelReport(type: ReportType, data: any, context?: string) {
+    try {
+        const fileTimestamp = format(new Date(), 'yyyy-MM-dd_HH-mm');
+        let fileName = 'Audit_Report';
+        let excelData: any[] = [];
+
+        const getScoreStr = (item: any) => {
+            const val = item.avg_performance ?? item.avg_score ?? item.cpu_score ?? 0;
+            let score = parseFloat(String(val)) || 0;
+            if (score > 100) score = score / 100;
+            if (score >= 100) score = 99.9;
+            return `${score.toFixed(1)}%`;
+        };
+        const getScoreRaw = (item: any) => {
+            const val = item.avg_performance ?? item.avg_score ?? item.cpu_score ?? 0;
+            let score = parseFloat(String(val)) || 0;
+            if (score > 100) score = score / 100;
+            if (score >= 100) score = 99.9;
+            return score;
+        };
+
+        if (type === 'GLOBAL') {
+            const locations = data.locations || [];
+            fileName = `Global_Infrastructure_Report_${fileTimestamp}`;
+            excelData.push(["DISTRICT", "TOTAL LABS", "TOTAL PCS", "LIVE", "PERFORMANCE"]);
+            locations.forEach((loc: any) => {
+                excelData.push([loc.city, loc.total_labs, loc.total_pcs, loc.online, getScoreStr(loc)]);
+            });
+        }
+        else if (type === 'CITY' || (type === 'SYSTEM' && context && !data.devices)) {
+            const labs = data.labs || [];
+            const cityName = context || data.city || 'TOTAL SYSTEM';
+            fileName = `City_Audit_${(cityName || 'Unknown').replace(/\s+/g, '_')}_${fileTimestamp}`;
+            excelData.push(["LAB FACILITY", "PCS", "LIVE", "LOAD SCORE", "HEALTH"]);
+            labs.forEach((l: any) => {
+                excelData.push([l.lab_name, l.total_pcs, l.online, (getScoreRaw(l) * (l.total_pcs || 1)).toFixed(0), getScoreStr(l)]);
+            });
+        }
+        else if (type === 'LAB' || (type === 'SYSTEM' && data.devices)) {
+            const devices = data.devices || [];
+            const labName = context || data.lab || 'GLOBAL FLEET';
+            fileName = `Lab_Audit_${(labName || 'Unknown').replace(/\s+/g, '_')}_${fileTimestamp}`;
+
+            const totalPcs = data.total_pcs ?? devices.length;
+            const onlineCount = data.online ?? devices.filter((d: any) => d.status === 'online').length;
+            const offlineCount = totalPcs - onlineCount;
+
+            excelData.push([`${labName.toUpperCase()} - SUMMARY`]);
+            excelData.push(["Total Infrastructure Nodes", totalPcs]);
+            excelData.push(["Active Systems", onlineCount]);
+            excelData.push(["Offline Systems", offlineCount]);
+            excelData.push([]);
+
+            if (devices.length > 0) {
+                excelData.push(["STATION", "STATUS", "CPU LOAD", "LAST SEEN"]);
+                devices.forEach((d: any) => {
+                    excelData.push([
+                        d.pc_name || 'Station',
+                        (d.status || 'offline').toUpperCase(),
+                        getScoreStr(d),
+                        d.last_seen ? format(new Date(d.last_seen), 'HH:mm') : 'N/A'
+                    ]);
+                });
+            }
+        }
+        else if (type === 'PC') {
+            const device = data;
+            fileName = `System_Profile_${(device.pc_name || 'System').replace(/\s+/g, '_')}_${fileTimestamp}`;
+            excelData.push(["Property", "Value"]);
+            excelData.push(["System ID", device.system_id]);
+            excelData.push(["Region", device.city?.toUpperCase() || 'N/A']);
+            excelData.push(["Facility", device.lab_name?.toUpperCase() || 'N/A']);
+            excelData.push(["Status", device.isOnline ? 'ONLINE' : 'OFFLINE']);
+            excelData.push(["Health Score", getScoreStr(device)]);
+        }
+
+        const ws = XLSX.utils.aoa_to_sheet(excelData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Audit Report");
+        XLSX.writeFile(wb, `${fileName}.xlsx`);
+        return true;
+    } catch (error) {
+        console.error("Excel Generation Error:", error);
+        throw error;
+    }
+}
+
+export async function generateCustomMultiLabExcelReport(selectedData: { city: string, labs: string[], pcs?: Record<string, string[]> }[]) {
+    try {
+        const fileTimestamp = format(new Date(), 'yyyy-MM-dd_HH-mm');
+        const fileName = `Bulk_Report_${fileTimestamp}`;
+        let hasData = false;
+        let excelData: any[] = [];
+
+        const getScoreStr = (d: any) => {
+            let score = parseFloat(d.avg_performance || d.cpu_score) || 0;
+            if (score > 100) score = score / 100;
+            if (score >= 100) score = 99.9;
+            return `${score.toFixed(1)}%`;
+        };
+
+        for (const cityData of selectedData) {
+            for (const labName of cityData.labs) {
+                const response = await apiFetch(`/devices?city=${cityData.city}&lab=${labName}`);
+                let devices = response?.devices || [];
+
+                const selectedPcsForLab = cityData.pcs?.[labName];
+                if (selectedPcsForLab && selectedPcsForLab.length > 0) {
+                    devices = devices.filter((d: any) => selectedPcsForLab.includes(d.system_id));
+                }
+
+                if (devices.length > 0) {
+                    hasData = true;
+                    excelData.push([`Bulk Report: ${labName}`]);
+                    excelData.push([`CITY: ${cityData.city}`, `DATE: ${fileTimestamp}`]);
+                    excelData.push([]);
+                    excelData.push(["PC NAME", "ID", "STATUS", "CPU PERFORMANCE"]);
+
+                    devices.forEach((d: any) => {
+                        excelData.push([
+                            d.pc_name,
+                            d.hardware_id?.substring(0, 12) || 'N/A',
+                            d.status?.toUpperCase() || 'N/A',
+                            getScoreStr(d)
+                        ]);
+                    });
+
+                    excelData.push([]); // blank line between datasets
+                    excelData.push([]);
+                }
+            }
+        }
+
+        if (hasData) {
+            const ws = XLSX.utils.aoa_to_sheet(excelData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Bulk Audit Report");
+            XLSX.writeFile(wb, `${fileName}.xlsx`);
+            return true;
+        } else {
+            console.warn("No data found to generate Excel report.");
+            return false;
+        }
+    } catch (error) {
+        console.error("Custom Excel Generation Error:", error);
+        throw error;
+    }
+}

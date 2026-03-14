@@ -1,12 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { apiFetch } from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Monitor, Wifi, WifiOff, Activity, Shield, Terminal, ArrowRight, Target, Zap, Waves } from "lucide-react";
+import { ArrowLeft, Monitor, Wifi, WifiOff, Terminal, ArrowRight, Target, Zap, FileText } from "lucide-react";
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from "@/lib/utils";
-import { MiniWaveChart } from '@/components/dashboard/MiniWaveChart';
+import { AddDeviceDialog } from "@/components/dashboard/AddDeviceDialog";
 
 const LabSummaryPage = () => {
     const { city, lab } = useParams();
@@ -14,134 +15,217 @@ const LabSummaryPage = () => {
 
     const { data: labsResponse, isLoading } = useQuery({
         queryKey: ['city-labs', city],
-        queryFn: () => apiFetch(`/stats/city/${city}/labs`),
+        queryFn: () => apiFetch(`/stats/city/${encodeURIComponent(city || '')}/labs`),
         enabled: !!city,
         refetchInterval: 5000,
     });
 
-    const labData = labsResponse?.labs?.find((l: any) => l.lab_name === lab);
+    const { data: devicesResponse, isLoading: devicesLoading } = useQuery({
+        queryKey: ['lab-inventory', city, lab],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('devices')
+                .select('*')
+                .ilike('city', city || '')
+                .ilike('lab_name', lab || '');
+
+            if (error) throw error;
+            return { devices: data || [], server_time: new Date().toISOString() };
+        },
+        enabled: !!city && !!lab,
+        refetchInterval: 5000,
+    });
+
+    const normalize = (name: string) => (name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const labData = labsResponse?.labs?.find((l: any) => normalize(l.lab_name) === normalize(lab || ''));
+    const devices = devicesResponse?.devices || [];
+    const serverTime = devicesResponse?.server_time || new Date().toISOString();
+
+    // Persistent Defective Logic using LocalStorage
+    const defectiveFromStorage = JSON.parse(localStorage.getItem('defective_devices') || '[]');
+
+    // Calculate all stats from the fresh device list and inject persistent defective state
+    const processedDevices = devices.map((d: any) => ({
+        ...d,
+        is_defective: d.is_defective || defectiveFromStorage.includes(d.system_id || d.id)
+    }));
+
+    const defectiveCount = processedDevices.filter((d: any) => d.is_defective).length;
+    const onlineCount = processedDevices.filter((d: any) => d.status === 'online' && !d.is_defective).length;
+    const offlineCount = processedDevices.filter((d: any) => d.status === 'offline' && !d.is_defective).length;
+    const totalCount = processedDevices.length;
+
+    const getOfflineCount = (days: number) => {
+        const now = new Date(serverTime);
+        return processedDevices.filter((d: any) => {
+            if (d.is_defective) return false;
+            if (d.status !== 'offline') return false;
+            if (!d.last_seen) return true;
+            const lastSeen = new Date(d.last_seen);
+            const diffDays = (now.getTime() - lastSeen.getTime()) / (1000 * 60 * 60 * 24);
+            return diffDays >= days;
+        }).length;
+    };
+
+    const offline7d = getOfflineCount(7);
+    const offline30d = getOfflineCount(30);
 
     // Dynamic Intensity for Wave Charts
     const getIntensity = (val: number, total: number) => Math.max(0.1, total > 0 ? (val / total) : 0);
 
     const stats = [
         {
-            label: "TOTAL PC",
-            value: labData?.total_pcs || 0,
+            label: "Total System",
+            value: totalCount,
             icon: Monitor,
-            color: "text-blue-400",
-            bg: "bg-blue-500/10",
-            borderColor: "border-blue-500/20",
-            glow: "glow-blue",
-            waveColor: "#3b82f6",
+            color: "text-primary",
+            bg: "bg-primary/5",
+            borderColor: "border-primary/20",
+            waveColor: "#01416D",
             filter: "all",
-            subtitle: "Global Node Inventory",
+            subtitle: "Total System Inventory",
             intensity: 0.8
         },
         {
-            label: "ONLINE PC",
-            value: labData?.online || 0,
+            label: "Online System",
+            value: onlineCount,
             icon: Wifi,
-            color: "text-emerald-400",
+            color: "text-emerald-500",
             bg: "bg-emerald-500/10",
             borderColor: "border-emerald-500/20",
-            glow: "glow-emerald",
             waveColor: "#10b981",
             filter: "online",
             subtitle: "Active Heartbeat Sync",
-            intensity: getIntensity(labData?.online || 0, labData?.total_pcs || 1)
+            intensity: getIntensity(onlineCount, totalCount || 1)
         },
         {
-            label: "OFFLINE PC",
-            value: labData?.offline || 0,
+            label: "Offline System",
+            value: offlineCount,
             icon: WifiOff,
-            color: "text-red-400",
+            color: "text-red-500",
             bg: "bg-red-500/10",
             borderColor: "border-red-500/20",
-            glow: "glow-red",
             waveColor: "#ef4444",
             filter: "offline",
             subtitle: "Connection Terminated",
-            intensity: getIntensity(labData?.offline || 0, labData?.total_pcs || 1)
+            intensity: getIntensity(offlineCount, totalCount || 1)
         }
     ];
 
     const allStats = [
         ...stats,
         {
-            label: "7+ DAYS OFFLINE",
-            value: labData?.offline_7d || 0,
+            label: "7 Days+ Offline PCs",
+            value: offline7d,
             icon: Terminal,
-            color: "text-purple-400",
-            bg: "bg-purple-500/10",
-            borderColor: "border-purple-500/20",
-            glow: "glow-purple",
-            waveColor: "#a855f7",
-            filter: "offline",
-            intensity: getIntensity(labData?.offline_7d || 0, labData?.total_pcs || 1)
+            color: "text-orange-500",
+            bg: "bg-orange-500/10",
+            borderColor: "border-orange-500/20",
+            waveColor: "#f97316",
+            filter: "offline_7d",
+            intensity: getIntensity(offline7d, totalCount || 1)
         },
         {
-            label: "30+ DAYS OFFLINE",
-            value: labData?.offline_30d || 0,
+            label: "One Month+ Offline PCs",
+            value: offline30d,
             icon: Target,
-            color: "text-pink-400",
-            bg: "bg-pink-500/10",
-            borderColor: "border-pink-500/20",
-            glow: "glow-pink",
-            waveColor: "#ec4899",
-            filter: "offline",
-            intensity: getIntensity(labData?.offline_30d || 0, labData?.total_pcs || 1)
+            color: "text-white",
+            bg: "bg-secondary/5",
+            borderColor: "border-secondary/20",
+            waveColor: "#f99a1d",
+            filter: "offline_30d",
+            intensity: getIntensity(offline30d, totalCount || 1)
+        },
+        {
+            label: "Defective System",
+            value: defectiveCount,
+            icon: Zap,
+            color: "text-yellow-500",
+            bg: "bg-yellow-500/10",
+            borderColor: "border-yellow-500/20",
+            waveColor: "#eab308",
+            filter: "defective",
+            intensity: getIntensity(defectiveCount, totalCount || 1)
         }
     ];
 
-    if (isLoading) {
+    if (isLoading || devicesLoading) {
         return (
             <div className="p-8 space-y-8 animate-in fade-in duration-500 max-w-7xl mx-auto">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-20">
-                    {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-64 rounded-[2rem] bg-white/5" />)}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 pt-20">
+                    {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-40 rounded-2xl bg-card" />)}
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="p-4 md:p-6 space-y-6 animate-in fade-in duration-700 min-h-screen bg-background text-foreground overflow-x-hidden">
-            {/* Elegant Background elements */}
-            <div className="fixed inset-0 bg-[radial-gradient(circle_at_50%_-20%,hsl(var(--primary)/0.05),transparent)] pointer-events-none" />
-            <div className="fixed inset-0 bg-[linear-gradient(to_right,hsl(var(--foreground)/0.02)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--foreground)/0.02)_1px,transparent_1px)] bg-[size:30px_30px] pointer-events-none" />
-
+        <div className="p-4 md:p-8 space-y-8 animate-in fade-in duration-700 min-h-screen bg-background text-foreground overflow-x-hidden">
             {/* TOP NAVIGATION BAR */}
-            <div className="relative z-10 flex items-center justify-between border-b border-border/50 pb-4">
-                <div className="flex items-center gap-4">
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-border">
+                <div className="flex items-center gap-6">
                     <Button
-                        onClick={() => navigate(`/dashboard/lab-analytics?city=${city}`)}
-                        className="bg-muted/50 border border-border/50 hover:bg-muted/80 rounded-xl w-10 h-10 flex items-center justify-center group transition-all"
+                        onClick={() => navigate(`/dashboard/labs?city=${city}`)}
+                        variant="ghost"
+                        size="icon"
+                        className="bg-card border border-border hover:bg-muted rounded-lg w-12 h-12 flex items-center justify-center group transition-all shadow-sm"
                     >
-                        <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                        <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform text-primary" />
                     </Button>
                     <div>
-                        <div className="flex items-center gap-2 mb-0.5">
-                            <span className="text-[8px] font-black text-primary uppercase tracking-widest">Core Lab Dashboard</span>
-                            <div className="w-0.5 h-0.5 bg-foreground/30 rounded-full" />
-                            <span className="text-[8px] font-black opacity-30 uppercase tracking-widest">{city}</span>
+                        <div className="flex items-center gap-3 mb-1">
+                            <span className="text-[10px] font-bold text-white uppercase tracking-widest">Lab Overview</span>
+                            <div className="w-1 h-1 bg-secondary rounded-full" />
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{labData?.city || city} District</span>
                         </div>
-                        <h1 className="text-2xl font-black tracking-tighter uppercase leading-none text-foreground">
-                            {lab} <span className="opacity-20">SEGMENT</span>
+                        <h1 className="text-3xl font-bold tracking-tight uppercase text-white font-display leading-tight">
+                            {labData?.lab_name || lab} <span className="text-white/80">Summary</span>
                         </h1>
                     </div>
                 </div>
 
-                <div className="hidden lg:flex items-center gap-6">
+                <div className="flex flex-wrap items-center gap-3">
+                    {/* QUICK NAV BUTTONS - TOP */}
+                    <Button
+                        onClick={() => navigate(`/dashboard/devices?city=${city}&lab=${lab}`)}
+                        className="bg-primary hover:bg-primary/90 text-black gap-2 px-4 rounded-lg h-9 text-[9px] font-bold uppercase tracking-widest transition-all shadow-sm"
+                    >
+                        <ArrowRight size={13} />
+                        View All Systems
+                    </Button>
+
+                    <AddDeviceDialog
+                        defaultCity={labData?.city || city}
+                        defaultLab={labData?.lab_name || lab}
+                        defaultTehsil={labData?.tehsil || labData?.norm_tehsil}
+                    />
+                    <Button
+                        onClick={() => navigate(`/dashboard/devices?city=${city}&lab=${lab}&status=online`)}
+                        variant="outline"
+                        className="gap-2 px-4 rounded-lg h-9 text-[9px] font-bold uppercase tracking-widest text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 transition-all"
+                    >
+                        <Wifi size={13} />
+                        View Online
+                    </Button>
+                    <Button
+                        onClick={() => navigate(`/dashboard/devices?city=${city}&lab=${lab}&status=offline`)}
+                        variant="outline"
+                        className="gap-2 px-4 rounded-lg h-9 text-[9px] font-bold uppercase tracking-widest text-red-400 border-red-500/30 hover:bg-red-500/10 transition-all"
+                    >
+                        <WifiOff size={13} />
+                        View Offline
+                    </Button>
+
+                    <div className="w-px h-8 bg-border mx-1" />
+
                     <Button
                         onClick={async () => {
                             const toastId = (await import('sonner')).toast.loading(`Synthesizing audit for ${lab}...`);
                             try {
                                 const { generateDynamicReport } = await import('@/lib/pdf-generator');
-                                // Fetch detailed inventory to include in the report
-                                const devicesResponse = await apiFetch(`/devices?city=${city}&lab=${lab}`);
                                 await generateDynamicReport('LAB', {
                                     ...labData,
-                                    devices: devicesResponse?.devices || []
+                                    devices: processedDevices
                                 }, lab);
                                 (await import('sonner')).toast.success("Facility Audit Ready", { id: toastId });
                             } catch (e) {
@@ -149,100 +233,87 @@ const LabSummaryPage = () => {
                                 (await import('sonner')).toast.error("Audit Generation Failed", { id: toastId });
                             }
                         }}
-                        className="bg-muted/50 hover:bg-muted/80 border border-border/50 text-foreground gap-2 px-4 rounded-xl h-10 text-[9px] font-black uppercase tracking-widest transition-all group backdrop-blur-xl mr-2"
+                        className="bg-white hover:bg-white/90 text-black gap-2 px-4 rounded-lg h-9 text-[9px] font-bold uppercase tracking-widest transition-all shadow-lg"
                     >
-                        <Zap size={14} className="text-primary group-hover:scale-110 transition-transform" />
-                        generate daily audit report
+                        <FileText size={13} />
+                        Generate PPTX
                     </Button>
 
-                    {[
-                        { label: "STABILITY", value: "99.9%", icon: Activity },
-                        { label: "STATUS", value: "ENCRYPTED", icon: Shield },
-                        { label: "THREATS", value: labData?.offline_30d || 0, icon: Target },
-                    ].map((m, i) => (
-                        <div key={i} className="flex flex-col items-end">
-                            <div className="flex items-center gap-2 mb-1">
-                                <m.icon size={10} className="text-primary" />
-                                <span className="text-[8px] font-black opacity-20 uppercase tracking-[0.3em]">{m.label}</span>
-                            </div>
-                            <span className="text-[12px] font-black uppercase tracking-widest text-foreground">{m.value}</span>
-                        </div>
-                    ))}
+                    <Button
+                        onClick={async () => {
+                            const toastId = (await import('sonner')).toast.loading(`Synthesizing excel for ${lab}...`);
+                            try {
+                                const { generateDynamicExcelReport } = await import('@/lib/pdf-generator');
+                                await generateDynamicExcelReport('LAB', {
+                                    ...labData,
+                                    devices: processedDevices
+                                }, lab);
+                                (await import('sonner')).toast.success("Excel Audit Ready", { id: toastId });
+                            } catch (e) {
+                                console.error(e);
+                                (await import('sonner')).toast.error("Audit Generation Failed", { id: toastId });
+                            }
+                        }}
+                        className="bg-emerald-600 hover:bg-emerald-500 text-white gap-2 px-4 rounded-lg h-9 text-[9px] font-bold uppercase tracking-widest transition-all shadow-lg"
+                    >
+                        <FileText size={13} />
+                        Generate Excel
+                    </Button>
                 </div>
-
             </div>
 
-            {/* CORE METRICS GRID - EVERYTHING IN ONE VIEW */}
+            {/* CORE METRICS GRID */}
             <div className="relative z-10">
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
                     {allStats.map((stat, i) => (
-                        <div
+                        <Card
                             key={i}
                             onClick={() => navigate(`/dashboard/devices?city=${city}&lab=${lab}&status=${stat.filter}`)}
-                            className={cn(
-                                "group glass-card premium-border rounded-2xl p-4 md:p-5 cursor-pointer transition-all duration-500 hover:translate-y-[-4px] relative overflow-hidden flex flex-col justify-between min-h-[160px] md:min-h-[180px]",
-                                stat.glow,
-                                // Special styling for alerts
-                                i >= 3 && "border-yellow-500/20"
-                            )}
+                            className="group relative overflow-hidden bg-card cursor-pointer border border-border hover:border-primary/40 transition-all hover:translate-y-[-4px] shadow-sm hover:shadow-lg rounded-2xl min-h-[160px]"
                         >
-                            <div className="flex items-start justify-between mb-4">
-                                <div className={cn(
-                                    "p-2.5 rounded-xl bg-background/40 border transition-all duration-500 group-hover:scale-110 shadow-inner",
-                                    stat.borderColor
-                                )}>
-                                    <stat.icon size={20} className={stat.color} />
-                                    {i >= 3 && <div className="absolute -top-1 -right-1 bg-yellow-500 text-black text-[6px] font-black px-1 py-0.5 rounded-sm shadow-lg">ALERT</div>}
+                            <CardContent className="p-6 flex flex-col justify-between h-full space-y-4">
+                                <div className="flex items-start justify-between">
+                                    <div className="space-y-1">
+                                        <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-[0.2em]">
+                                            Infrastructure Node
+                                        </h3>
+                                        <h2 className="text-sm font-bold tracking-tight text-white group-hover:text-white/80 transition-colors uppercase">
+                                            {stat.label}
+                                        </h2>
+                                    </div>
+                                    <div className={cn(
+                                        "p-2 rounded-lg bg-background border border-border shadow-inner transition-colors group-hover:border-primary/30",
+                                        stat.color
+                                    )}>
+                                        <stat.icon size={16} />
+                                    </div>
                                 </div>
-                                <div className="bg-background/20 p-1.5 rounded-lg border border-border/30 backdrop-blur-md">
-                                    <MiniWaveChart
-                                        color={stat.waveColor}
-                                        width={80}
-                                        height={35}
-                                        intensity={stat.intensity}
-                                        showGrid={false}
-                                    />
-                                </div>
-                            </div>
 
-                            <div className="relative z-10 mt-auto">
-                                <div className={cn("border-l pl-2 mb-1 transition-all group-hover:pl-3", stat.borderColor)}>
-                                    <p className={cn("text-[8px] md:text-[9px] font-black uppercase tracking-[0.2em] mb-0.5 transition-colors", stat.color)}>
-                                        {stat.label}
-                                    </p>
-                                </div>
-                                <div className="flex items-baseline gap-2">
-                                    <h2 className="text-3xl md:text-4xl font-black tracking-tighter text-foreground leading-none transition-all duration-500 group-hover:scale-105">
-                                        {stat.value}
-                                    </h2>
-                                    <div className="flex flex-col">
+                                <div className="flex items-end justify-between border-t border-border pt-4">
+                                    <div className="flex items-baseline gap-1.5">
+                                        <span className="text-3xl font-bold text-white tracking-tight leading-none">{stat.value}</span>
+                                        <span className="text-[9px] font-bold text-white/50 uppercase tracking-widest">
+                                            {i === 0 ? "Total Units" : i === 1 ? "Live Sync" : i === 2 ? "Down Time" : "Alert Nodes"}
+                                        </span>
+                                    </div>
+                                    <div className={cn(
+                                        "flex items-baseline gap-1.5 px-3 py-1 rounded-full border shadow-sm transition-all",
+                                        i >= 3 ? "bg-red-500/10 border-red-500/20" : "bg-emerald-500/10 border-emerald-500/20"
+                                    )}>
                                         <span className={cn(
-                                            "text-[7px] font-black uppercase tracking-widest",
-                                            i >= 3 ? "text-red-500" : "text-emerald-500"
+                                            "text-[9px] font-bold uppercase tracking-wider",
+                                            i >= 3 ? "text-red-400" : "text-emerald-400"
                                         )}>
-                                            {i >= 3 ? "Critical" : "+5.2%"}
+                                            {i >= 3 ? "Critical" : "Nominal"}
                                         </span>
                                     </div>
                                 </div>
-                            </div>
-                            <div className={cn("absolute -right-6 -bottom-6 w-24 h-24 blur-[60px] opacity-10 rounded-full", stat.bg)} />
-                        </div>
+                            </CardContent>
+                        </Card>
                     ))}
                 </div>
             </div>
 
-            {/* PRESENTATION FOOTER */}
-            <div className="relative z-10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 border-t border-border/50">
-                <div>
-                    <p className="text-[7px] font-black opacity-20 uppercase tracking-[0.5em] mb-1 group-hover:text-primary">System Branch</p>
-                    <p className="text-[10px] font-black opacity-60 uppercase tracking-widest text-foreground">{city} • SECTOR CLUSTER</p>
-                </div>
-
-                <div className="text-center md:text-right">
-                    <p className="text-[9px] font-black opacity-30 tracking-widest uppercase text-foreground">© 2026 Lab Guardian • Core Intelligence systems</p>
-                    <p className="text-[8px] font-bold text-primary/40 uppercase tracking-[0.5em]">V2.0 PRO INFRASTRUCTURE</p>
-                </div>
-            </div>
         </div>
     );
 };
