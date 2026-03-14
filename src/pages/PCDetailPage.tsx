@@ -120,7 +120,7 @@ export default function PCDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['global-lab-stats'] });
       navigate('/dashboard', { replace: true });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       console.error(error);
       toast.error("Failed to delete system record");
     }
@@ -145,7 +145,7 @@ export default function PCDetailPage() {
 
   const statusMutation = useMutation({
     mutationFn: (isDefective: boolean) => updateDeviceStatus(id || '', isDefective),
-    onSuccess: (data: any) => {
+    onSuccess: (data: Device) => {
       queryClient.invalidateQueries({ queryKey: ['pc-detail', id] });
       queryClient.invalidateQueries({ queryKey: ['devices-list'] });
       
@@ -157,7 +157,7 @@ export default function PCDetailPage() {
         setTimeout(() => navigate(-1), 2500);
       }
     },
-    onError: () => {
+    onError: (error: Error) => {
       toast.error("Failed to update system status");
     }
   });
@@ -620,7 +620,7 @@ export default function PCDetailPage() {
                       {(() => {
                         const today = new Date().toISOString().split('T')[0];
                         // Robust check: Compare date strings directly
-                        const historyHasToday = history.some((h: any) => h.history_date === today || h.start_time?.startsWith(today));
+                        const historyHasToday = history.some((h: DeviceDailyHistory) => h.history_date === today || h.start_time?.startsWith(today));
 
                         const getNormalizedScore = (val: number | null | undefined) => {
                           let score = Number(val) || 0;

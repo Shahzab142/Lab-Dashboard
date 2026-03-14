@@ -2,8 +2,11 @@ import { useState, useEffect } from "react";
 import { Wrench, CheckCircle2, Clock, AlertTriangle, AlertCircle, ShieldAlert } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
-import { apiFetch } from "@/lib/api";
+import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { toast } from "sonner";
+import { apiFetch, updateDeviceStatus } from "@/lib/api";
+import { Device } from "@/types";
 
 type Ticket = {
     id: string;
@@ -20,78 +23,80 @@ export default function MaintenanceHub() {
     const [tickets, setTickets] = useState<Ticket[]>([]);
 
     useEffect(() => {
-        const generateMockTickets = async () => {
-            // Get defective devices to seed the ticket system
-            const defectiveIds = JSON.parse(localStorage.getItem('defective_devices') || '[]');
+        const fetchTickets = async () => {
             try {
                 const res = await apiFetch("/devices");
-                const allDevices = res.devices || [];
+                const allDevices: Device[] = res.devices || [];
 
-                let initialTickets: Ticket[] = defectiveIds.map((id: string, index: number) => {
-                    const device = allDevices.find((d: any) => d.system_id === id);
-                    return {
-                        id: `TKT-${Math.floor(Math.random() * 90000) + 10000}`,
-                        system_id: id,
-                        pc_name: device?.pc_name || `Unknown Node`,
-                        lab: device?.lab_name || 'Unassigned Lab',
-                        city: device?.city || 'Unknown District',
-                        status: index % 3 === 0 ? 'in-progress' : 'pending',
+                // 1. Map real defective devices to tickets
+                const initialTickets: Ticket[] = allDevices
+                    .filter(d => d.is_defective)
+                    .map((device, idx) => ({
+                        id: `TKT-${device.system_id}-${idx + 100}`,
+                        system_id: device.system_id,
+                        pc_name: device.pc_name || `Station ${device.system_id}`,
+                        lab: device.lab_name || 'Main Lab',
+                        city: device.city || 'Central',
+                        status: idx % 2 === 0 ? 'in-progress' : 'pending',
                         priority: 'high',
-                        created_at: new Date(Date.now() - (Math.random() * 100000000)).toISOString()
-                    };
-                });
+                        created_at: device.created_at || new Date().toISOString()
+                    }));
 
-                // Add some dummy offline ones
-                const offline = allDevices.filter((d: any) => d.status === 'offline').slice(0, 3);
-                offline.forEach((d: any) => {
-                    if (!initialTickets.find(t => t.system_id === d.system_id)) {
-                        initialTickets.push({
-                            id: `TKT-${Math.floor(Math.random() * 90000) + 10000}`,
-                            system_id: d.system_id,
-                            pc_name: d.pc_name || 'Station',
-                            lab: d.lab_name,
-                            city: d.city,
-                            status: 'pending',
-                            priority: 'medium',
-                            created_at: new Date().toISOString()
-                        });
-                    }
+                // 2. Add offline devices not already in tickets
+                const offline = allDevices.filter(d => d.status === 'offline' && !d.is_defective).slice(0, 5);
+                offline.forEach(d => {
+                    initialTickets.push({
+                        id: `OFF-${d.system_id}`,
+                        system_id: d.system_id,
+                        pc_name: d.pc_name || 'Offline Station',
+                        lab: d.lab_name || 'Main Lab',
+                        city: d.city || 'Central',
+                        status: 'pending',
+                        priority: 'medium',
+                        created_at: new Date().toISOString()
+                    });
                 });
 
                 setTickets(initialTickets);
-            } catch (err) {
-                console.error(err);
+            } catch (err: unknown) {
+                console.error("Maintenance Sync Failed:", err);
             }
         };
 
-        generateMockTickets();
+        fetchTickets();
     }, []);
 
-    const columns: { id: 'pending' | 'in-progress' | 'resolved'; title: string; icon: any; color: string }[] = [
+    const columns: { id: Ticket['status']; title: string; icon: typeof AlertCircle; color: string }[] = [
         { id: 'pending', title: 'Awaiting Action', icon: AlertCircle, color: 'text-red-400 border-red-500/20 bg-red-500/5' },
         { id: 'in-progress', title: 'In Maintenance', icon: Clock, color: 'text-amber-400 border-amber-500/20 bg-amber-500/5' },
         { id: 'resolved', title: 'Resolved & Verified', icon: CheckCircle2, color: 'text-emerald-400 border-emerald-500/20 bg-emerald-500/5' }
     ];
 
-    const onDragEnd = (result: any) => {
+    const onDragEnd = async (result: DropResult) => {
         if (!result.destination) return;
 
         const { source, destination } = result;
         if (source.droppableId !== destination.droppableId) {
+            const ticketId = result.draggableId;
+            const newStatus = destination.droppableId as Ticket['status'];
+
             setTickets(prev => prev.map(t => {
-                if (t.id === result.draggableId) {
-                    return { ...t, status: destination.droppableId as any };
+                if (t.id === ticketId) {
+                    return { ...t, status: newStatus };
                 }
                 return t;
             }));
 
-            // If moved to resolved, optionally remove from defective
-            if (destination.droppableId === 'resolved') {
-                const ticket = tickets.find(t => t.id === result.draggableId);
+            // If moved to resolved, clear the defective flag on the server
+            if (newStatus === 'resolved') {
+                const ticket = tickets.find(t => t.id === ticketId);
                 if (ticket) {
-                    const defectiveIds = JSON.parse(localStorage.getItem('defective_devices') || '[]');
-                    const newDefective = defectiveIds.filter((id: string) => id !== ticket.system_id);
-                    localStorage.setItem('defective_devices', JSON.stringify(newDefective));
+                    try {
+                        await updateDeviceStatus(ticket.system_id, false);
+                        toast.success(`System ${ticket.pc_name} marked as Repaired in cloud.`);
+                    } catch (err) {
+                        toast.error("Cloud update failed. Check connectivity.");
+                    }
                 }
             }
         }

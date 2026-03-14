@@ -47,3 +47,12 @@ export async function updateDeviceStatus(hid: string, isDefective: boolean) {
         body: JSON.stringify({ is_defective: isDefective }),
     });
 }
+
+import { Json } from "@/integrations/supabase/types";
+
+export async function sendDeviceCommand(hid: string, type: string, payload: Json = {}) {
+    return apiFetch(`/devices/${hid}/command`, {
+        method: "POST",
+        body: JSON.stringify({ type, payload }),
+    });
+}

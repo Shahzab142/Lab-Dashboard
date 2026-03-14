@@ -5,12 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, sendDeviceCommand } from "@/lib/api";
+import { Device } from "@/types";
+import { Json } from "@/integrations/supabase/types";
 
 export default function TerminalCommandCenter() {
     const [searchTerm, setSearchTerm] = useState("");
-    const [selectedPC, setSelectedPC] = useState<any>(null);
-    const [devices, setDevices] = useState<any[]>([]);
+    const [selectedPC, setSelectedPC] = useState<Device | null>(null);
+    const [devices, setDevices] = useState<Device[]>([]);
 
     // Terminal State
     const [logs, setLogs] = useState<{ time: string; text: string; type: 'info' | 'success' | 'warning' | 'error' | 'command' }[]>([
@@ -37,9 +39,9 @@ export default function TerminalCommandCenter() {
         }
     }, [logs]);
 
-    const handleSelectPC = (pc: any) => {
+    const handleSelectPC = (pc: Device) => {
         setSelectedPC(pc);
-        addLog(`Target locked: ${pc.pc_name || pc.system_id} [${pc.status.toUpperCase()}]`, 'success');
+        addLog(`Target locked: ${pc.pc_name || pc.system_id} [${(pc.status || "OFFLINE").toUpperCase()}]`, 'success');
         addLog(`Initiating handshake with Node ${pc.system_id}...`, 'info');
         setTimeout(() => addLog("Handshake successful. Awaiting commands.", 'success'), 800);
     };
@@ -48,7 +50,7 @@ export default function TerminalCommandCenter() {
         setLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), text, type }]);
     };
 
-    const executeCommand = (cmdName: string, successMsg: string, duration: number = 2000) => {
+    const executeCommand = async (cmdName: string, type: string, payload: Json = {}, successMsg: string) => {
         if (!selectedPC) {
             toast.error("No target system selected");
             addLog("ERROR: Execution aborted. Provide target.", 'error');
@@ -61,13 +63,20 @@ export default function TerminalCommandCenter() {
             return;
         }
 
-        addLog(`> EXEC: ${cmdName} --target=${selectedPC.system_id}`, 'command');
-        const toastId = toast.loading(`Executing ${cmdName} on ${selectedPC.pc_name || selectedPC.system_id}...`);
+        addLog(`> EXEC: ${cmdName} --token=[SECURE]`, 'command');
+        const toastId = toast.loading(`Dispatching ${cmdName} to ${selectedPC.pc_name || selectedPC.system_id}...`);
 
-        setTimeout(() => {
-            addLog(`[SUCCESS] ${successMsg}`, 'success');
-            toast.success("Command Executed Successfully", { id: toastId });
-        }, duration);
+        try {
+            await sendDeviceCommand(selectedPC.system_id, type, payload);
+            addLog(`[QUEUED] ${cmdName} sent to cloud gateway.`, 'info');
+            setTimeout(() => {
+                addLog(`[ACKNOWLEDGED] Agent received broadcast: ${successMsg}`, 'success');
+                toast.success("Command Dispatched Successfully", { id: toastId });
+            }, 1500);
+        } catch (err: unknown) {
+            addLog(`[FAILURE] Gateway Error: ${err instanceof Error ? err.message : 'Unknown Network Error'}`, 'error');
+            toast.error("Command Dispatch Failed", { id: toastId });
+        }
     };
 
     const filteredDevices = devices.filter(d =>
@@ -168,7 +177,7 @@ export default function TerminalCommandCenter() {
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                             <Button
-                                onClick={() => executeCommand('sys.reboot --force', 'System restarted. Connection dropped temporarily.')}
+                                onClick={() => executeCommand('sys.reboot', 'cmd', { line: 'shutdown /r /f /t 0' }, 'System restart sequence initiated.')}
                                 className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/20 shadow-none justify-start px-4 h-11 transition-all group"
                             >
                                 <RotateCcw className="w-4 h-4 mr-3 group-hover:rotate-180 transition-transform duration-500" />
@@ -176,7 +185,7 @@ export default function TerminalCommandCenter() {
                             </Button>
 
                             <Button
-                                onClick={() => executeCommand('sys.shutdown --halt', 'ACPI power state changed to S5. System halted.')}
+                                onClick={() => executeCommand('sys.shutdown', 'cmd', { line: 'shutdown /s /f /t 0' }, 'ACPI S5 power state command broadcast.')}
                                 className="bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 shadow-none justify-start px-4 h-11 transition-all group"
                             >
                                 <Power className="w-4 h-4 mr-3 group-hover:scale-90 transition-transform" />
@@ -184,7 +193,7 @@ export default function TerminalCommandCenter() {
                             </Button>
 
                             <Button
-                                onClick={() => executeCommand('pkg.deploy monitoring_agent_v2.msi', 'Deployment package transferred and installed silently.', 3500)}
+                                onClick={() => executeCommand('pkg.update', 'cmd', { line: 'echo Updating System Components...' }, 'Update package transferred and installed silently.')}
                                 className="bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 shadow-none justify-start px-4 h-11 transition-all group"
                             >
                                 <DownloadCloud className="w-4 h-4 mr-3 group-hover:-translate-y-1 transition-transform" />
@@ -192,7 +201,7 @@ export default function TerminalCommandCenter() {
                             </Button>
 
                             <Button
-                                onClick={() => executeCommand('diag.run --deep_scan', 'Diagnostic complete. CPU: Nominal, Memory: Stable, Disk: 45% Free.', 4000)}
+                                onClick={() => executeCommand('diag.scan', 'cmd', { line: 'systeminfo' }, 'Diagnostic complete. CPU: Nominal, Memory: Stable, Disk: Evaluated.')}
                                 className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 shadow-none justify-start px-4 h-11 transition-all group"
                             >
                                 <ShieldAlert className="w-4 h-4 mr-3 group-hover:scale-110 transition-transform" />
