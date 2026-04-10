@@ -13,22 +13,45 @@ import {
     CheckCircle2,
     LayoutGrid,
     Laptop,
-    Hourglass,
-    Cpu
+    Hourglass
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatAppName, parseUTC } from '@/lib/utils';
-import { MiniWaveChart } from '@/components/dashboard/MiniWaveChart';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+
+interface DeviceHistory {
+    history_date?: string;
+    start_time?: string;
+    end_time?: string;
+    avg_score?: number;
+    runtime_minutes?: number;
+    app_usage?: Record<string, number>;
+}
+
+interface Device {
+    pc_name: string;
+    lab_name: string;
+    cpu_score: number;
+    runtime_minutes: number;
+    today_start_time: string;
+    today_last_active: string;
+    last_seen?: string;
+    app_usage?: Record<string, number>;
+}
+
+interface DeviceDetail {
+    device: Device;
+    history: DeviceHistory[];
+}
 
 export default function PCHistoryDetailPage() {
     const { id, date } = useParams();
     const navigate = useNavigate();
 
-    const { data: detail, isLoading } = useQuery({
+    const { data: detail, isLoading } = useQuery<DeviceDetail>({
         queryKey: ['pc-detail', id],
         queryFn: () => apiFetch(`/devices/${encodeURIComponent(id || '')}`),
     });
@@ -55,7 +78,7 @@ export default function PCHistoryDetailPage() {
     };
 
     // Find the log for the requested date
-    const historyLog = history?.find((h: any) => (h.history_date || h.start_time?.split('T')[0]) === date) || (isToday ? {
+    const historyLog = history?.find((h: DeviceHistory) => (h.history_date || h.start_time?.split('T')[0]) === date) || (isToday ? {
         history_date: date,
         avg_score: device.cpu_score,
         runtime_minutes: device.runtime_minutes,
@@ -66,7 +89,7 @@ export default function PCHistoryDetailPage() {
 
     // Find Previous Log for Delta Calculation
     const prevDate = getPreviousDate(date);
-    const prevLog = history?.find((h: any) => (h.history_date || h.start_time?.split('T')[0]) === prevDate);
+    const prevLog = history?.find((h: DeviceHistory) => (h.history_date || h.start_time?.split('T')[0]) === prevDate);
 
     if (!historyLog) return (
         <div className="min-h-screen bg-background flex flex-col items-center justify-center text-center space-y-6">
@@ -166,36 +189,8 @@ export default function PCHistoryDetailPage() {
                 {/* MAIN CONTENT: APP USAGE */}
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
-                    {/* Visual Chart Column (Optional, can be smaller) */}
-                    <div className="lg:col-span-4 space-y-6">
-                        <Card className="bg-card border-border flex flex-col overflow-hidden relative group">
-                            <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
-                            <CardHeader>
-                                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                                    <Cpu className="w-4 h-4 text-primary" />
-                                    System Health
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-8 relative z-10">
-                                <div className="relative w-48 h-48">
-                                    <div className="absolute inset-0 flex items-center justify-center">
-                                        <MiniWaveChart color="#6366f1" width={180} height={100} intensity={1.2} showGrid={false} />
-                                    </div>
-                                    <div className="absolute inset-0 rounded-full border-2 border-dashed border-border animate-[spin_60s_linear_infinite]" />
-                                    <div className="absolute inset-4 rounded-full border border-border opacity-50" />
-                                </div>
-                                <div>
-                                    <h3 className="text-2xl font-bold text-foreground mb-2"> optimal</h3>
-                                    <p className="text-xs text-muted-foreground max-w-[200px] mx-auto leading-relaxed">
-                                        User activity patterns indicate normal usage behavior. No idle anomalies detected.
-                                    </p>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-
                     {/* Detailed Logic Grid */}
-                    <div className="lg:col-span-8">
+                    <div className="lg:col-span-12">
                         <Card className="bg-card border-border min-h-[600px] flex flex-col">
                             <CardHeader className="border-b border-border pb-4">
                                 <div className="flex items-center justify-between">
