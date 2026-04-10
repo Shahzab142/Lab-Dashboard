@@ -1,18 +1,17 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiFetch, updateDeviceStatus } from '@/lib/api';
+import { apiFetch } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
-import { Device, DeviceDailyHistory } from '@/types';
 import {
   ArrowLeft,
   Monitor,
   HardDrive,
   Activity,
   ShieldCheck,
-  Cpu,
   MapPin,
   Beaker,
   Calendar,
+  CalendarDays,
   Sunrise,
   Timer,
   Save,
@@ -29,9 +28,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { useState, useEffect } from 'react';
-import { MiniWaveChart } from '@/components/dashboard/MiniWaveChart';
 import { toast } from 'sonner';
 import { cn, formatAppName } from '@/lib/utils';
+import { useLabSchedule } from '@/hooks/useLabSchedule';
 
 /**
  * PC DETAIL PAGE - VERSION 3.0 (FULL PAGE NAVIGATION)
@@ -43,9 +42,9 @@ export default function PCDetailPage() {
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({ pc_name: '', city: '', lab_name: '', tehsil: '' });
-  // selectedHistory state removed as we now navigate to a full page
   const [isLocallyDefective, setIsLocallyDefective] = useState(false);
   const [showDefectiveSuccess, setShowDefectiveSuccess] = useState(false);
+  const schedule = useLabSchedule();
   const [showRepairedSuccess, setShowRepairedSuccess] = useState(false);
 
   // --- HARD RESET LOGIC ---
@@ -58,8 +57,16 @@ export default function PCDetailPage() {
     };
     resetUI();
 
-    // Safety check for localStorage corruption - REDUNDANT in Phase 7 (Moved to Server)
-    // setIsLocallyDefective(detail?.device?.is_defective || false);
+    // Safety check for localStorage corruption
+    try {
+      if (id) {
+        const defectiveDevices = JSON.parse(localStorage.getItem('defective_devices') || '[]');
+        setIsLocallyDefective(defectiveDevices.includes(id));
+      }
+    } catch (e) {
+      console.error("Storage corruption detected:", e);
+      localStorage.setItem('defective_devices', '[]');
+    }
 
     return () => resetUI();
   }, [id]);
@@ -120,14 +127,14 @@ export default function PCDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['global-lab-stats'] });
       navigate('/dashboard', { replace: true });
     },
-    onError: (error: Error) => {
+    onError: (error: any) => {
       console.error(error);
       toast.error("Failed to delete system record");
     }
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: Partial<Device>) => apiFetch(`/devices/${encodeURIComponent(id || '')}`, {
+    mutationFn: (data: any) => apiFetch(`/devices/${encodeURIComponent(id || '')}`, {
       method: 'PATCH',
       body: JSON.stringify({
         pc_name: data.pc_name,
@@ -143,28 +150,48 @@ export default function PCDetailPage() {
     }
   });
 
-  const statusMutation = useMutation({
-    mutationFn: (isDefective: boolean) => updateDeviceStatus(id || '', isDefective),
-    onSuccess: (data: Device) => {
-      queryClient.invalidateQueries({ queryKey: ['pc-detail', id] });
-      queryClient.invalidateQueries({ queryKey: ['devices-list'] });
-      
-      if (data.is_defective) {
-        setShowDefectiveSuccess(true);
-        setTimeout(() => navigate(-1), 2500);
-      } else {
-        setShowRepairedSuccess(true);
-        setTimeout(() => navigate(-1), 2500);
-      }
-    },
-    onError: (error: Error) => {
-      toast.error("Failed to update system status");
-    }
-  });
+  const toggleDefectiveLocal = () => {
+    try {
+      const defectiveDevices = JSON.parse(localStorage.getItem('defective_devices') || '[]');
+      let newDevices;
 
-  const toggleDefectiveStatus = () => {
-    if (!detail?.device) return;
-    statusMutation.mutate(!detail.device.is_defective);
+      if (isLocallyDefective) {
+        // REMOVING FROM DEFECTIVE
+        newDevices = defectiveDevices.filter((did: string) => did !== id);
+
+        // Update Local Storage
+        localStorage.setItem('defective_devices', JSON.stringify(newDevices));
+        setIsLocallyDefective(false);
+
+        // Show Repaired Modal
+        setShowRepairedSuccess(true);
+        queryClient.invalidateQueries({ queryKey: ['devices'] });
+
+        // Delay navigation
+        setTimeout(() => navigate(-1), 2500);
+
+      } else {
+        // ADDING TO DEFECTIVE
+        newDevices = [...defectiveDevices, id];
+
+        localStorage.setItem('defective_devices', JSON.stringify(newDevices));
+        setIsLocallyDefective(true);
+
+        // Show the centered modal
+        setShowDefectiveSuccess(true);
+
+        queryClient.invalidateQueries({ queryKey: ['devices'] });
+        queryClient.invalidateQueries({ queryKey: ['devices-list'] });
+        queryClient.invalidateQueries({ queryKey: ['pc-detail', id] });
+
+        // Wait longer (2.5s) for user to read the centered message
+        setTimeout(() => {
+          navigate(-1);
+        }, 2500);
+      }
+    } catch (e) {
+      toast.error("Logic Error: Could not update status");
+    }
   };
 
   // --- RENDER STATES ---
@@ -239,12 +266,7 @@ export default function PCDetailPage() {
               </div>
             </div>
             <p className="text-white font-bold text-[10px] uppercase tracking-widest opacity-60">
-              System ID: <span className="text-white/80">{device.system_id}</span> • Node Status: <span className={device.is_defective ? "text-red-500" : "text-emerald-500"}>{device.is_defective ? "DEFECTIVE" : "VERIFIED"}</span>
-              {device.health_score < 100 && (
-                <span className="ml-2 px-2 py-0.5 bg-red-500/20 text-red-400 rounded-sm border border-red-500/30">
-                  HEALTH ALERT: {device.health_score}%
-                </span>
-              )}
+              System ID: <span className="text-white/80">{device.system_id}</span> • Node Status: <span className={isLocallyDefective ? "text-red-500" : "text-emerald-500"}>{isLocallyDefective ? "DEFECTIVE" : "VERIFIED"}</span>
             </p>
           </div>
         </div>
@@ -262,17 +284,16 @@ export default function PCDetailPage() {
           ) : (
             <>
               <Button
-                onClick={toggleDefectiveStatus}
-                disabled={statusMutation.isPending}
+                onClick={toggleDefectiveLocal}
                 className={cn(
                   "gap-2 px-6 rounded-lg h-10 text-[10px] font-bold uppercase tracking-widest transition-all shadow-sm border",
-                  device.is_defective
+                  isLocallyDefective
                     ? "bg-red-500 text-white border-red-600 hover:bg-red-600"
                     : "bg-amber-500/10 text-amber-500 border-amber-500/20 hover:bg-amber-500 hover:text-white"
                 )}
               >
-                {statusMutation.isPending ? <RefreshCw className="animate-spin" size={16} /> : <Activity size={16} />}
-                {device.is_defective ? "Repaired / Fix" : "Mark as Defective"}
+                <Activity size={16} />
+                {isLocallyDefective ? "Repaired / Fix" : "Mark as Defective"}
               </Button>
 
               <Button
@@ -394,32 +415,19 @@ export default function PCDetailPage() {
 
               <div className="p-5 rounded-xl bg-card border border-border transition-all hover:border-secondary/20 group relative overflow-hidden">
                 <div className="absolute -right-2 -top-2 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity">
-                  <Monitor size={80} />
+                  <HardDrive size={80} />
                 </div>
                 <div className="flex items-center gap-4 relative z-10">
                   <div className="p-3 rounded-lg bg-orange-500 text-white shadow-lg shadow-orange-500/10">
-                    <Monitor size={22} />
+                    <HardDrive size={22} />
                   </div>
                   <div className="flex-1">
-                    <p className="text-[10px] text-white/90 uppercase font-black tracking-widest">OS INFORMATION</p>
-                    <p className="font-bold text-sm text-primary mt-1 line-clamp-1">{device.os_info || "Windows Core Terminal"}</p>
-                    <p className="text-[8px] text-white/40 uppercase tracking-widest mt-0.5">Hardware ID: {device.hardware_id}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-5 rounded-xl bg-card border border-border transition-all hover:border-blue-500/20 group relative overflow-hidden">
-                <div className="absolute -right-2 -top-2 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity">
-                  <ShieldCheck size={80} />
-                </div>
-                <div className="flex items-center gap-4 relative z-10">
-                  <div className="p-3 rounded-lg bg-blue-500 text-white shadow-lg shadow-blue-500/10">
-                    <ShieldCheck size={22} />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-[10px] text-white/90 uppercase font-black tracking-widest">NETWORK INTERFACE</p>
-                    <p className="font-mono text-xs font-bold text-primary mt-1">{device.local_ip || "127.0.0.1"}</p>
-                    <p className="text-[8px] text-white/40 uppercase tracking-widest mt-0.5 font-bold">Encrypted VPN Tunnel Stable</p>
+                    <p className="text-[10px] text-white/90 uppercase font-black tracking-widest">HARDWARE ID</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <p className="font-mono text-xs font-bold uppercase tracking-tight text-primary break-all bg-primary/5 px-2.5 py-1.5 rounded border border-primary/20 shadow-inner">
+                        {device.hardware_id || device.hwid || "HS-PR10-TRON-X12"}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -444,77 +452,6 @@ export default function PCDetailPage() {
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <p className="text-[10px] font-black text-primary uppercase tracking-widest opacity-40">Professional Hardware Spec</p>
-                <div className="grid grid-cols-1 gap-3">
-                  <div className="flex items-center justify-between p-3 bg-muted rounded-lg border border-border">
-                    <div className="flex items-center gap-2">
-                      <Cpu size={14} className="text-secondary" />
-                      <span className="text-[10px] font-bold text-white/70 uppercase">Processor</span>
-                    </div>
-                    <span className="text-[10px] font-mono font-bold text-primary truncate max-w-[150px]">{device.cpu_model || "X86-64 GENERIC"}</span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between p-3 bg-muted rounded-lg border border-border">
-                    <div className="flex items-center gap-2">
-                      <Activity size={14} className="text-secondary" />
-                      <span className="text-[10px] font-bold text-white/70 uppercase">Total Memory</span>
-                    </div>
-                    <span className="text-[10px] font-mono font-bold text-primary">{device.ram_total || "0.0 GB"}</span>
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 bg-muted rounded-lg border border-border">
-                    <div className="flex items-center gap-2">
-                      <HardDrive size={14} className="text-secondary" />
-                      <span className="text-[10px] font-bold text-white/70 uppercase">Storage Cluster</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-[10px] font-mono font-bold text-primary block">{device.disk_free} FREE</span>
-                      <span className="text-[8px] font-bold text-white/40 block">OF {device.disk_total}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 bg-muted rounded-lg border border-border">
-                    <div className="flex items-center gap-2">
-                      <Monitor size={14} className="text-secondary" />
-                      <span className="text-[10px] font-bold text-white/70 uppercase">Graphic Core</span>
-                    </div>
-                    <span className="text-[10px] font-mono font-bold text-primary truncate max-w-[150px]">{device.gpu_model || "INTEGRATED"}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-6 rounded-2xl bg-card border border-border relative overflow-hidden group shadow-sm">
-                <div className="absolute top-0 right-0 p-4 opacity-5">
-                  <Cpu size={48} className="text-primary" />
-                </div>
-                <p className="text-[10px] text-white/50 uppercase font-bold tracking-widest mb-4">Real-time Telemetry</p>
-                <div className="bg-muted/50 rounded-xl border border-border p-4 mb-4 flex justify-center opacity-40">
-                  <MiniWaveChart
-                    color="#01416D"
-                    width={280}
-                    height={80}
-                    intensity={isOnline ? 0.8 : 0.05}
-                    showGrid={false}
-                  />
-                </div>
-                <div className="flex items-end justify-between">
-                  <div className="flex flex-col">
-                    <span className="text-7xl font-bold tracking-tighter text-emerald-500 animate-in fade-in zoom-in duration-500">
-                      {device.app_usage?.['__current_cpu__'] || 0}
-                    </span>
-
-                    <span className="text-[10px] font-bold text-emerald-500/60 uppercase tracking-widest mt-1">REAL-TIME LOAD</span>
-                  </div>
-
-                  <div className="flex flex-col items-end opacity-60">
-                    <span className="text-3xl font-bold tracking-tighter text-white">
-                      {device.cpu_score || 0}%
-                    </span>
-                    <span className="text-[9px] font-bold text-white/50 uppercase tracking-widest mt-1">DAILY AVERAGE</span>
-                  </div>
-                </div>
-              </div>
             </CardContent>
           </Card>
 
@@ -603,7 +540,17 @@ export default function PCDetailPage() {
                 <CardTitle className="text-[10px] font-bold tracking-widest text-primary uppercase opacity-60">Handshake History</CardTitle>
                 <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mt-1">Rolling 7-Day Performance Log</p>
               </div>
-              <Calendar className="text-primary opacity-20 w-5 h-5" />
+              <div className="flex items-center gap-2">
+                {schedule.getScheduleLabel(device.city, device.tehsil, device.lab_name) && (
+                  <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-primary/10 border border-primary/20">
+                    <CalendarDays size={10} className="text-primary" />
+                    <span className="text-[8px] font-bold text-primary uppercase tracking-widest">
+                      {schedule.getScheduleLabel(device.city, device.tehsil, device.lab_name)}
+                    </span>
+                  </div>
+                )}
+                <Calendar className="text-primary opacity-20 w-5 h-5" />
+              </div>
             </CardHeader>
             <CardContent className="p-8 pb-4">
               {history && history.length > 0 ? (
@@ -619,21 +566,19 @@ export default function PCDetailPage() {
                       {/* INJECT TODAY'S LIVE SESSION - ONLY IF NOT ALREADY IN HISTORY */}
                       {(() => {
                         const today = new Date().toISOString().split('T')[0];
-                        // Robust check: Compare date strings directly
-                        const historyHasToday = history.some((h: DeviceDailyHistory) => h.history_date === today || h.start_time?.startsWith(today));
+                        const historyHasToday = history.some((h: any) => h.history_date === today || h.start_time?.startsWith(today));
 
-                        const getNormalizedScore = (val: number | null | undefined) => {
-                          let score = Number(val) || 0;
-                          // Heuristic: If value is absurdly high (accumulated), divide by 100 as per user request
-                          if (score > 100) {
-                            score = score / 100;
-                          }
-                          // Hard cap to ensure it never exceeds or equals 100%
+                        const getNormalizedScore = (val: any) => {
+                          let score = parseFloat(val) || 0;
+                          if (score > 100) score = score / 100;
                           if (score >= 100) score = 99.9;
                           return score.toFixed(1);
                         };
 
-                        if (!historyHasToday) {
+                        // Check if today is a scheduled day for this device's lab
+                        const todayIsScheduled = schedule.isScheduledDay(device.city, device.tehsil, device.lab_name, today);
+
+                        if (!historyHasToday && todayIsScheduled) {
                           return (
                             <tr
                               onClick={() => handleHistoryClick(today)}
@@ -641,7 +586,10 @@ export default function PCDetailPage() {
                             >
                               <td className="px-6 py-5 border-b border-border/50">
                                 <div className="flex flex-col">
-                                  <span className="font-bold text-primary uppercase tracking-tight text-sm">TODAY (LIVE)</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-primary uppercase tracking-tight text-sm">TODAY (LIVE)</span>
+                                    <CalendarDays size={10} className="text-primary/60" />
+                                  </div>
                                   <span className="text-[8px] font-bold text-emerald-500 uppercase mt-0.5 animate-pulse">Active Session</span>
                                 </div>
                               </td>
@@ -654,40 +602,47 @@ export default function PCDetailPage() {
                             </tr>
                           );
                         }
-
-                        // Helper available for the map loop below as well if we scope it correctly, 
-                        // but since we are inside an IIFE, we can't export it easily.
-                        // Instead, let's just return the single row here, and handle the map separately or 
-                        // redefine the helper in the map.
-                        // To keep code clean in this replace_block, I'll inline the logic in the map below.
                         return null;
                       })()}
 
-                      {history.slice(0, 10).map((h: DeviceDailyHistory) => {
-                        const dateObj = h.history_date ? new Date(h.history_date) : new Date(h.start_time || "");
-                        const dateArg = h.history_date || (h.start_time ? h.start_time.split('T')[0] : "");
+                      {history.slice(0, 10)
+                        .filter((h: any) => {
+                          // If a schedule is active for this lab, hide non-scheduled days
+                          const dateArg = h.history_date || h.start_time?.split('T')[0];
+                          if (!dateArg) return true;
+                          return schedule.isScheduledDay(device.city, device.tehsil, device.lab_name, dateArg);
+                        })
+                        .map((h: any) => {
+                          const dateObj = h.history_date ? new Date(h.history_date) : new Date(h.start_time);
+                          const dateArg = h.history_date || h.start_time?.split('T')[0];
+                          const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
 
-                        let score = Number(h.avg_score || 0);
-                        if (score > 100) score = score / 100;
-                        if (score >= 100) score = 99.9;
+                          let score = parseFloat(h.avg_score || 0);
+                          if (score > 100) score = score / 100;
+                          if (score >= 100) score = 99.9;
 
-                        return (
-                          <tr key={h.id || h.history_date} onClick={() => handleHistoryClick(dateArg)} className="text-xs group hover:bg-muted/50 transition-all cursor-pointer">
-                            <td className="px-6 py-5 border-b border-border/50">
-                              <div className="flex flex-col">
-                                <span className="font-bold text-primary uppercase tracking-tight text-sm">{dateObj.toLocaleDateString('en-US', { month: 'short', day: '2-digit' }).toUpperCase()}</span>
-                                <span className="text-[8px] font-bold text-muted-foreground uppercase mt-0.5">Archive Data Sync</span>
-                              </div>
-                            </td>
-                            <td className="px-6 py-5 border-b border-border/50 text-right">
-                              <div className="flex flex-col items-end">
-                                <span className="text-lg font-bold text-primary">{score.toFixed(1)}%</span>
-                                <span className="text-[7px] font-bold text-secondary uppercase tracking-widest">AVG %</span>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
+                          return (
+                            <tr key={h.id || h.history_date} onClick={() => handleHistoryClick(dateArg)} className="text-xs group hover:bg-muted/50 transition-all cursor-pointer">
+                              <td className="px-6 py-5 border-b border-border/50">
+                                <div className="flex flex-col">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-primary uppercase tracking-tight text-sm">
+                                      {dateObj.toLocaleDateString('en-US', { month: 'short', day: '2-digit' }).toUpperCase()}
+                                    </span>
+                                    <span className="text-[8px] font-bold text-white/30 uppercase">{dayName}</span>
+                                  </div>
+                                  <span className="text-[8px] font-bold text-muted-foreground uppercase mt-0.5">Archive Data Sync</span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-5 border-b border-border/50 text-right">
+                                <div className="flex flex-col items-end">
+                                  <span className="text-lg font-bold text-primary">{score.toFixed(1)}%</span>
+                                  <span className="text-[7px] font-bold text-secondary uppercase tracking-widest">AVG %</span>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
                     </tbody>
                   </table>
                 </div>
@@ -701,6 +656,7 @@ export default function PCDetailPage() {
           </Card>
         </div>
       </div>
+
 
       {/* Manual Recovery Button (Always at bottom left for emergencies) */}
       <button

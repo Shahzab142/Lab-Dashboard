@@ -10,16 +10,9 @@ import { GeneratePDFDialog } from './GeneratePDFDialog';
 
 const navItems = [
   { to: '/dashboard/analytics', icon: LayoutDashboard, label: 'DASHBOARD' },
-  { to: '/dashboard/utilization', icon: Activity, label: 'LAB UTILIZATION' },
-  { to: '/dashboard/dashboard_4', icon: Activity, label: 'DISTRICTWISE GRAPH' },
-  { to: '/dashboard/dashboard_5', icon: Activity, label: 'DISTRICT PERFORMANCE' },
-  { to: '/dashboard/tehsil-performance', icon: Activity, label: 'TEHSIL PERFORMANCE' },
   { to: '/dashboard/overview', icon: LayoutDashboard, label: 'DISTRICTWISE' },
   { to: '/dashboard/cities', icon: Globe, label: 'TEHSILWISE LAB' },
   { to: '/dashboard/labs', icon: Monitor, label: 'LABWISE SYSTEM' },
-  // { to: '/dashboard/terminal', icon: Terminal, label: 'COMMAND CENTER' },
-  // { to: '/dashboard/maintenance', icon: Wrench, label: 'MAINTENANCE HUB' },
-  // { to: '/dashboard/heatmap', icon: Grid3X3, label: 'LAB BLUEPRINT' },
 ];
 
 interface DashboardSidebarProps {

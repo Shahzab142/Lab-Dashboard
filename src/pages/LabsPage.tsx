@@ -2,9 +2,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiFetch } from '@/lib/api';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Building2, Search, MoreVertical, Edit2, Trash2, ArrowRight } from 'lucide-react';
+import { ArrowLeft, Building2, Search, MoreVertical, Edit2, Trash2, Upload, RotateCcw, CalendarDays } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
@@ -13,9 +13,13 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
+    DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { supabase } from '@/lib/supabase';
+import { useLabSchedule } from '@/hooks/useLabSchedule';
+import { normalize, type ScheduleMap } from '@/lib/scheduleUtils';
+import * as XLSX from 'xlsx';
 
 export default function LabsPage() {
     const navigate = useNavigate();
@@ -24,7 +28,70 @@ export default function LabsPage() {
     const city = searchParams.get('city');
     const tehsil = searchParams.get('tehsil');
     const [searchTerm, setSearchTerm] = useState('');
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
+    const schedule = useLabSchedule();
+
+    // ─── Excel Upload Handler ───────────────────────────────────────────────
+    const handleExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            try {
+                const data = new Uint8Array(evt.target?.result as ArrayBuffer);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+                const newMap: ScheduleMap = { ...schedule.getScheduleMap() };
+                let imported = 0;
+
+                // Skip header row (row index 0)
+                for (let i = 1; i < rows.length; i++) {
+                    const row = rows[i];
+                    if (!row || row.length < 4) continue;
+
+                    const districtRaw = String(row[0] || '').trim();
+                    const tehsilRaw = String(row[1] || '').trim();
+                    const labNameRaw = String(row[2] || '').trim();
+                    const scheduleRaw = String(row[3] || '').trim();
+
+                    if (!districtRaw || !labNameRaw || !scheduleRaw) continue;
+
+                    // Parse days: "Monday, Friday" → ["Monday", "Friday"]
+                    const days = scheduleRaw
+                        .split(/[,;/]+/)
+                        .map(d => d.trim())
+                        .filter(d => d.length > 2);
+
+                    if (days.length === 0) continue;
+
+                    const key = schedule.makeLabKey(districtRaw, tehsilRaw, labNameRaw);
+                    newMap[key] = days;
+                    imported++;
+                }
+
+                if (imported === 0) {
+                    toast.error('No valid rows found. Check the Excel format: District | Tehsil | Lab Name | Schedule');
+                    return;
+                }
+
+                schedule.applySchedule(newMap);
+                toast.success(`📅 Schedule applied for ${imported} lab(s). History now filtered by scheduled days.`);
+            } catch (err) {
+                console.error(err);
+                toast.error('Failed to parse Excel file. Ensure it is a valid .xlsx or .xls file.');
+            }
+        };
+        reader.readAsArrayBuffer(file);
+
+        // Reset input so the same file can be re-uploaded
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    // ─── Lab Actions ────────────────────────────────────────────────────────
     const handleRenameLab = async (e: React.MouseEvent, oldName: string) => {
         e.stopPropagation();
         const newName = prompt("Enter new name for lab:", oldName);
@@ -53,10 +120,7 @@ export default function LabsPage() {
         }
     };
 
-    // --- NEW LOGIC: FETCH ALL DEVICES TO CALCULATE UTILIZATION ---
-    // The user wants to distinguish between "ON but IDLE" and "ON and DRIVING".
-    // We fetch raw device data and aggregate it ourselves.
-
+    // ─── Data Fetching ───────────────────────────────────────────────────────
     const { data: statsData, isLoading } = useQuery({
         queryKey: ['global-lab-stats'],
         queryFn: () => apiFetch("/stats/labs/all"),
@@ -102,7 +166,6 @@ export default function LabsPage() {
         const IDLE_TIME_WINDOW = 60 * 60 * 1000;
         const CPU_ACTIVITY_THRESHOLD = 12;
 
-        // 🛡️ STEP 1: Deduplicate Labs from API (prevent overlap for same-named labs in different tehsils)
         const uniqueLabsMap = new Map();
         labs.forEach((l: any) => {
             const key = `${(l.city || l.norm_city || '').toUpperCase().trim()}-${(l.tehsil || l.norm_tehsil || '').toUpperCase().trim()}-${(l.lab_name || l.lab || '').toUpperCase().trim()}`;
@@ -110,7 +173,6 @@ export default function LabsPage() {
         });
         const uniqueLabs = Array.from(uniqueLabsMap.values());
 
-        // 🛡️ STEP 2: Apply the EXACT Audit Logic used in UtilizationPage
         return uniqueLabs.filter((lab: any) => {
             const labName = (lab.lab_name || lab.lab || '').toUpperCase().trim();
             const labCity = (lab.city || lab.norm_city || '').toUpperCase().trim();
@@ -118,7 +180,6 @@ export default function LabsPage() {
 
             const matchesSearch = labName.includes(searchTerm.toUpperCase().trim());
 
-            // Strictly pull devices for THIS city, THIS tehsil, and THIS lab
             const labDevices = allDevices.filter(d =>
                 (d.lab_name || '').toUpperCase().trim() === labName &&
                 (d.city || '').toUpperCase().trim() === labCity &&
@@ -157,7 +218,6 @@ export default function LabsPage() {
                 const hasSignificantActivity = onlinePCs.some(pc => (pc.cpu_score || 0) > CPU_ACTIVITY_THRESHOLD);
                 matchesFilter = onlineCount > 0 && (hasSignificantActivity || avgCpu > 10);
             } else if (auditStatus === 'idle') {
-                // THE MISUSE CASE: Match UtilizationPage logic precisely
                 const hasSignificantActivity = onlinePCs.some(pc => (pc.cpu_score || 0) > CPU_ACTIVITY_THRESHOLD);
                 matchesFilter = onlineCount > 0 && !(hasSignificantActivity || avgCpu > 10);
             }
@@ -170,6 +230,8 @@ export default function LabsPage() {
         if (!filteredLabs || filteredLabs.length === 0) return 20;
         return Math.max(...filteredLabs.map((l: any) => l.total_pcs || 0), 10);
     }, [filteredLabs]);
+
+    const hasSchedule = schedule.hasAnySchedule();
 
     return (
         <div className="p-4 md:p-8 space-y-8 animate-in slide-in-from-right-4 duration-700 bg-background min-h-screen font-sans select-none">
@@ -222,7 +284,55 @@ export default function LabsPage() {
                     )}
                 </div>
 
-                <div className="flex flex-col md:flex-row items-center justify-end gap-4 pt-2">
+                {/* ─── Controls Row: Upload + Reset + Search ─── */}
+                <div className="flex flex-col md:flex-row items-center gap-3 pt-2">
+
+                    {/* Hidden file input */}
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".xlsx,.xls"
+                        className="hidden"
+                        onChange={handleExcelUpload}
+                    />
+
+                    {/* Upload Schedule Button */}
+                    <Button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="h-11 px-5 rounded-lg bg-secondary/10 border border-secondary/30 text-secondary hover:bg-secondary hover:text-black text-[10px] font-bold uppercase tracking-widest gap-2 transition-all shrink-0"
+                        variant="ghost"
+                    >
+                        <Upload size={14} />
+                        Upload Schedule
+                    </Button>
+
+                    {/* Global Reset Button — only shown when schedule exists */}
+                    {hasSchedule && (
+                        <Button
+                            onClick={() => {
+                                schedule.resetAll();
+                                toast.success('All lab schedules cleared. Showing full history.');
+                            }}
+                            className="h-11 px-5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500 hover:text-white text-[10px] font-bold uppercase tracking-widest gap-2 transition-all shrink-0"
+                            variant="ghost"
+                        >
+                            <RotateCcw size={14} />
+                            Reset All Schedules
+                        </Button>
+                    )}
+
+                    {/* Active schedule indicator */}
+                    {hasSchedule && (
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/20">
+                            <CalendarDays size={12} className="text-primary" />
+                            <span className="text-[9px] font-bold text-primary uppercase tracking-widest">Schedule Active</span>
+                        </div>
+                    )}
+
+                    {/* Spacer */}
+                    <div className="flex-1" />
+
+                    {/* Search */}
                     <div className="relative w-full md:w-96 group">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-all" />
                         <Input
@@ -233,6 +343,13 @@ export default function LabsPage() {
                         />
                     </div>
                 </div>
+
+                {/* ─── Excel Format Hint (shown when upload area is focused) ─── */}
+                {hasSchedule && (
+                    <div className="text-[9px] text-white/30 font-bold uppercase tracking-widest">
+                        📅 History filtered by Excel schedule &nbsp;•&nbsp; Format: District | Tehsil | Lab Name | Schedule (e.g. Monday, Friday)
+                    </div>
+                )}
             </header >
 
             {
@@ -251,6 +368,12 @@ export default function LabsPage() {
                         {filteredLabs.map((lab: any, index: number) => {
                             const total = lab.total_pcs || 0;
                             const online = lab.online || 0;
+                            const labCityVal = lab.city || lab.norm_city || '';
+                            const labTehsilVal = lab.tehsil || lab.norm_tehsil || '';
+                            const labNameVal = lab.lab_name || lab.lab || '';
+
+                            const scheduleLabel = schedule.getScheduleLabel(labCityVal, labTehsilVal, labNameVal);
+
                             const gaugeData = [
                                 { name: 'Systems', value: total },
                                 { name: 'Remaining', value: Math.max(0, maxSystemsInLab - total) }
@@ -269,9 +392,18 @@ export default function LabsPage() {
                                                 <div className="p-2 rounded-lg bg-primary text-black shrink-0 shadow-sm transition-transform group-hover:scale-110">
                                                     <Building2 size={14} />
                                                 </div>
-                                                <h2 className="text-sm font-bold tracking-tight uppercase text-white group-hover:text-white/80 transition-colors truncate font-display">
-                                                    {lab.lab_name || lab.lab}
-                                                </h2>
+                                                <div className="flex-1 overflow-hidden">
+                                                    <h2 className="text-sm font-bold tracking-tight uppercase text-white group-hover:text-white/80 transition-colors truncate font-display">
+                                                        {labNameVal}
+                                                    </h2>
+                                                    {/* Schedule badge */}
+                                                    {scheduleLabel && (
+                                                        <div className="flex items-center gap-1 mt-0.5">
+                                                            <CalendarDays size={9} className="text-primary/60" />
+                                                            <span className="text-[8px] font-bold text-primary/60 uppercase tracking-widest">{scheduleLabel}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
 
                                             <DropdownMenu>
@@ -281,12 +413,28 @@ export default function LabsPage() {
                                                     </button>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end" className="bg-card border border-border rounded-xl p-1.5 shadow-2xl backdrop-blur-xl">
-                                                    <DropdownMenuItem onClick={(e) => handleRenameLab(e, lab.lab_name)} className="gap-2 text-[10px] font-bold uppercase p-2.5 rounded-lg transition-all focus:bg-primary focus:text-black">
+                                                    <DropdownMenuItem onClick={(e) => handleRenameLab(e, labNameVal)} className="gap-2 text-[10px] font-bold uppercase p-2.5 rounded-lg transition-all focus:bg-primary focus:text-black">
                                                         <Edit2 size={12} className="text-primary group-focus:text-black" /> Rename
                                                     </DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={(e) => handleDeleteLab(e, lab.lab_name)} className="gap-2 text-red-500 text-[10px] font-bold uppercase p-2.5 rounded-lg transition-all focus:bg-red-500 focus:text-white">
+                                                    <DropdownMenuItem onClick={(e) => handleDeleteLab(e, labNameVal)} className="gap-2 text-red-500 text-[10px] font-bold uppercase p-2.5 rounded-lg transition-all focus:bg-red-500 focus:text-white">
                                                         <Trash2 size={12} /> Delete
                                                     </DropdownMenuItem>
+                                                    {/* Per-lab schedule reset */}
+                                                    {scheduleLabel && (
+                                                        <>
+                                                            <DropdownMenuSeparator className="bg-border my-1" />
+                                                            <DropdownMenuItem
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    schedule.resetLab(labCityVal, labTehsilVal, labNameVal);
+                                                                    toast.success(`Schedule cleared for ${labNameVal}`);
+                                                                }}
+                                                                className="gap-2 text-amber-400 text-[10px] font-bold uppercase p-2.5 rounded-lg transition-all focus:bg-amber-500 focus:text-black"
+                                                            >
+                                                                <RotateCcw size={12} /> Reset Lab Schedule
+                                                            </DropdownMenuItem>
+                                                        </>
+                                                    )}
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
                                         </div>

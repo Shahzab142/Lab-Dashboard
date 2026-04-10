@@ -16,7 +16,7 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
 
     try {
         // CONSTANT: Force the verified live backend URL to prevent stale environment variables on Netlify from breaking the connection.
-        const LIVE_BACKEND_URL = import.meta.env.VITE_API_URL || "https://labmonitoringsystem-01a8e56a5658.herokuapp.com/api";
+        const LIVE_BACKEND_URL = "https://lab-systems-monitoring-server-1.onrender.com/api";
         const baseUrl = LIVE_BACKEND_URL;
         const url = new URL(`${baseUrl}${path}`);
         url.searchParams.append("_t", String(Date.now()));
@@ -39,20 +39,4 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
         console.error("API Fetch Failure", error);
         throw error;
     }
-}
-
-export async function updateDeviceStatus(hid: string, isDefective: boolean) {
-    return apiFetch(`/devices/${hid}/status`, {
-        method: "PATCH",
-        body: JSON.stringify({ is_defective: isDefective }),
-    });
-}
-
-import { Json } from "@/integrations/supabase/types";
-
-export async function sendDeviceCommand(hid: string, type: string, payload: Json = {}) {
-    return apiFetch(`/devices/${hid}/command`, {
-        method: "POST",
-        body: JSON.stringify({ type, payload }),
-    });
 }

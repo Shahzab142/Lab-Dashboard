@@ -2,8 +2,6 @@ import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Monitor, MapPin, ArrowRight, MoreVertical, Edit2, Trash2, Cpu } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { apiFetch } from '@/lib/api';
-import { Device } from '@/types';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,7 +13,7 @@ import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 
 interface DeviceCardProps {
-  device: Device;
+  device: any;
   serverTime?: string;
 }
 
@@ -65,8 +63,15 @@ export function DeviceCard({ device, serverTime }: DeviceCardProps) {
     lastSeenDate &&
     (referenceTime.getTime() - lastSeenDate.getTime() < 60 * 1000);
 
-  // Phase 7: Rely on Server-Side Status
-  const isCurrentlyDefective = device.is_defective || false;
+  // Persistent defective check
+  const isCurrentlyDefective = (() => {
+    try {
+      const defectiveDevices = JSON.parse(localStorage.getItem('defective_devices') || '[]');
+      return device.is_defective || defectiveDevices.includes(device.system_id);
+    } catch (e) {
+      return device.is_defective || false;
+    }
+  })();
 
   const lastActiveText = lastSeenDate ?
     new Intl.DateTimeFormat('en-US', {
