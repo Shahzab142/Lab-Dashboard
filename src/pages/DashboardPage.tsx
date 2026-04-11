@@ -541,7 +541,7 @@ export default function DashboardPage() {
                                     else if (selectedFilter.type === 'lab') navigate(`/dashboard/lab-summary/${encodeURIComponent(selectedFilter.district)}/${encodeURIComponent(selectedFilter.name)}`);
                                 } else {
                                     if (centerViewMode === 'district') navigate(`/dashboard/cities`);
-                                    else if (centerViewMode === 'tehsil') navigate(`/dashboard/tehsils`);
+                                    else if (centerViewMode === 'tehsil') navigate(`/dashboard/cities`); // Redirect to Tehsilwise Lab list instead of broken Tehsils view
                                     else if (centerViewMode === 'labs') navigate(`/dashboard/labs`);
                                     else if (centerViewMode === 'pc') navigate(`/dashboard/devices`);
                                 }

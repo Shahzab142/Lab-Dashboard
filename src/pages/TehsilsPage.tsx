@@ -24,13 +24,20 @@ export default function TehsilsPage() {
 
     const tehsils = useMemo(() => {
         const labs = Array.isArray(statsData?.labs) ? statsData.labs : [];
-        const cityLabs = labs.filter((l: any) => l.city?.toLowerCase() === city?.toLowerCase());
+        
+        // --- FALLBACK LOGIC ---
+        // If city is missing, we show ALL tehsils from ALL cities instead of an empty screen.
+        const filteredLabs = city 
+            ? labs.filter((l: any) => l.city?.toLowerCase() === city?.toLowerCase())
+            : labs;
 
         const tehsilMap = new Map<string, any>();
-        cityLabs.forEach((lab: any) => {
+        filteredLabs.forEach((lab: any) => {
             const tehsilName = lab.tehsil || 'Unknown';
-            if (!tehsilMap.has(tehsilName)) {
-                tehsilMap.set(tehsilName, {
+            const groupKey = city ? tehsilName : `${lab.city}-${tehsilName}`;
+
+            if (!tehsilMap.has(groupKey)) {
+                tehsilMap.set(groupKey, {
                     tehsil: tehsilName,
                     city: lab.city,
                     total_pcs: 0,
@@ -38,7 +45,7 @@ export default function TehsilsPage() {
                     total_labs: 0
                 });
             }
-            const target = tehsilMap.get(tehsilName);
+            const target = tehsilMap.get(groupKey);
             target.total_pcs += Number(lab.total_pcs || 0);
             target.online += Number(lab.online || 0);
             target.total_labs += 1;
@@ -71,10 +78,14 @@ export default function TehsilsPage() {
                         </Button>
                         <div>
                             <h1 className="text-2xl font-bold tracking-tight uppercase text-white font-display leading-tight">
-                                TEHSILS IN <span className="text-primary">{city}</span>
+                                {city ? (
+                                    <>TEHSILS IN <span className="text-primary">{city}</span></>
+                                ) : (
+                                    <span className="text-primary">ALL TEHSILS</span>
+                                )}
                             </h1>
                             <p className="text-white/40 font-bold uppercase tracking-wider text-[9px] mt-1">
-                                Regional Hubs & Tehsil-level Infrastructure Breakdown
+                                Regional Hubs & Infrastructure Breakdown
                             </p>
                         </div>
                     </div>

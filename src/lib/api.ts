@@ -15,9 +15,7 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
     };
 
     try {
-        // CONSTANT: Force the verified live backend URL to prevent stale environment variables on Netlify from breaking the connection.
-        const LIVE_BACKEND_URL = "https://lab-systems-monitoring-server-1.onrender.com/api";
-        const baseUrl = LIVE_BACKEND_URL;
+        const baseUrl = import.meta.env.VITE_API_URL || "https://labmonitoringserver-444c1a9264ea.herokuapp.com/api";
         const url = new URL(`${baseUrl}${path}`);
         url.searchParams.append("_t", String(Date.now()));
         const res = await fetch(url.toString(), finalOptions);
