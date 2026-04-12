@@ -575,10 +575,9 @@ export default function PCDetailPage() {
                           return score.toFixed(1);
                         };
 
-                        // Check if today is a scheduled day for this device's lab
-                        const todayIsScheduled = schedule.isScheduledDay(device.city, device.tehsil, device.lab_name, today);
+                        const todayIsScheduled = true; // Ignored for today, we always want to see live data
 
-                        if (!historyHasToday && todayIsScheduled) {
+                        if (!historyHasToday) {
                           return (
                             <tr
                               onClick={() => handleHistoryClick(today)}
@@ -610,7 +609,7 @@ export default function PCDetailPage() {
                           // If a schedule is active for this lab, hide non-scheduled days
                           const dateArg = h.history_date || h.start_time?.split('T')[0];
                           if (!dateArg) return true;
-                          return schedule.isScheduledDay(device.city, device.tehsil, device.lab_name, dateArg);
+                          return true; // We always show history if it exists in the database
                         })
                         .map((h: any) => {
                           const dateObj = h.history_date ? new Date(h.history_date) : new Date(h.start_time);
