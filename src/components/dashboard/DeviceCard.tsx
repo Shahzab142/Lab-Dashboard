@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { Monitor, MapPin, ArrowRight, MoreVertical, Edit2, Trash2, Cpu } from 'lucide-react';
+import { Monitor, MapPin, ArrowRight, MoreVertical, Edit2, Trash2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   DropdownMenu,
@@ -11,11 +11,15 @@ import {
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
+import { apiFetch } from '@/lib/api';
+import type { Device } from '@/lib/types';
+
 
 interface DeviceCardProps {
-  device: any;
+  device: Device & { hardware_id?: string; hwid?: string };
   serverTime?: string;
 }
+
 
 export function DeviceCard({ device, serverTime }: DeviceCardProps) {
   const navigate = useNavigate();
@@ -78,8 +82,7 @@ export function DeviceCard({ device, serverTime }: DeviceCardProps) {
       hour: '2-digit', minute: '2-digit'
     }).format(lastSeenDate) : '---';
 
-  const currentCpu = device.app_usage?.['__current_cpu__'] || device.cpu_score || 0;
-  const cpuIntensity = Math.min(1, currentCpu / 100) || 0.1;
+
 
   return (
     <Card
@@ -146,37 +149,14 @@ export function DeviceCard({ device, serverTime }: DeviceCardProps) {
         </div>
 
         {/* Compute & Info Grid */}
-        <div className="grid grid-cols-2 gap-2">
-          <div className="bg-background border border-border p-2 rounded-lg flex flex-col justify-between">
-            <div className="flex items-center justify-between mb-1 opacity-60">
-              <div className="flex items-center gap-1">
-                <Cpu size={10} className="text-primary" />
-                <span className="text-[7px] font-bold uppercase text-white/70 tracking-tight">CPU LOAD</span>
-              </div>
-            </div>
-            <div className="flex items-end justify-between">
-              <div>
-                <p className={cn("text-sm font-bold tracking-tight leading-none", isOnline ? "text-white" : "text-white/60")}>
-                  {device.app_usage?.['__current_cpu__'] || 0}%
-                </p>
-                <p className="text-[6px] font-bold uppercase text-muted-foreground mt-0.5">Current</p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-bold tracking-tight leading-none text-white/50">
-                  {device.cpu_score || 0}%
-                </p>
-                <p className="text-[6px] font-bold uppercase text-muted-foreground mt-0.5">Avg</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-background border border-border p-2 rounded-lg">
+          <div className="bg-background border border-border p-2 rounded-lg flex flex-col justify-between col-span-2">
             <div className="flex items-center gap-1 mb-1 opacity-60">
               <MapPin size={10} className="text-secondary" />
-              <span className="text-[8px] font-bold uppercase text-white/70 tracking-tight">Node</span>
+              <span className="text-[8px] font-bold uppercase text-white/70 tracking-tight">Location Node</span>
             </div>
             <p className="text-xs font-bold text-white/90 truncate uppercase">{device.city || 'N/A'}</p>
           </div>
-        </div>
+
 
         {/* Status Bar */}
         <div className="flex items-center justify-between pt-2 border-t border-border">

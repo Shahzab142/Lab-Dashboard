@@ -8,6 +8,8 @@ import { ArrowLeft, Monitor, Wifi, WifiOff, Terminal, ArrowRight, Target, Zap, F
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from "@/lib/utils";
 import { AddDeviceDialog } from "@/components/dashboard/AddDeviceDialog";
+import type { Lab, Device } from '@/lib/types';
+
 
 const LabSummaryPage = () => {
     const { city, lab } = useParams();
@@ -37,7 +39,8 @@ const LabSummaryPage = () => {
     });
 
     const normalize = (name: string) => (name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    const labData = labsResponse?.labs?.find((l: any) => normalize(l.lab_name) === normalize(lab || ''));
+    const labData: Lab | undefined = labsResponse?.labs?.find((l: Lab) => normalize(l.lab_name || '') === normalize(lab || ''));
+
     const devices = devicesResponse?.devices || [];
     const serverTime = devicesResponse?.server_time || new Date().toISOString();
 
@@ -45,19 +48,22 @@ const LabSummaryPage = () => {
     const defectiveFromStorage = JSON.parse(localStorage.getItem('defective_devices') || '[]');
 
     // Calculate all stats from the fresh device list and inject persistent defective state
-    const processedDevices = devices.map((d: any) => ({
+    const processedDevices: Device[] = devices.map((d: Device) => ({
         ...d,
         is_defective: d.is_defective || defectiveFromStorage.includes(d.system_id || d.id)
     }));
 
-    const defectiveCount = processedDevices.filter((d: any) => d.is_defective).length;
-    const onlineCount = processedDevices.filter((d: any) => d.status === 'online' && !d.is_defective).length;
-    const offlineCount = processedDevices.filter((d: any) => d.status === 'offline' && !d.is_defective).length;
+
+    const defectiveCount = processedDevices.filter((d: Device) => d.is_defective).length;
+    const onlineCount = processedDevices.filter((d: Device) => d.status === 'online' && !d.is_defective).length;
+    const offlineCount = processedDevices.filter((d: Device) => d.status === 'offline' && !d.is_defective).length;
+
     const totalCount = processedDevices.length;
 
     const getOfflineCount = (days: number) => {
         const now = new Date(serverTime);
-        return processedDevices.filter((d: any) => {
+        return processedDevices.filter((d: Device) => {
+
             if (d.is_defective) return false;
             if (d.status !== 'offline') return false;
             if (!d.last_seen) return true;
@@ -174,7 +180,7 @@ const LabSummaryPage = () => {
                     </Button>
                     <div>
                         <div className="flex items-center gap-3 mb-1">
-                            <span className="text-[10px] font-bold text-white uppercase tracking-widest">Lab Overview</span>
+                            <span className="text-[10px] font-bold text-white uppercase tracking-widest">Lab Details</span>
                             <div className="w-1 h-1 bg-secondary rounded-full" />
                             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{labData?.city || city} District</span>
                         </div>

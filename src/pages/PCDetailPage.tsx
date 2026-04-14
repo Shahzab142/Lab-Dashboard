@@ -127,14 +127,14 @@ export default function PCDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['global-lab-stats'] });
       navigate('/dashboard', { replace: true });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       console.error(error);
       toast.error("Failed to delete system record");
     }
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: any) => apiFetch(`/devices/${encodeURIComponent(id || '')}`, {
+    mutationFn: (data: Partial<any>) => apiFetch(`/devices/${encodeURIComponent(id || '')}`, {
       method: 'PATCH',
       body: JSON.stringify({
         pc_name: data.pc_name,
@@ -471,7 +471,6 @@ export default function PCDetailPage() {
                     const runtimeMins = device.runtime_minutes || 1; // Avoid div by zero
                     const maxSessionSecs = runtimeMins * 60;
                     const items = Object.entries(device.app_usage as Record<string, number>)
-                      .filter(([app]) => app !== '__current_cpu__')
                       .sort(([, a], [, b]) => b - a);
 
                     return items.slice(0, 15).map(([app, rawSecs]) => {
@@ -559,7 +558,6 @@ export default function PCDetailPage() {
                     <thead>
                       <tr className="text-[9px] font-bold uppercase text-muted-foreground/60 tracking-wider">
                         <th className="px-6 pb-4 border-b border-border">Temporal Index</th>
-                        <th className="px-6 pb-4 border-b border-border text-right">Avg Load</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -568,14 +566,9 @@ export default function PCDetailPage() {
                         const today = new Date().toISOString().split('T')[0];
                         const historyHasToday = history.some((h: any) => h.history_date === today || h.start_time?.startsWith(today));
 
-                        const getNormalizedScore = (val: any) => {
-                          let score = parseFloat(val) || 0;
-                          if (score > 100) score = score / 100;
-                          if (score >= 100) score = 99.9;
-                          return score.toFixed(1);
-                        };
 
-                        const todayIsScheduled = true; // Ignored for today, we always want to see live data
+                        // Check if today is a scheduled day for this device's lab
+                        const todayIsScheduled = schedule.isScheduledDay(device.city, device.tehsil, device.lab_name, today);
 
                         if (!historyHasToday) {
                           return (
@@ -592,12 +585,6 @@ export default function PCDetailPage() {
                                   <span className="text-[8px] font-bold text-emerald-500 uppercase mt-0.5 animate-pulse">Active Session</span>
                                 </div>
                               </td>
-                              <td className="px-6 py-5 border-b border-border/50 text-right">
-                                <div className="flex flex-col items-end">
-                                  <span className="text-lg font-bold text-primary">{getNormalizedScore(device.cpu_score)}%</span>
-                                  <span className="text-[7px] font-bold text-secondary uppercase tracking-widest">DAILY AVG</span>
-                                </div>
-                              </td>
                             </tr>
                           );
                         }
@@ -609,16 +596,12 @@ export default function PCDetailPage() {
                           // If a schedule is active for this lab, hide non-scheduled days
                           const dateArg = h.history_date || h.start_time?.split('T')[0];
                           if (!dateArg) return true;
-                          return true; // We always show history if it exists in the database
+                          return schedule.isScheduledDay(device.city, device.tehsil, device.lab_name, dateArg);
                         })
                         .map((h: any) => {
                           const dateObj = h.history_date ? new Date(h.history_date) : new Date(h.start_time);
                           const dateArg = h.history_date || h.start_time?.split('T')[0];
                           const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
-
-                          let score = parseFloat(h.avg_score || 0);
-                          if (score > 100) score = score / 100;
-                          if (score >= 100) score = 99.9;
 
                           return (
                             <tr key={h.id || h.history_date} onClick={() => handleHistoryClick(dateArg)} className="text-xs group hover:bg-muted/50 transition-all cursor-pointer">
@@ -631,12 +614,6 @@ export default function PCDetailPage() {
                                     <span className="text-[8px] font-bold text-white/30 uppercase">{dayName}</span>
                                   </div>
                                   <span className="text-[8px] font-bold text-muted-foreground uppercase mt-0.5">Archive Data Sync</span>
-                                </div>
-                              </td>
-                              <td className="px-6 py-5 border-b border-border/50 text-right">
-                                <div className="flex flex-col items-end">
-                                  <span className="text-lg font-bold text-primary">{score.toFixed(1)}%</span>
-                                  <span className="text-[7px] font-bold text-secondary uppercase tracking-widest">AVG %</span>
                                 </div>
                               </td>
                             </tr>

@@ -1,6 +1,8 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
+import { cn } from "@/lib/utils";
+
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { Loader2, Search, X, MapPin, Building2, Layout, Landmark } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -217,7 +219,7 @@ export default function DashboardPage() {
                 const targetLab = labs.find((l) => l.lab_name === selectedFilter.name);
                 if (!targetLab) return [];
                 const online = Number(targetLab.online || 0);
-                const total = Number(targetTargetLab.total_pcs || 1);
+                const total = Number(targetLab.total_pcs || 1);
                 const offline = Math.max(0, total - online);
                 return [
                     { name: 'Online', value: online, color: '#00a629' },
@@ -453,20 +455,16 @@ export default function DashboardPage() {
                                 <button
                                     key={btn.id}
                                     onClick={() => setCenterViewMode(btn.id)}
-                                    className={`px-6 py-2.5 rounded-xl font-black text-[10px] tracking-[0.2em] transition-all duration-500 border ${isActive
-                                        ? (isLabs
-                                            ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white border-emerald-500 shadow-[0_0_30px_rgba(16,185,129,0.3)] scale-105'
-                                            : isPC
-                                                ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white border-cyan-500 shadow-[0_0_30px_rgba(6,182,212,0.3)] scale-105'
-                                                : isDistrict
-                                                    ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white border-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.3)] scale-105'
-                                                    : isTehsil
-                                                        ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white border-blue-400 shadow-[0_0_30px_rgba(59,130,246,0.3)] scale-105'
-                                                        : 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white border-violet-500 shadow-[0_0_30px_rgba(124,77,255,0.3)] scale-105')
-                                        : 'bg-white/5 text-white/30 border-white/10 hover:border-white/30 hover:bg-white/10'
-                                        }`}
+                                    className={cn(
+                                        "px-6 py-2.5 rounded-xl font-black text-[10px] tracking-[0.2em] transition-all duration-500 border w-full",
+                                        isActive && "scale-105",
+                                        isDistrict && (isActive ? "bg-gradient-to-r from-blue-700 to-blue-900 text-white border-blue-600 shadow-[0_0_35px_rgba(29,78,216,0.4)]" : "bg-blue-700/20 text-blue-400/60 border-blue-700/30 hover:bg-blue-700/30"),
+                                        isTehsil && (isActive ? "bg-gradient-to-r from-blue-600 to-blue-800 text-white border-blue-500 shadow-[0_0_30px_rgba(37,99,235,0.35)]" : "bg-blue-600/20 text-blue-500/60 border-blue-600/30 hover:bg-blue-600/30"),
+                                        isLabs && (isActive ? "bg-gradient-to-r from-blue-500 to-blue-700 text-white border-blue-400 shadow-[0_0_25px_rgba(59,130,246,0.3)]" : "bg-blue-500/20 text-blue-400/60 border-blue-500/30 hover:bg-blue-500/30"),
+                                        isPC && (isActive ? "bg-gradient-to-r from-blue-400 to-blue-600 text-white border-blue-300 shadow-[0_0_20px_rgba(96,165,250,0.25)]" : "bg-blue-400/20 text-blue-300/60 border-blue-400/30 hover:bg-blue-400/30")
+                                    )}
                                 >
-                                    {btn.label}
+                                    {isActive ? `• ${btn.label} •` : btn.label}
                                 </button>
                             );
                         })}

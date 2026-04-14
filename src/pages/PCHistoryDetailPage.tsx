@@ -80,7 +80,6 @@ export default function PCHistoryDetailPage() {
     // Find the log for the requested date
     const historyLog = history?.find((h: DeviceHistory) => (h.history_date || h.start_time?.split('T')[0]) === date) || (isToday ? {
         history_date: date,
-        avg_score: device.cpu_score,
         runtime_minutes: device.runtime_minutes,
         start_time: device.today_start_time,
         end_time: device.today_last_active,

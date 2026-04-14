@@ -15,13 +15,10 @@ export async function generateDynamicReport(type: ReportType, data: any, context
         const THEME_ORANGE = "f99a1d";
         const TEXT_WHITE = "FFFFFF";
 
-        // Helper to get score safely
-        const getScore = (item: any) => {
-            const val = item.avg_performance ?? item.avg_score ?? item.cpu_score ?? 0;
-            let score = parseFloat(String(val)) || 0;
-            if (score > 100) score = score / 100;
-            if (score >= 100) score = 99.9;
-            return score;
+        // Helper to get active apps count safely
+        const getAppCount = (item: any) => {
+            const apps = item.app_usage || {};
+            return Object.keys(apps).length;
         };
 
         const addHeader = (slide: any, title: string) => {
@@ -42,11 +39,11 @@ export async function generateDynamicReport(type: ReportType, data: any, context
                 { text: String(loc.total_labs) },
                 { text: String(loc.total_pcs) },
                 { text: String(loc.online) },
-                { text: `${getScore(loc).toFixed(1)}%` }
+                { text: String(getAppCount(loc)) }
             ]);
 
             slide.addTable([
-                ["DISTRICT", "TOTAL LABS", "TOTAL PCS", "LIVE", "PERFORMANCE"],
+                ["DISTRICT", "TOTAL LABS", "TOTAL PCS", "LIVE", "APP ACTIVITY"],
                 ...rows
             ], {
                 x: 0.5, y: 1.2, w: 9,
@@ -69,12 +66,12 @@ export async function generateDynamicReport(type: ReportType, data: any, context
                 { text: l.lab_name },
                 { text: String(l.total_pcs) },
                 { text: String(l.online) },
-                { text: (getScore(l) * (l.total_pcs || 1)).toFixed(0) },
-                { text: `${getScore(l).toFixed(1)}%` }
+                { text: String(getAppCount(l)) },
+                { text: l.online > 0 ? "NOMINAL" : "OFFLINE" }
             ]);
 
             slide.addTable([
-                ["LAB FACILITY", "PCS", "LIVE", "LOAD SCORE", "HEALTH"],
+                ["LAB FACILITY", "PCS", "LIVE", "ACTIVE APPS", "STATUS"],
                 ...rows
             ], {
                 x: 0.5, y: 1.2, w: 9,
@@ -108,12 +105,12 @@ export async function generateDynamicReport(type: ReportType, data: any, context
                 const rows = devices.slice(0, 15).map((d: any) => [
                     d.pc_name || 'Station',
                     (d.status || 'offline').toUpperCase(),
-                    `${getScore(d).toFixed(1)}%`,
+                    String(getAppCount(d)),
                     d.last_seen ? format(new Date(d.last_seen), 'HH:mm') : 'N/A'
                 ]);
 
                 slide2.addTable([
-                    ["STATION", "STATUS", "CPU LOAD", "LAST SEEN"],
+                    ["STATION", "STATUS", "ACTIVE APPS", "LAST SEEN"],
                     ...rows
                 ], { x: 0.5, y: 1.2, w: 9, fontSize: 10, headerProps: { fill: THEME_BLUE, color: TEXT_WHITE } });
             }
@@ -130,8 +127,7 @@ export async function generateDynamicReport(type: ReportType, data: any, context
                 ["System ID", device.system_id],
                 ["Region", device.city?.toUpperCase() || 'N/A'],
                 ["Facility", device.lab_name?.toUpperCase() || 'N/A'],
-                ["Status", device.isOnline ? 'ONLINE' : 'OFFLINE'],
-                ["Health Score", `${getScore(device).toFixed(1)}%`]
+                ["Status", device.isOnline ? 'ONLINE' : 'OFFLINE']
             ];
 
             slide.addTable(profileData, {
@@ -181,15 +177,13 @@ export async function generateCustomMultiLabReport(selectedData: { city: string,
                     slide.addText(`CITY: ${cityData.city} | DATE: ${fileTimestamp}`, { x: 0.5, y: 0.7, w: '90%', h: 0.2, fontSize: 8, color: "FFFFFF" });
 
                     const rows = devices.slice(0, 15).map((d: any) => {
-                        let score = parseFloat(d.avg_performance || d.cpu_score) || 0;
-                        if (score > 100) score = score / 100;
-                        if (score >= 100) score = 99.9;
+                        const appCount = Object.keys(d.app_usage || {}).length;
 
                         return [
                             d.pc_name,
                             d.hardware_id?.substring(0, 12) || 'N/A',
                             d.status?.toUpperCase() || 'N/A',
-                            `${score.toFixed(1)}%`
+                            String(appCount)
                         ];
                     });
 
@@ -197,7 +191,7 @@ export async function generateCustomMultiLabReport(selectedData: { city: string,
                         { text: "PC NAME", options: { fill: "000000", color: "FFFFFF", bold: true, fontSize: 12 } },
                         { text: "ID", options: { fill: "000000", color: "FFFFFF", bold: true, fontSize: 12 } },
                         { text: "STATUS", options: { fill: "000000", color: "FFFFFF", bold: true, fontSize: 12 } },
-                        { text: "CPU PERFORMANCE", options: { fill: "000000", color: "FFFFFF", bold: true, fontSize: 12 } }
+                        { text: "ACTIVE APPS", options: { fill: "000000", color: "FFFFFF", bold: true, fontSize: 12 } }
                     ];
 
                     slide.addTable([
@@ -231,36 +225,25 @@ export async function generateDynamicExcelReport(type: ReportType, data: any, co
         let fileName = 'Audit_Report';
         let excelData: any[] = [];
 
-        const getScoreStr = (item: any) => {
-            const val = item.avg_performance ?? item.avg_score ?? item.cpu_score ?? 0;
-            let score = parseFloat(String(val)) || 0;
-            if (score > 100) score = score / 100;
-            if (score >= 100) score = 99.9;
-            return `${score.toFixed(1)}%`;
-        };
-        const getScoreRaw = (item: any) => {
-            const val = item.avg_performance ?? item.avg_score ?? item.cpu_score ?? 0;
-            let score = parseFloat(String(val)) || 0;
-            if (score > 100) score = score / 100;
-            if (score >= 100) score = 99.9;
-            return score;
+        const getAppCount = (item: any) => {
+            return Object.keys(item.app_usage || {}).length;
         };
 
         if (type === 'GLOBAL') {
             const locations = data.locations || [];
             fileName = `Global_Infrastructure_Report_${fileTimestamp}`;
-            excelData.push(["DISTRICT", "TOTAL LABS", "TOTAL PCS", "LIVE", "PERFORMANCE"]);
+            excelData.push(["DISTRICT", "TOTAL LABS", "TOTAL PCS", "LIVE", "APP ACTIVITY"]);
             locations.forEach((loc: any) => {
-                excelData.push([loc.city, loc.total_labs, loc.total_pcs, loc.online, getScoreStr(loc)]);
+                excelData.push([loc.city, loc.total_labs, loc.total_pcs, loc.online, getAppCount(loc)]);
             });
         }
         else if (type === 'CITY' || (type === 'SYSTEM' && context && !data.devices)) {
             const labs = data.labs || [];
             const cityName = context || data.city || 'TOTAL SYSTEM';
             fileName = `City_Audit_${(cityName || 'Unknown').replace(/\s+/g, '_')}_${fileTimestamp}`;
-            excelData.push(["LAB FACILITY", "PCS", "LIVE", "LOAD SCORE", "HEALTH"]);
+            excelData.push(["LAB FACILITY", "PCS", "LIVE", "ACTIVE APPS", "STATUS"]);
             labs.forEach((l: any) => {
-                excelData.push([l.lab_name, l.total_pcs, l.online, (getScoreRaw(l) * (l.total_pcs || 1)).toFixed(0), getScoreStr(l)]);
+                excelData.push([l.lab_name, l.total_pcs, l.online, getAppCount(l), l.online > 0 ? "NOMINAL" : "OFFLINE"]);
             });
         }
         else if (type === 'LAB' || (type === 'SYSTEM' && data.devices)) {
@@ -279,12 +262,12 @@ export async function generateDynamicExcelReport(type: ReportType, data: any, co
             excelData.push([]);
 
             if (devices.length > 0) {
-                excelData.push(["STATION", "STATUS", "CPU LOAD", "LAST SEEN"]);
+                excelData.push(["STATION", "STATUS", "ACTIVE APPS", "LAST SEEN"]);
                 devices.forEach((d: any) => {
                     excelData.push([
                         d.pc_name || 'Station',
                         (d.status || 'offline').toUpperCase(),
-                        getScoreStr(d),
+                        getAppCount(d),
                         d.last_seen ? format(new Date(d.last_seen), 'HH:mm') : 'N/A'
                     ]);
                 });
@@ -298,7 +281,6 @@ export async function generateDynamicExcelReport(type: ReportType, data: any, co
             excelData.push(["Region", device.city?.toUpperCase() || 'N/A']);
             excelData.push(["Facility", device.lab_name?.toUpperCase() || 'N/A']);
             excelData.push(["Status", device.isOnline ? 'ONLINE' : 'OFFLINE']);
-            excelData.push(["Health Score", getScoreStr(device)]);
         }
 
         const ws = XLSX.utils.aoa_to_sheet(excelData);
@@ -319,11 +301,8 @@ export async function generateCustomMultiLabExcelReport(selectedData: { city: st
         let hasData = false;
         let excelData: any[] = [];
 
-        const getScoreStr = (d: any) => {
-            let score = parseFloat(d.avg_performance || d.cpu_score) || 0;
-            if (score > 100) score = score / 100;
-            if (score >= 100) score = 99.9;
-            return `${score.toFixed(1)}%`;
+        const getAppCount = (d: any) => {
+            return Object.keys(d.app_usage || {}).length;
         };
 
         for (const cityData of selectedData) {
@@ -341,14 +320,14 @@ export async function generateCustomMultiLabExcelReport(selectedData: { city: st
                     excelData.push([`Bulk Report: ${labName}`]);
                     excelData.push([`CITY: ${cityData.city}`, `DATE: ${fileTimestamp}`]);
                     excelData.push([]);
-                    excelData.push(["PC NAME", "ID", "STATUS", "CPU PERFORMANCE"]);
+                    excelData.push(["PC NAME", "ID", "STATUS", "ACTIVE APPS"]);
 
                     devices.forEach((d: any) => {
                         excelData.push([
                             d.pc_name,
                             d.hardware_id?.substring(0, 12) || 'N/A',
                             d.status?.toUpperCase() || 'N/A',
-                            getScoreStr(d)
+                            getAppCount(d)
                         ]);
                     });
 
