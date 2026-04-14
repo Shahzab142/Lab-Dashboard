@@ -15,7 +15,7 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
     };
 
     try {
-        const baseUrl = import.meta.env.VITE_API_URL || "https://labmonitoringserver-444c1a9264ea.herokuapp.com/api";
+        const baseUrl = import.meta.env.VITE_API_URL || "https://lab-monitroring-server-python-28bc8262a067.herokuapp.com/api";
         const url = new URL(`${baseUrl}${path}`);
         url.searchParams.append("_t", String(Date.now()));
         const res = await fetch(url.toString(), finalOptions);
