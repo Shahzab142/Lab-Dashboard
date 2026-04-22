@@ -299,10 +299,10 @@ export default function LabsPage() {
                     {/* Upload Schedule Button */}
                     <Button
                         onClick={() => fileInputRef.current?.click()}
-                        className="h-11 px-5 rounded-lg bg-secondary/10 border border-secondary/30 text-secondary hover:bg-secondary hover:text-black text-[10px] font-bold uppercase tracking-widest gap-2 transition-all shrink-0"
+                        className="h-11 px-6 rounded-lg bg-secondary/20 border-2 border-secondary/80 text-secondary hover:bg-secondary hover:text-black text-[10px] font-black uppercase tracking-widest gap-3 transition-all shrink-0 shadow-[0_0_20px_rgba(0,0,0,0.2)]"
                         variant="ghost"
                     >
-                        <Upload size={14} />
+                        <Upload size={16} className="shrink-0" />
                         Upload Schedule
                     </Button>
 
@@ -334,12 +334,12 @@ export default function LabsPage() {
 
                     {/* Search */}
                     <div className="relative w-full md:w-96 group">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-all" />
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/60 group-focus-within:text-primary transition-all" />
                         <Input
                             placeholder="SEARCH BY LAB NAME OR CITY..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-12 bg-card border-border focus:ring-1 focus:ring-primary text-[10px] font-bold uppercase tracking-wider h-11 rounded-lg transition-all shadow-sm"
+                            className="pl-12 bg-card border-2 border-white/40 focus:ring-2 focus:ring-primary text-white placeholder:text-white/60 text-[10px] font-black uppercase tracking-wider h-11 rounded-lg transition-all shadow-lg"
                         />
                     </div>
                 </div>

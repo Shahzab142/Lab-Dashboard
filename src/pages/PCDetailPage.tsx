@@ -230,6 +230,13 @@ export default function PCDetailPage() {
       (referenceTime.getTime() - lastSeenDate.getTime() < 60 * 1000);
   })();
 
+  const isSeenToday = (() => {
+    if (!device.last_seen) return false;
+    const lastSeenDate = new Date(device.last_seen);
+    const today = new Date();
+    return lastSeenDate.toDateString() === today.toDateString();
+  })();
+
   const handleHistoryClick = (dateStr: string) => {
     // Navigate to the full history detail page
     navigate(`/dashboard/pc/${id}/history/${dateStr}`);
@@ -437,7 +444,7 @@ export default function PCDetailPage() {
                   <Sunrise className="text-secondary w-4 h-4 mb-3" />
                   <p className="text-[8px] text-muted-foreground uppercase font-bold tracking-widest opacity-60">System Boot</p>
                   <p className="font-bold text-lg text-primary leading-tight">
-                    {device.today_start_time ? new Date(device.today_start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                    {isSeenToday && device.today_start_time ? new Date(device.today_start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
                   </p>
                 </div>
                 <div className="p-5 rounded-xl bg-primary text-black shadow-md">
@@ -445,6 +452,7 @@ export default function PCDetailPage() {
                   <p className="text-[8px] text-black/60 uppercase font-bold tracking-widest">Active Cycle</p>
                   <p className="font-bold text-lg text-black leading-tight">
                     {(() => {
+                      if (!isSeenToday) return '0H 0M';
                       const mins = device.runtime_minutes || 0;
                       return `${Math.floor(mins / 60)}H ${Math.floor(mins % 60)}M`;
                     })()}
@@ -465,7 +473,7 @@ export default function PCDetailPage() {
               <Activity className="text-primary opacity-20 w-5 h-4" />
             </CardHeader>
             <CardContent className="p-8 pb-4">
-              {device.app_usage && Object.keys(device.app_usage).length > 0 ? (
+              {isSeenToday && device.app_usage && Object.keys(device.app_usage).length > 0 ? (
                 <div className="space-y-4 max-h-[350px] overflow-y-auto pr-3 custom-scrollbar">
                   {(() => {
                     const runtimeMins = device.runtime_minutes || 1; // Avoid div by zero
@@ -570,7 +578,7 @@ export default function PCDetailPage() {
                         // Check if today is a scheduled day for this device's lab
                         const todayIsScheduled = schedule.isScheduledDay(device.city, device.tehsil, device.lab_name, today);
 
-                        if (!historyHasToday) {
+                        if (!historyHasToday && isSeenToday) {
                           return (
                             <tr
                               onClick={() => handleHistoryClick(today)}

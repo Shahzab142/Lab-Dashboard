@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { useRef, useState } from 'react';
-import { LayoutDashboard, Monitor, LogOut, Menu, X, Globe, ShieldCheck, Beaker, Activity, TrendingUp, Camera, Bell, Map, FileText, Terminal, Wrench, Grid3X3 } from 'lucide-react';
+import { LayoutDashboard, Monitor, LogOut, Menu, X, Globe, ShieldCheck, Beaker, Activity, TrendingUp, Camera, Bell, Map, FileText, Terminal, Wrench, Grid3X3, Rocket } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -179,6 +179,20 @@ export function DashboardSidebar({ isOpen, setIsOpen, isMobile }: DashboardSideb
               </div>
             </div>
           </div>
+
+          <NavLink
+            to="/dashboard/ota"
+            onClick={handleNavClick}
+            className={({ isActive }) => cn(
+              'w-full flex items-center justify-center gap-3 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 shadow-lg group border',
+              isActive
+                ? 'bg-gradient-to-r from-violet-600 to-blue-600 text-white border-violet-500/50 shadow-[0_0_20px_rgba(124,58,237,0.4)]'
+                : 'bg-[#0d1117]/80 text-violet-400 hover:text-white border-violet-500/20 hover:border-violet-500/50 hover:bg-violet-600/20 hover:shadow-[0_0_15px_rgba(124,58,237,0.3)]'
+            )}
+          >
+            <Rocket className="w-4 h-4 shrink-0 transition-transform group-hover:scale-110 group-hover:-translate-y-0.5" />
+            <span>OTA Update Hub</span>
+          </NavLink>
 
           <GeneratePDFDialog />
 

@@ -343,11 +343,11 @@ export default function DashboardPage() {
                 <div className="relative w-full max-w-[380px]" ref={searchRef}>
                     <div className="relative group">
                         <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none">
-                            <Search className="w-5 h-5 text-white/30 group-focus-within:text-primary transition-colors" />
+                            <Search className="w-5 h-5 text-white/60 group-focus-within:text-primary transition-colors" />
                         </div>
                         <input
                             type="text"
-                            className="w-full bg-[#1a1b3a]/60 backdrop-blur-2xl border border-white/10 rounded-2xl py-3 pl-14 pr-12 text-white placeholder:text-white/20 focus:outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/10 transition-all text-sm font-medium"
+                            className="w-full bg-[#1a1b3a]/80 backdrop-blur-2xl border-2 border-white/60 rounded-2xl py-3 pl-14 pr-12 text-white placeholder:text-white/70 focus:outline-none focus:border-primary/80 focus:ring-4 focus:ring-primary/20 transition-all text-sm font-bold"
                             placeholder="Quick search District, Tehsil, Lab..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
@@ -356,7 +356,7 @@ export default function DashboardPage() {
                         {searchQuery && (
                             <button 
                                 onClick={() => setSearchQuery("")}
-                                className="absolute inset-y-0 right-4 flex items-center text-white/20 hover:text-white transition-colors"
+                                className="absolute inset-y-0 right-4 flex items-center text-white/60 hover:text-white transition-colors"
                             >
                                 <X className="w-4 h-4" />
                             </button>

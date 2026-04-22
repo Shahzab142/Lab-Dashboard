@@ -24,6 +24,7 @@ import UtilizationPage from "./pages/UtilizationPage";
 import TerminalCommandCenter from "./pages/TerminalCommandCenter";
 import MaintenanceHub from "./pages/MaintenanceHub";
 import LabHeatmap from "./pages/LabHeatmap";
+import OTAUpdateHub from "./pages/OTAUpdateHub";
 
 import NotFound from "./pages/NotFound";
 import { GlobalFailsafe } from "@/components/GlobalFailsafe";
@@ -63,6 +64,7 @@ const App = () => (
               <Route path="terminal" element={<TerminalCommandCenter />} />
               <Route path="maintenance" element={<MaintenanceHub />} />
               <Route path="heatmap" element={<LabHeatmap />} />
+              <Route path="ota" element={<OTAUpdateHub />} />
 
               <Route path="lab-summary/:city/:lab" element={<LabSummaryPage />} />
               <Route path="pc/:id" element={<PCDetailPage />} />
