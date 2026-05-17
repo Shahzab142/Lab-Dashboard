@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { apiFetch } from '@/lib/api';
-import { supabase } from '@/lib/supabase';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DeviceCard } from '@/components/dashboard/DeviceCard';
 import { Search, Monitor, ArrowLeft, Layout, Activity } from 'lucide-react';
@@ -22,63 +21,31 @@ export default function DevicesPage() {
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<'all' | 'online' | 'offline' | 'offline_7d' | 'offline_30d' | 'defective'>(statusParam || 'all');
+  const [visibleCount, setVisibleCount] = useState(50);
 
   useEffect(() => {
     if (statusParam) setStatusFilter(statusParam);
   }, [statusParam]);
 
+  // Reset visible count when filters change
+  useEffect(() => {
+    setVisibleCount(50);
+  }, [statusFilter, search, cityParam, labParam, tehsilParam]);
+
   const { data: response, isLoading } = useQuery({
     queryKey: ['devices-list', cityParam, labParam, tehsilParam, statusFilter, search],
-    queryFn: async () => {
-      let query = supabase.from('devices').select('*');
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (cityParam) params.append('city', cityParam);
+      if (labParam) params.append('lab', labParam);
+      if (tehsilParam) params.append('tehsil', tehsilParam);
+      if (statusFilter && statusFilter !== 'all') params.append('status', statusFilter);
+      if (search) params.append('search', search);
 
-      if (cityParam) {
-        if (cityParam.toUpperCase() === 'UNKNOWN') {
-          query = query.or('city.is.null,city.eq.Unknown,city.eq.UNKNOWN,city.eq.pending');
-        } else {
-          query = query.ilike('city', `%${cityParam}%`);
-        }
-      }
-
-      if (tehsilParam) {
-        if (tehsilParam.toUpperCase() === 'UNKNOWN' || tehsilParam.toUpperCase() === 'PENDING ASSIGNMENT') {
-          query = query.or('tehsil.is.null,tehsil.eq.Unknown,tehsil.eq.UNKNOWN,tehsil.eq.pending,tehsil.eq.""');
-        } else {
-          query = query.ilike('tehsil', `%${tehsilParam}%`);
-        }
-      }
-
-      if (labParam) {
-        if (labParam.toUpperCase() === 'UNKNOWN' || labParam.toUpperCase() === 'UNASSIGNED LAB') {
-          query = query.or('lab_name.is.null,lab_name.eq.Unknown,lab_name.eq.UNKNOWN,lab_name.eq.""');
-        } else {
-          query = query.ilike('lab_name', `%${labParam}%`);
-        }
-      }
-
-      // Handle base status filter from DB
-      if (statusFilter === 'online') query = query.eq('status', 'online');
-      if (statusFilter === 'offline' || statusFilter === 'offline_7d' || statusFilter === 'offline_30d') {
-        query = query.eq('status', 'offline');
-      }
-
-      if (search) {
-        // Simple search on pc_name
-        query = query.ilike('pc_name', `%${search}%`);
-      }
-
-      // Execute query
-      const { data, error } = await query;
-      if (error) throw error;
-
-      return {
-        devices: data,
-        server_time: new Date().toISOString()
-      };
+      return apiFetch(`/devices?${params.toString()}`);
     },
-    refetchInterval: 1000,
-    staleTime: 1000,
-    gcTime: 30000
+    refetchInterval: 15000,
+    staleTime: 10000,
   });
 
   let devices = response?.devices || [];
@@ -113,6 +80,9 @@ export default function DevicesPage() {
       });
     }
   }
+
+  const paginatedDevices = devices.slice(0, visibleCount);
+  const hasMore = devices.length > visibleCount;
 
   return (
     <div className="p-4 md:p-8 space-y-8 animate-in slide-in-from-bottom-4 duration-700 bg-background min-h-screen">
@@ -206,7 +176,15 @@ export default function DevicesPage() {
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-[11px] font-bold text-white uppercase tracking-widest">{devices.length}</span>
-            <span className="text-[9px] font-bold text-white uppercase tracking-widest">Active Units in Region</span>
+            <span className="text-[9px] font-bold text-white/60 uppercase tracking-widest">
+              {statusFilter === 'online' ? 'Online Units' :
+               statusFilter === 'offline' ? 'Offline Units' :
+               statusFilter === 'offline_7d' ? 'Offline 7D+' :
+               statusFilter === 'offline_30d' ? 'Offline 30D+' :
+               statusFilter === 'defective' ? 'Defective Units' :
+               'Total Units'}
+              {(cityParam || labParam || tehsilParam) && ` in ${labParam || tehsilParam || cityParam}`}
+            </span>
           </div>
         </div>
 
@@ -229,10 +207,34 @@ export default function DevicesPage() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 pb-20">
-          {devices.map((device: any) => (
-            <DeviceCard key={device.system_id} device={device} serverTime={response?.server_time} />
-          ))}
+        <div className="space-y-12 pb-20">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+            {paginatedDevices.map((device: any) => (
+              <DeviceCard key={device.system_id} device={device} serverTime={response?.server_time} />
+            ))}
+          </div>
+
+          {hasMore && (
+            <div className="flex flex-col items-center gap-4 py-10 border-t border-border/50">
+              <p className="text-[10px] font-bold text-white/30 uppercase tracking-[0.2em]">
+                Showing {visibleCount} of {devices.length} Units
+              </p>
+              <Button
+                onClick={() => setVisibleCount(prev => prev + 50)}
+                className="bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 px-10 rounded-xl h-12 text-[10px] font-black uppercase tracking-[0.2em] transition-all hover:scale-105 active:scale-95"
+              >
+                Load More Units
+              </Button>
+            </div>
+          )}
+
+          {!hasMore && devices.length > 0 && (
+            <div className="text-center py-10 border-t border-border/50">
+              <p className="text-[9px] font-bold text-white/20 uppercase tracking-[0.3em]">
+                All {devices.length} infrastructure nodes loaded
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>

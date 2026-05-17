@@ -13,6 +13,15 @@ export default {
       },
     },
     extend: {
+      height: {
+        screen: '133.333vh',
+      },
+      minHeight: {
+        screen: '133.333vh',
+      },
+      maxHeight: {
+        screen: '133.333vh',
+      },
       fontFamily: {
         sans: ['Inter', 'sans-serif'],
         mono: ['JetBrains Mono', 'monospace'],

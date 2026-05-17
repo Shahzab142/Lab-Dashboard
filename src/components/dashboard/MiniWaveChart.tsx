@@ -42,7 +42,7 @@ export function MiniWaveChart({
         // Beautiful organic data points
         const data = [0, -0.8, 1.2, -0.5, 1.0, -0.9, 0.4, -1.3, 0.6, 0];
 
-        let path = "";
+        const path = "";
         const generateSegment = (xOffset: number) => {
             let segPath = "";
             for (let i = 0; i < data.length; i++) {

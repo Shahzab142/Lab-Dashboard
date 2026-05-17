@@ -25,14 +25,28 @@ export default function LocationsPage() {
     const status = searchParams.get('status');
 
     const { data: response, isLoading } = useQuery({
-        queryKey: ['tehsil-stats-global'],
-        queryFn: () => apiFetch('/stats/tehsils'),
-        refetchInterval: 10000,
-        staleTime: 5000,
-        gcTime: 30000
+        queryKey: ['global-lab-stats'],
+        queryFn: () => apiFetch('/stats/labs/all'),
+        refetchInterval: 15000,
+        staleTime: 10000,
     });
 
-    const tehsils = Array.isArray(response?.tehsils) ? response.tehsils : [];
+    // Derive tehsil stats from the unified labs data (same source as all other pages)
+    const allLabs = Array.isArray(response?.labs) ? response.labs : [];
+    const tehsilRawMap = new Map<string, any>();
+    allLabs.forEach((lab: any) => {
+        const city = lab.city || 'Unknown';
+        const tehsilName = lab.tehsil || 'Unknown';
+        const key = `${city}||${tehsilName}`;
+        if (!tehsilRawMap.has(key)) {
+            tehsilRawMap.set(key, { tehsil: tehsilName, city, online: 0, total_labs: 0, total_pcs: 0 });
+        }
+        const t = tehsilRawMap.get(key);
+        t.total_pcs += Number(lab.total_pcs || 0);
+        t.online += Number(lab.online || 0);
+        t.total_labs += 1;
+    });
+    const tehsils = Array.from(tehsilRawMap.values());
 
     // DEBUG: Log the fetched data for verification
     // console.log("Tehsil Data Fetched:", tehsils);

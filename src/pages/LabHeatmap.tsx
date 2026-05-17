@@ -120,8 +120,8 @@ export default function LabHeatmap() {
 
                                 const isDefective = JSON.parse(localStorage.getItem('defective_devices') || '[]').includes(device.system_id);
                                 const isOnline = device.status === 'online';
-                                const cpuLoad = device.cpu_score || 0;
-                                const isWorking = isOnline && cpuLoad > 10;
+                                const runtimeMins = device.runtime_minutes || 0;
+                                const isWorking = isOnline && runtimeMins > 0;
 
                                 let glowStyle = "";
                                 let iconStyle = "text-white/20";
@@ -153,7 +153,7 @@ export default function LabHeatmap() {
                                         <IconToUse className={`w-8 h-8 mb-2 transition-transform group-hover:-translate-y-1 ${iconStyle}`} />
                                         <div className="text-center w-full">
                                             <p className="text-[10px] font-black text-white truncate px-1 uppercase leading-tight">{device.pc_name || `PC-${index + 1}`}</p>
-                                            {isOnline && !isDefective && <p className={`text-[8px] font-bold ${isWorking ? 'text-primary' : 'text-white/40'}`}>{cpuLoad.toFixed(0)}% LOAD</p>}
+                                            {isOnline && !isDefective && <p className={`text-[8px] font-bold ${isWorking ? 'text-primary' : 'text-white/40'}`}>{runtimeMins.toFixed(0)}m active</p>}
                                         </div>
                                     </div>
                                 );
@@ -184,8 +184,8 @@ export default function LabHeatmap() {
                             </span>
                         </div>
                         <div className="flex justify-between items-center bg-white/5 p-3 rounded-lg">
-                            <span className="text-[10px] uppercase font-bold text-white/40 tracking-widest">CPU Compute Load</span>
-                            <span className="text-xl font-black text-primary">{selectedPC?.cpu_score?.toFixed(1) || 0}%</span>
+                            <span className="text-[10px] uppercase font-bold text-white/40 tracking-widest">Active Duration</span>
+                            <span className="text-xl font-black text-primary">{Math.floor(selectedPC?.runtime_minutes || 0)}m</span>
                         </div>
                     </div>
                 </DialogContent>

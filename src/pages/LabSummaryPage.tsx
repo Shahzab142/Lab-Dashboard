@@ -4,7 +4,7 @@ import { apiFetch } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Monitor, Wifi, WifiOff, Terminal, ArrowRight, Target, Zap, FileText } from "lucide-react";
+import { ArrowLeft, Monitor, Wifi, WifiOff, Activity, ArrowRight, Target, Zap, FileText } from "lucide-react";
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from "@/lib/utils";
 import { AddDeviceDialog } from "@/components/dashboard/AddDeviceDialog";
@@ -123,7 +123,7 @@ const LabSummaryPage = () => {
         {
             label: "7 Days+ Offline PCs",
             value: offline7d,
-            icon: Terminal,
+            icon: Activity,
             color: "text-orange-500",
             bg: "bg-orange-500/10",
             borderColor: "border-orange-500/20",

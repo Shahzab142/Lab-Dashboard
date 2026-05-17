@@ -186,7 +186,7 @@ export default function Login() {
               {/* Footer */}
               <div className="mt-8 flex items-center justify-between pt-6 border-t border-slate-100">
                 <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
-                  © 2026 Punjab Pk <br /> Secure Terminal
+                  © 2026 Punjab Pk <br /> Monitoring System
                 </div>
                 <div className="text-[11px] font-black text-[#F59E0B] uppercase tracking-wider">
                   Powered by ITU

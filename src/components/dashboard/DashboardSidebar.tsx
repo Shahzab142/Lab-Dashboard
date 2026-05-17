@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { useRef, useState } from 'react';
-import { LayoutDashboard, Monitor, LogOut, Menu, X, Globe, ShieldCheck, Beaker, Activity, TrendingUp, Camera, Bell, Map, FileText, Terminal, Wrench, Grid3X3, Rocket } from 'lucide-react';
+import { LayoutDashboard, Monitor, LogOut, Menu, X, Globe, ShieldCheck, Beaker, Activity, TrendingUp, Camera, Bell, Map, FileText, Grid3X3, Rocket } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ const navItems = [
   { to: '/dashboard/overview', icon: LayoutDashboard, label: 'DISTRICTWISE' },
   { to: '/dashboard/cities', icon: Globe, label: 'TEHSILWISE LAB' },
   { to: '/dashboard/labs', icon: Monitor, label: 'LABWISE SYSTEM' },
+  { to: '/dashboard/assign-labs', icon: ShieldCheck, label: 'ASSIGN LABS', adminOnly: true },
 ];
 
 interface DashboardSidebarProps {
@@ -85,7 +86,7 @@ export function DashboardSidebar({ isOpen, setIsOpen, isMobile }: DashboardSideb
 
       <aside
         className={cn(
-          'fixed top-0 left-0 h-screen bg-card border-r border-border flex flex-col z-40',
+          'fixed top-0 left-0 bottom-0 bg-card border-r border-border flex flex-col z-40',
           'transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1) shadow-2xl',
           isOpen ? 'w-64 translate-x-0' : '-translate-x-full'
         )}
@@ -142,7 +143,9 @@ export function DashboardSidebar({ isOpen, setIsOpen, isMobile }: DashboardSideb
 
         <ScrollArea className="flex-1 px-2">
           <nav className="space-y-0 py-1">
-            {navItems.map(({ to, icon: Icon, label }) => (
+            {navItems
+              .filter(item => !item.adminOnly || user?.role === 'ADMIN')
+              .map(({ to, icon: Icon, label }) => (
               <NavLink
                 key={to}
                 to={to}
@@ -180,19 +183,21 @@ export function DashboardSidebar({ isOpen, setIsOpen, isMobile }: DashboardSideb
             </div>
           </div>
 
-          <NavLink
-            to="/dashboard/ota"
-            onClick={handleNavClick}
-            className={({ isActive }) => cn(
-              'w-full flex items-center justify-center gap-3 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 shadow-lg group border',
-              isActive
-                ? 'bg-gradient-to-r from-violet-600 to-blue-600 text-white border-violet-500/50 shadow-[0_0_20px_rgba(124,58,237,0.4)]'
-                : 'bg-[#0d1117]/80 text-violet-400 hover:text-white border-violet-500/20 hover:border-violet-500/50 hover:bg-violet-600/20 hover:shadow-[0_0_15px_rgba(124,58,237,0.3)]'
-            )}
-          >
-            <Rocket className="w-4 h-4 shrink-0 transition-transform group-hover:scale-110 group-hover:-translate-y-0.5" />
-            <span>OTA Update Hub</span>
-          </NavLink>
+          {user?.role === 'ADMIN' && (
+            <NavLink
+              to="/dashboard/ota"
+              onClick={handleNavClick}
+              className={({ isActive }) => cn(
+                'w-full flex items-center justify-center gap-3 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300 shadow-lg group border',
+                isActive
+                  ? 'bg-gradient-to-r from-violet-600 to-blue-600 text-white border-violet-500/50 shadow-[0_0_20px_rgba(124,58,237,0.4)]'
+                  : 'bg-[#0d1117]/80 text-violet-400 hover:text-white border-violet-500/20 hover:border-violet-500/50 hover:bg-violet-600/20 hover:shadow-[0_0_15px_rgba(124,58,237,0.3)]'
+              )}
+            >
+              <Rocket className="w-4 h-4 shrink-0 transition-transform group-hover:scale-110 group-hover:-translate-y-0.5" />
+              <span>OTA Update Hub</span>
+            </NavLink>
+          )}
 
           <GeneratePDFDialog />
 

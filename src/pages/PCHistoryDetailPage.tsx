@@ -34,7 +34,6 @@ interface DeviceHistory {
 interface Device {
     pc_name: string;
     lab_name: string;
-    cpu_score: number;
     runtime_minutes: number;
     today_start_time: string;
     today_last_active: string;
@@ -159,8 +158,8 @@ export default function PCHistoryDetailPage() {
 
             <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
 
-                {/* HERO STATS ROW - UPDATED TO 2 CARDS */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* HERO STATS ROW - 3 CARDS */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <Card className="bg-card border-border backdrop-blur-sm p-6 flex flex-col justify-between group hover:bg-muted/50 transition-colors">
                         <div>
                             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Monitoring Started</p>
@@ -169,6 +168,19 @@ export default function PCHistoryDetailPage() {
                         <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
                             <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
                             <span>First activity detected</span>
+                        </div>
+                    </Card>
+
+                    <Card className="bg-card border-border backdrop-blur-sm p-6 flex flex-col justify-between group hover:bg-muted/50 transition-colors">
+                        <div>
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Total Daily Runtime</p>
+                            <span className="text-4xl font-bold text-primary tracking-tighter">
+                                {Math.floor(netRuntimeMins / 60)}h {Math.floor(netRuntimeMins % 60)}m
+                            </span>
+                        </div>
+                        <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+                            <Timer className="w-4 h-4 text-primary" />
+                            <span>Cumulative active duration</span>
                         </div>
                     </Card>
 

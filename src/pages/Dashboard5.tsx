@@ -8,7 +8,6 @@ import {
 import { Users, Globe, Landmark, Monitor, MoreHorizontal, Filter, Share2, ArrowUpRight, Activity, Cpu } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
 
 const ALL_DISTRICTS = [
     "Attock", "Bahawalnagar", "Bahawalpur", "Bhakkar", "Chakwal", "Chiniot", "Faisalabad",
@@ -136,30 +135,24 @@ export default function Dashboard5() {
         setViewMode('all');
     };
 
-    const { data: allPcsData } = useQuery({
+    const { data: allPcsResponse } = useQuery({
         queryKey: ["top-pcs-utilization-d5"],
-        queryFn: async () => {
-            const { data, error } = await supabase.from('devices').select('*');
-            if (error) throw error;
-            return data;
-        },
+        queryFn: () => apiFetch("/devices"),
         refetchInterval: 5000,
     });
+    const allPcsData = allPcsResponse?.devices || [];
 
     const topPcs = useMemo(() => {
         if (!allPcsData) return [];
         let data = [...allPcsData]
             .map(pc => {
-                let score = parseFloat(pc.cpu_score) || 0;
-                if (score > 100) score = score / 100;
-                if (score >= 100) score = 99.9;
-
                 return {
                     name: pc.pc_name || "STATION",
                     district: pc.city || "Unknown",
                     status: pc.status || "online",
-                    cpu: Number(score.toFixed(2)),
-                    value: Number(score.toFixed(2)),
+                    runtime: Math.round(pc.runtime_minutes || 0),
+                    cpu: 0,
+                    value: 0,
                     id: pc.system_id,
                     initial: (pc.pc_name || "S").charAt(0).toUpperCase()
                 };
@@ -189,19 +182,19 @@ export default function Dashboard5() {
         allPcsData.forEach(pc => {
             const city = pc.city || 'Unknown';
             // Only aggregate if online and has a valid score when viewing active 
-            if (pc.status === 'online' || viewMode === 'all') {
-                const current = districtScores.get(city) || { totalCpu: 0, count: 0 };
-                current.totalCpu += Number(pc.cpu_score) || 0;
-                current.count += 1;
-                districtScores.set(city, current);
-            }
+                // Aggregate only if online
+                if (pc.status === 'online' || viewMode === 'all') {
+                    const current = districtScores.get(city) || { totalCpu: 0, count: 0 };
+                    current.count += 1;
+                    districtScores.set(city, current);
+                }
         });
 
         let data = Array.from(districtScores.entries())
             .map(([name, stats]) => ({
                 name: name.toUpperCase(),
-                cpu: stats.count > 0 ? Math.round(stats.totalCpu / stats.count) : 0,
-                value: stats.count > 0 ? Math.round(stats.totalCpu / stats.count) : 0,
+                cpu: 0, // Removed
+                value: stats.count, // Show count instead of score
             }))
             .sort((a, b) => b.cpu - a.cpu)
             .slice(0, 5);
@@ -234,10 +227,13 @@ export default function Dashboard5() {
     const summaryData = useMemo(() => {
         const pcList = allPcsData || [];
         const total = pcList.length;
-        const online = pcList.filter(p => p.status === 'online').length;
+        const now = new Date();
+        const online = pcList.filter(p => {
+            const lastSeenDate = p.last_seen ? new Date(p.last_seen) : null;
+            return p.status === 'online' && lastSeenDate && (now.getTime() - lastSeenDate.getTime() < 120 * 1000);
+        }).length;
         const offline = total - online;
 
-        const now = new Date();
         const sevenDaysAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
         const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
 
@@ -558,7 +554,7 @@ export default function Dashboard5() {
                                         <th className="pb-3 text-[9px] font-black text-white/20 uppercase tracking-[0.2em]">
                                             Zone / District
                                         </th>
-                                        <th className="pb-3 text-right text-[9px] font-black text-white/20 uppercase tracking-[0.2em]">Usage</th>
+                                        <th className="pb-3 text-right text-[9px] font-black text-white/20 uppercase tracking-[0.2em]">Runtime</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/5">
@@ -598,9 +594,9 @@ export default function Dashboard5() {
                                             <td className="py-2 text-right">
                                                 <div className={cn(
                                                     "inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-2xl transition-all duration-500 group-hover/row:scale-105",
-                                                    item.cpu > 80 ? "bg-emerald-600/20 text-emerald-400 border border-emerald-500/20" : "bg-violet-600/20 text-violet-400 border border-violet-500/20"
+                                                    "bg-violet-600/20 text-violet-400 border border-violet-500/20"
                                                 )}>
-                                                    <span>{item.cpu}%</span>
+                                                    <span>{item.runtime}m</span>
                                                 </div>
                                             </td>
                                         </tr>

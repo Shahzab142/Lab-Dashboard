@@ -1,7 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api';
-import { supabase } from '@/lib/supabase';
 import {
   ArrowLeft,
   Monitor,
@@ -71,31 +70,35 @@ export default function PCDetailPage() {
     return () => resetUI();
   }, [id]);
 
-  // --- DATA FETCHING (DIRECT FROM DATABASE) ---
+  // --- DATA FETCHING (VIA AUTHENTICATED API — single source of truth) ---
   const { data: detail, isLoading, isError, refetch } = useQuery({
     queryKey: ['pc-detail', id],
     queryFn: async () => {
-      // 1. Fetch Device
-      const { data: device, error: devError } = await supabase
-        .from('devices')
-        .select('*')
-        .eq('system_id', id)
-        .single();
+      // Use the authenticated API route which returns all hardware fields correctly
+      // at root level (ram_total, disk_total, os_info, cpu_model, etc.)
+      const result = await apiFetch(`/devices/${encodeURIComponent(id || '')}`);
 
-      if (devError) throw devError;
+      if (!result || !result.device) {
+        throw new Error('Device not found');
+      }
 
-      // 2. Fetch History (Last 7 Days)
-      const { data: history, error: histError } = await supabase
-        .from('device_daily_history')
-        .select('*')
-        .eq('device_id', id)
-        .order('history_date', { ascending: false })
-        .limit(7);
+      // Normalize specs: API returns hardware fields at root level on DeviceRow,
+      // but some older records nest them under a 'specs' object. Handle both.
+      const device = result.device;
+      if (device.specs && typeof device.specs === 'object') {
+        device.ram_total   = device.ram_total   || device.specs.ram_total;
+        device.disk_total  = device.disk_total  || device.specs.disk_total;
+        device.disk_free   = device.disk_free   || device.specs.disk_free;
+        device.os_info     = device.os_info     || device.specs.os_info;
+        device.cpu_model   = device.cpu_model   || device.specs.cpu_model;
+        device.gpu_model   = device.gpu_model   || device.specs.gpu_model;
+        device.local_ip    = device.local_ip    || device.specs.local_ip;
+      }
 
       return {
         device,
-        history: history || [],
-        server_time: new Date().toISOString() // Use client time as reference since we are direct to DB
+        history: result.history || [],
+        server_time: result.server_time || new Date().toISOString(),
       };
     },
     refetchInterval: isEditing ? false : 1000,
@@ -227,7 +230,7 @@ export default function PCDetailPage() {
     const referenceTime = detail.server_time ? new Date(detail.server_time) : new Date();
     return device.status === 'online' &&
       lastSeenDate &&
-      (referenceTime.getTime() - lastSeenDate.getTime() < 60 * 1000);
+      (referenceTime.getTime() - lastSeenDate.getTime() < 120 * 1000); // 120s window (accounts for 30s DB flush delay)
   })();
 
   const isSeenToday = (() => {
@@ -444,8 +447,22 @@ export default function PCDetailPage() {
                   <Sunrise className="text-secondary w-4 h-4 mb-3" />
                   <p className="text-[8px] text-muted-foreground uppercase font-bold tracking-widest opacity-60">System Boot</p>
                   <p className="font-bold text-lg text-primary leading-tight">
-                    {isSeenToday && device.today_start_time ? new Date(device.today_start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                    {(() => {
+                      const todayStr = new Date().toISOString().split('T')[0];
+                      const historyLog = history?.find((h: any) => (h.history_date || (h.start_time && h.start_time.split('T')[0])) === todayStr);
+                      const bootTimeStr = historyLog?.start_time || (isSeenToday ? device.today_start_time : null);
+                      
+                      if (!bootTimeStr) return 'N/A';
+                      
+                      const bootDate = new Date(bootTimeStr);
+                      const today = new Date();
+                      
+                      // Only show if it's actually from today to avoid showing yesterday's boot time, unless we matched from today's history log
+                      if (bootDate.toDateString() !== today.toDateString() && !historyLog) return 'Pending...';
+                      return bootDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    })()}
                   </p>
+
                 </div>
                 <div className="p-5 rounded-xl bg-primary text-black shadow-md">
                   <Timer className="text-black w-4 h-4 mb-3" />
@@ -522,7 +539,7 @@ export default function PCDetailPage() {
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Operational State</p>
                   <h2 className={cn("text-2xl font-bold uppercase tracking-tight leading-tight", isOnline ? "text-emerald-500" : "text-gray-400")}>{isOnline ? "Operational" : "Idle State"}</h2>
-                  <p className="text-[9px] font-bold opacity-60 mt-1 uppercase tracking-wider">{isOnline ? "Link established" : "Terminal signal absent"}</p>
+                  <p className="text-[9px] font-bold opacity-60 mt-1 uppercase tracking-wider">{isOnline ? "Link established" : "Network signal absent"}</p>
                 </div>
               </CardContent>
             </Card>
@@ -566,6 +583,7 @@ export default function PCDetailPage() {
                     <thead>
                       <tr className="text-[9px] font-bold uppercase text-muted-foreground/60 tracking-wider">
                         <th className="px-6 pb-4 border-b border-border">Temporal Index</th>
+                        <th className="px-6 pb-4 border-b border-border text-right">Daily Duration</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -591,6 +609,14 @@ export default function PCDetailPage() {
                                     <CalendarDays size={10} className="text-primary/60" />
                                   </div>
                                   <span className="text-[8px] font-bold text-emerald-500 uppercase mt-0.5 animate-pulse">Active Session</span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-5 border-b border-border/50 text-right">
+                                <div className="flex flex-col items-end">
+                                  <span className="font-bold text-white text-sm">
+                                    {Math.floor((device.runtime_minutes || 0) / 60)}H {Math.floor((device.runtime_minutes || 0) % 60)}M
+                                  </span>
+                                  <span className="text-[8px] font-bold text-muted-foreground uppercase mt-0.5">Current Cycle</span>
                                 </div>
                               </td>
                             </tr>
@@ -622,6 +648,14 @@ export default function PCDetailPage() {
                                     <span className="text-[8px] font-bold text-white/30 uppercase">{dayName}</span>
                                   </div>
                                   <span className="text-[8px] font-bold text-muted-foreground uppercase mt-0.5">Archive Data Sync</span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-5 border-b border-border/50 text-right">
+                                <div className="flex flex-col items-end">
+                                  <span className="font-bold text-white text-sm">
+                                    {Math.floor((h.runtime_minutes || 0) / 60)}H {Math.floor((h.runtime_minutes || 0) % 60)}M
+                                  </span>
+                                  <span className="text-[8px] font-bold text-muted-foreground uppercase mt-0.5">Total Runtime</span>
                                 </div>
                               </td>
                             </tr>

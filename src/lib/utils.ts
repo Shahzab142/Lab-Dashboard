@@ -80,7 +80,7 @@ export function formatAppName(name: string): string {
   if (!name) return 'UNKNOWN APPLICATION';
 
   // Extract filename if it's a full path
-  let baseName = name.split(/[\\/]/).pop() || name;
+  const baseName = name.split(/[\\/]/).pop() || name;
   const upperRaw = baseName.toUpperCase().replace(/\.EXE$/, '');
 
   const mapping: Record<string, string> = {

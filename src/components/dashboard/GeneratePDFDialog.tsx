@@ -14,53 +14,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { PUNJAB_HIERARCHY } from "@/lib/locationHierarchy";
 
-const punjabCities = [
-    { name: "Abdul Hakeem" }, { name: "Ahmadpur East" }, { name: "Ahmadpur Sial" }, { name: "Ahmed Nager Chatha" },
-    { name: "Alipur" }, { name: "Alipur Chatha" }, { name: "Arifwala" }, { name: "Athara Hazari" },
-    { name: "Attock" }, { name: "Baddomalhi" }, { name: "Bahawalnagar" }, { name: "Bahawalpur" },
-    { name: "Bhalwal" }, { name: "Bhakkar" }, { name: "Bhawana" }, { name: "Bhera" },
-    { name: "Burewala" }, { name: "Chak Azam Saffar" }, { name: "Chak Jhumra" }, { name: "Chakwal" },
-    { name: "Chichawatni" }, { name: "Chiniot" }, { name: "Chishtian" }, { name: "Choa Saidan Shah" },
-    { name: "Dahr Ranwan" }, { name: "Darya Khan" }, { name: "Daska" }, { name: "Dera Ghazi Khan" },
-    { name: "Dhaular" }, { name: "Dina" }, { name: "Dinga" }, { name: "Dipalpur" },
-    { name: "Dunyapur" }, { name: "Faisalabad" }, { name: "Fateh Jang" }, { name: "Fazilpur" },
-    { name: "Fort Abbas" }, { name: "Ghakhar Mandi" }, { name: "Gojra" }, { name: "Gujar Khan" },
-    { name: "Gujranwala" }, { name: "Gujrat" }, { name: "Hadali" }, { name: "Hafizabad" },
-    { name: "Harnoli" }, { name: "Haroonabad" }, { name: "Hasilpur" }, { name: "Hassan Abdal" },
-    { name: "Haveli Lakha" }, { name: "Hazro" }, { name: "Hujra Shah Muqeem" }, { name: "Islampur" },
-    { name: "Jahanian" }, { name: "Jalalpur Jattan" }, { name: "Jalalpur Pirwala" }, { name: "Jampur" },
-    { name: "Jand" }, { name: "Jandanwala" }, { name: "Jaranwala" }, { name: "Jauharabad" },
-    { name: "Jhang" }, { name: "Jhelum" }, { name: "Kabirwala" }, { name: "Kahror Pacca" },
-    { name: "Kalabagh" }, { name: "Kalaswala" }, { name: "Kallar Kahar" }, { name: "Kallar Syedan" },
-    { name: "Kalur Kot" }, { name: "Kamalia" }, { name: "Kamoke" }, { name: "Karor Lal Esan" },
-    { name: "Kashmor" }, { name: "Kasur" }, { name: "Khairpur Tamewali" }, { name: "Khanewal" },
-    { name: "Khangarh" }, { name: "Khanpur" }, { name: "Kharian" }, { name: "Khewra" },
-    { name: "Khurrianwala" }, { name: "Khushab" }, { name: "Kot Adu" }, { name: "Kot Mithan" },
-    { name: "Kot Momin" }, { name: "Kot Radha Kishan" }, { name: "Kot Samaba" }, { name: "Kot Sultan" },
-    { name: "Kunda" }, { name: "Kunjah" }, { name: "Ladhewala Waraich" }, { name: "Lahore" },
-    { name: "Lalamusa" }, { name: "Lalian" }, { name: "Layyah" }, { name: "Liaquat Pur" },
-    { name: "Lodhran" }, { name: "Ludhewala" }, { name: "Mailsi" }, { name: "Malakwal" },
-    { name: "Mamoori" }, { name: "Mandi Bahauddin" }, { name: "Mandi Warburton" }, { name: "Mankera" },
-    { name: "Mari" }, { name: "Mian Channu" }, { name: "Mianwali" }, { name: "Minchanabad" },
-    { name: "Mitha Tiwana" }, { name: "Multan" }, { name: "Muridke" }, { name: "Murree" },
-    { name: "Mustafabad" }, { name: "Muzaffargarh" }, { name: "Nankana Sahib" }, { name: "Narang" },
-    { name: "Narowal" }, { name: "Naushera" }, { name: "Noorpur Thal" }, { name: "Nowshera Virkan" },
-    { name: "Okara" }, { name: "Pakpattan" }, { name: "Pasrur" }, { name: "Pattoki" },
-    { name: "Phalia" }, { name: "Pindi Bhattian" }, { name: "Pindi Gheb" }, { name: "Pir Mahal" },
-    { name: "Qila Didar Singh" }, { name: "Qila Sobha Singh" }, { name: "Rabwah" }, { name: "Raiwind" },
-    { name: "Rajanpur" }, { name: "Rahim Yar Khan" }, { name: "Rawalpindi" }, { name: "Renala Khurd" },
-    { name: "Rojhan" }, { name: "Sadiqabad" }, { name: "Safdarabad" }, { name: "Sahiwal" },
-    { name: "Samberial" }, { name: "Sangla Hill" }, { name: "Sarai Alamgir" }, { name: "Sarai Sidhu" },
-    { name: "Sargodha" }, { name: "Shahkot" }, { name: "Shahpur" }, { name: "Shakargarh" },
-    { name: "Sheikhupura" }, { name: "Sher Shah" }, { name: "Shorkot" }, { name: "Shujaabad" },
-    { name: "Sialkot" }, { name: "Sillanwali" }, { name: "Sohawa" }, { name: "Soianwala" },
-    { name: "Tandlianwala" }, { name: "Talagang" }, { name: "Taranda Aurat" }, { name: "Taunsa Sharif" },
-    { name: "Taxila" }, { name: "Tiba Sultanpur" }, { name: "Toba Tek Singh" }, { name: "Tulamba" },
-    { name: "Uch Sharif" }, { name: "Vehari" }, { name: "Wah Cantonment" }, { name: "Wazirabad" },
-    { name: "Yazman" }, { name: "Zafarwal" }, { name: "Zahir Pir" }
-];
+// Removed static PUNJAB_HIERARCHY and punjabCities in favor of dynamic registry
 
 export function GeneratePDFDialog() {
     const [open, setOpen] = useState(false);
@@ -88,6 +43,10 @@ export function GeneratePDFDialog() {
     const [qsPCsList, setQsPCsList] = useState<any[]>([]);
     const [fetchingQsPCs, setFetchingQsPCs] = useState(false);
 
+    // Dynamic Hierarchy
+    const [dynamicHierarchy, setDynamicHierarchy] = useState<Record<string, Record<string, string[]>>>({});
+    const [isSyncingRegistry, setIsSyncingRegistry] = useState(false);
+
     useEffect(() => {
         if (open) {
             // Reset all selections to ensure a clean state
@@ -100,29 +59,51 @@ export function GeneratePDFDialog() {
             setQsLab("");
             setQsPC("");
 
+            fetchDynamicHierarchy();
             fetchCities();
         }
     }, [open]);
+
+    const fetchDynamicHierarchy = async () => {
+        setIsSyncingRegistry(true);
+        try {
+            const registry = await apiFetch("/registry");
+            const hierarchy: Record<string, Record<string, string[]>> = {};
+            
+            registry.forEach((item: any) => {
+                const city = (item.city || "UNKNOWN").toUpperCase().trim();
+                const tehsil = (item.tehsil || "UNKNOWN").toUpperCase().trim();
+                const lab = (item.lab_name || "UNKNOWN").toUpperCase().trim();
+
+                if (!hierarchy[city]) hierarchy[city] = {};
+                if (!hierarchy[city][tehsil]) hierarchy[city][tehsil] = [];
+                if (!hierarchy[city][tehsil].includes(lab)) {
+                    hierarchy[city][tehsil].push(lab);
+                }
+            });
+            setDynamicHierarchy(hierarchy);
+        } catch (err) {
+            console.error("Failed to build dynamic hierarchy", err);
+        } finally {
+            setIsSyncingRegistry(false);
+        }
+    };
 
     const fetchCities = async () => {
         try {
             const response = await apiFetch("/stats/locations");
             const apiCities = response.locations || [];
-
-            // Merge punjabCities with API data to show lab counts where available
-            const mergedCities = punjabCities.map(pc => {
-                const apiMatch = apiCities.find((ac: any) => ac.city.toLowerCase() === pc.name.toLowerCase());
-                return {
-                    city: pc.name,
-                    total_labs: apiMatch ? apiMatch.total_labs : 0
-                };
-            }).sort((a, b) => b.total_labs - a.total_labs); // Show cities with labs at top
+            
+            // Build list from available statistics
+            const mergedCities = apiCities.map((ac: any) => ({
+                city: ac.city,
+                total_labs: ac.total_labs
+            })).sort((a: any, b: any) => b.total_labs - a.total_labs);
 
             setCities(mergedCities);
         } catch (error) {
             console.error("Failed to fetch cities", error);
-            // Fallback to static list if API fails
-            setCities(punjabCities.map(pc => ({ city: pc.name, total_labs: 0 })));
+            setCities([]);
         }
     };
 
@@ -518,7 +499,7 @@ export function GeneratePDFDialog() {
                                     <SelectValue placeholder="DISTRICT" />
                                 </SelectTrigger>
                                 <SelectContent className="bg-card border-border text-white">
-                                    {Object.keys(PUNJAB_HIERARCHY).sort().map(d => (
+                                    {Object.keys(dynamicHierarchy).sort().map(d => (
                                         <SelectItem key={d} value={d} className="text-[10px] font-bold uppercase">{d}</SelectItem>
                                     ))}
                                 </SelectContent>
@@ -529,7 +510,7 @@ export function GeneratePDFDialog() {
                                     <SelectValue placeholder="TEHSIL" />
                                 </SelectTrigger>
                                 <SelectContent className="bg-card border-border text-white">
-                                    {qsDistrict && PUNJAB_HIERARCHY[qsDistrict] && Object.keys(PUNJAB_HIERARCHY[qsDistrict]).sort().map(t => (
+                                    {qsDistrict && dynamicHierarchy[qsDistrict] && Object.keys(dynamicHierarchy[qsDistrict]).sort().map(t => (
                                         <SelectItem key={t} value={t} className="text-[10px] font-bold uppercase">{t}</SelectItem>
                                     ))}
                                 </SelectContent>
@@ -540,7 +521,7 @@ export function GeneratePDFDialog() {
                                     <SelectValue placeholder="LABORATORY" />
                                 </SelectTrigger>
                                 <SelectContent className="bg-card border-border text-white">
-                                    {qsDistrict && qsTehsil && PUNJAB_HIERARCHY[qsDistrict][qsTehsil] && PUNJAB_HIERARCHY[qsDistrict][qsTehsil].sort().map(l => (
+                                    {qsDistrict && qsTehsil && dynamicHierarchy[qsDistrict][qsTehsil] && dynamicHierarchy[qsDistrict][qsTehsil].sort().map(l => (
                                         <SelectItem key={l} value={l} className="text-[10px] font-bold uppercase">{l}</SelectItem>
                                     ))}
                                 </SelectContent>

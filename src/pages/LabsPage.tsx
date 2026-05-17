@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
 import { apiFetch } from '@/lib/api';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Building2, Search, MoreVertical, Edit2, Trash2, Upload, RotateCcw, CalendarDays } from 'lucide-react';
@@ -16,12 +17,12 @@ import {
     DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import { supabase } from '@/lib/supabase';
 import { useLabSchedule } from '@/hooks/useLabSchedule';
 import { normalize, type ScheduleMap } from '@/lib/scheduleUtils';
 import * as XLSX from 'xlsx';
 
 export default function LabsPage() {
+    const { user } = useAuth();
     const navigate = useNavigate();
     const queryClient = useQueryClient();
     const [searchParams] = useSearchParams();
@@ -59,6 +60,18 @@ export default function LabsPage() {
                     const scheduleRaw = String(row[3] || '').trim();
 
                     if (!districtRaw || !labNameRaw || !scheduleRaw) continue;
+
+                    // SECURITY: Verify that this lab exists in the authorized labs list
+                    const isAuthorized = labs.some((l: any) => 
+                        (l.city || l.norm_city || '').toUpperCase().trim() === districtRaw.toUpperCase() &&
+                        (l.tehsil || l.norm_tehsil || '').toUpperCase().trim() === tehsilRaw.toUpperCase() &&
+                        (l.lab_name || l.lab || '').toUpperCase().trim() === labNameRaw.toUpperCase()
+                    );
+
+                    if (!isAuthorized) {
+                        console.warn(`Unauthorized schedule row skipped: ${districtRaw}/${tehsilRaw}/${labNameRaw}`);
+                        continue;
+                    }
 
                     // Parse days: "Monday, Friday" → ["Monday", "Friday"]
                     const days = scheduleRaw
@@ -124,7 +137,8 @@ export default function LabsPage() {
     const { data: statsData, isLoading } = useQuery({
         queryKey: ['global-lab-stats'],
         queryFn: () => apiFetch("/stats/labs/all"),
-        refetchInterval: 10000,
+        refetchInterval: 15000,
+        staleTime: 10000,
     });
 
     const labs = useMemo(() => {
@@ -149,22 +163,13 @@ export default function LabsPage() {
     const status = searchParams.get('status');
     const auditStatus = searchParams.get('audit');
 
-    const { data: allDevices } = useQuery({
-        queryKey: ['all-devices-for-audit'],
-        queryFn: async () => {
-            const { data, error } = await supabase.from('devices').select('*');
-            if (error) throw error;
-            return data;
-        },
-        refetchInterval: 15000
-    });
+    // ─── Removed: all-devices fetch for cross-join ────────────────────────────
+    // Previously fetched /devices (all 1000+ records) every 15s to compute onlineCount.
+    // Now we rely on the server-aggregated `online` field from /stats/labs/all,
+    // which is updated every heartbeat cycle and is accurate within ~30 seconds.
 
     const filteredLabs = useMemo(() => {
-        if (!labs || !allDevices) return [];
-
-        const now = new Date();
-        const IDLE_TIME_WINDOW = 60 * 60 * 1000;
-        const CPU_ACTIVITY_THRESHOLD = 12;
+        if (!labs) return [];
 
         const uniqueLabsMap = new Map();
         labs.forEach((l: any) => {
@@ -175,56 +180,27 @@ export default function LabsPage() {
 
         return uniqueLabs.filter((lab: any) => {
             const labName = (lab.lab_name || lab.lab || '').toUpperCase().trim();
-            const labCity = (lab.city || lab.norm_city || '').toUpperCase().trim();
-            const labTehsil = (lab.tehsil || lab.norm_tehsil || '').toUpperCase().trim();
+            const onlineCount = Number(lab.online || 0);
+            const total = Number(lab.total_pcs || 0);
 
             const matchesSearch = labName.includes(searchTerm.toUpperCase().trim());
 
-            const labDevices = allDevices.filter(d =>
-                (d.lab_name || '').toUpperCase().trim() === labName &&
-                (d.city || '').toUpperCase().trim() === labCity &&
-                (d.tehsil || '').toUpperCase().trim() === labTehsil
-            );
-
-            const onlinePCs = labDevices.filter(d => {
-                const lastSeen = d.last_seen ? new Date(d.last_seen) : null;
-                return d.status === 'online' && lastSeen && (now.getTime() - lastSeen.getTime() < IDLE_TIME_WINDOW);
-            });
-
-            const onlineCount = onlinePCs.length;
-            const avgCpu = onlineCount > 0
-                ? onlinePCs.reduce((acc, pc) => acc + (pc.cpu_score || 0), 0) / onlineCount
-                : 0;
-
-            const maxLastSeen = labDevices.reduce((max, d) => {
-                const dTime = d.last_seen ? new Date(d.last_seen).getTime() : 0;
-                return Math.max(max, dTime);
-            }, 0);
-            const daysOffline = maxLastSeen === 0 ? 999 : (now.getTime() - maxLastSeen) / (1000 * 3600 * 24);
-
             let matchesFilter = true;
-
             if (status === 'online') {
                 matchesFilter = onlineCount > 0;
             } else if (status === 'offline') {
-                matchesFilter = onlineCount === 0 && daysOffline <= 7;
-            } else if (status === 'offline_7d') {
-                matchesFilter = onlineCount === 0 && daysOffline > 7 && daysOffline <= 30;
-            } else if (status === 'offline_30d') {
-                matchesFilter = onlineCount === 0 && daysOffline > 30;
+                matchesFilter = onlineCount === 0;
             } else if (status === 'all_offline') {
                 matchesFilter = onlineCount === 0;
             } else if (auditStatus === 'used') {
-                const hasSignificantActivity = onlinePCs.some(pc => (pc.cpu_score || 0) > CPU_ACTIVITY_THRESHOLD);
-                matchesFilter = onlineCount > 0 && (hasSignificantActivity || avgCpu > 10);
+                matchesFilter = onlineCount > 0;
             } else if (auditStatus === 'idle') {
-                const hasSignificantActivity = onlinePCs.some(pc => (pc.cpu_score || 0) > CPU_ACTIVITY_THRESHOLD);
-                matchesFilter = onlineCount > 0 && !(hasSignificantActivity || avgCpu > 10);
+                matchesFilter = onlineCount === 0 && total > 0;
             }
 
             return matchesSearch && matchesFilter;
         }).sort((a: any, b: any) => (b.total_pcs || 0) - (a.total_pcs || 0));
-    }, [labs, allDevices, searchTerm, status, auditStatus]);
+    }, [labs, searchTerm, status, auditStatus]);
 
     const maxSystemsInLab = useMemo(() => {
         if (!filteredLabs || filteredLabs.length === 0) return 20;
@@ -296,18 +272,20 @@ export default function LabsPage() {
                         onChange={handleExcelUpload}
                     />
 
-                    {/* Upload Schedule Button */}
-                    <Button
-                        onClick={() => fileInputRef.current?.click()}
-                        className="h-11 px-6 rounded-lg bg-secondary/20 border-2 border-secondary/80 text-secondary hover:bg-secondary hover:text-black text-[10px] font-black uppercase tracking-widest gap-3 transition-all shrink-0 shadow-[0_0_20px_rgba(0,0,0,0.2)]"
-                        variant="ghost"
-                    >
-                        <Upload size={16} className="shrink-0" />
-                        Upload Schedule
-                    </Button>
+                    {/* Upload Schedule Button - ADMIN ONLY */}
+                    {user?.role === 'ADMIN' && (
+                        <Button
+                            onClick={() => fileInputRef.current?.click()}
+                            className="h-11 px-6 rounded-lg bg-secondary/20 border-2 border-secondary/80 text-secondary hover:bg-secondary hover:text-black text-[10px] font-black uppercase tracking-widest gap-3 transition-all shrink-0 shadow-[0_0_20px_rgba(0,0,0,0.2)]"
+                            variant="ghost"
+                        >
+                            <Upload size={16} className="shrink-0" />
+                            Upload Schedule
+                        </Button>
+                    )}
 
-                    {/* Global Reset Button — only shown when schedule exists */}
-                    {hasSchedule && (
+                    {/* Global Reset Button — ADMIN ONLY */}
+                    {user?.role === 'ADMIN' && hasSchedule && (
                         <Button
                             onClick={() => {
                                 schedule.resetAll();
@@ -406,37 +384,39 @@ export default function LabsPage() {
                                                 </div>
                                             </div>
 
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                                    <button className="p-1.5 hover:bg-white/5 rounded transition-colors text-white/20 shrink-0">
-                                                        <MoreVertical size={14} />
-                                                    </button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end" className="bg-card border border-border rounded-xl p-1.5 shadow-2xl backdrop-blur-xl">
-                                                    <DropdownMenuItem onClick={(e) => handleRenameLab(e, labNameVal)} className="gap-2 text-[10px] font-bold uppercase p-2.5 rounded-lg transition-all focus:bg-primary focus:text-black">
-                                                        <Edit2 size={12} className="text-primary group-focus:text-black" /> Rename
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={(e) => handleDeleteLab(e, labNameVal)} className="gap-2 text-red-500 text-[10px] font-bold uppercase p-2.5 rounded-lg transition-all focus:bg-red-500 focus:text-white">
-                                                        <Trash2 size={12} /> Delete
-                                                    </DropdownMenuItem>
-                                                    {/* Per-lab schedule reset */}
-                                                    {scheduleLabel && (
-                                                        <>
-                                                            <DropdownMenuSeparator className="bg-border my-1" />
-                                                            <DropdownMenuItem
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    schedule.resetLab(labCityVal, labTehsilVal, labNameVal);
-                                                                    toast.success(`Schedule cleared for ${labNameVal}`);
-                                                                }}
-                                                                className="gap-2 text-amber-400 text-[10px] font-bold uppercase p-2.5 rounded-lg transition-all focus:bg-amber-500 focus:text-black"
-                                                            >
-                                                                <RotateCcw size={12} /> Reset Lab Schedule
-                                                            </DropdownMenuItem>
-                                                        </>
-                                                    )}
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
+                                            {user?.role === 'ADMIN' && (
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                                        <button className="p-1.5 hover:bg-white/5 rounded transition-colors text-white/20 shrink-0">
+                                                            <MoreVertical size={14} />
+                                                        </button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end" className="bg-card border border-border rounded-xl p-1.5 shadow-2xl backdrop-blur-xl">
+                                                        <DropdownMenuItem onClick={(e) => handleRenameLab(e, labNameVal)} className="gap-2 text-[10px] font-bold uppercase p-2.5 rounded-lg transition-all focus:bg-primary focus:text-black">
+                                                            <Edit2 size={12} className="text-primary group-focus:text-black" /> Rename
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem onClick={(e) => handleDeleteLab(e, labNameVal)} className="gap-2 text-red-500 text-[10px] font-bold uppercase p-2.5 rounded-lg transition-all focus:bg-red-500 focus:text-white">
+                                                            <Trash2 size={12} /> Delete
+                                                        </DropdownMenuItem>
+                                                        {/* Per-lab schedule reset */}
+                                                        {scheduleLabel && (
+                                                            <>
+                                                                <DropdownMenuSeparator className="bg-border my-1" />
+                                                                <DropdownMenuItem
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        schedule.resetLab(labCityVal, labTehsilVal, labNameVal);
+                                                                        toast.success(`Schedule cleared for ${labNameVal}`);
+                                                                    }}
+                                                                    className="gap-2 text-amber-400 text-[10px] font-bold uppercase p-2.5 rounded-lg transition-all focus:bg-amber-500 focus:text-black"
+                                                                >
+                                                                    <RotateCcw size={12} /> Reset Lab Schedule
+                                                                </DropdownMenuItem>
+                                                            </>
+                                                        )}
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            )}
                                         </div>
 
                                         {/* Gauge Section */}

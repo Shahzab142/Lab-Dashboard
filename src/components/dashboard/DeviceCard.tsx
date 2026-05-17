@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { Monitor, MapPin, ArrowRight, MoreVertical, Edit2, Trash2 } from 'lucide-react';
+import { Monitor, MapPin, Timer, MoreVertical, Edit2, Trash2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   DropdownMenu,
@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api';
+import { useAuth } from '@/hooks/useAuth';
 import type { Device } from '@/lib/types';
 
 
@@ -24,6 +25,7 @@ interface DeviceCardProps {
 export function DeviceCard({ device, serverTime }: DeviceCardProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   const handleRenamePC = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -65,7 +67,7 @@ export function DeviceCard({ device, serverTime }: DeviceCardProps) {
   const referenceTime = serverTime ? new Date(serverTime) : new Date();
   const isOnline = device.status === 'online' &&
     lastSeenDate &&
-    (referenceTime.getTime() - lastSeenDate.getTime() < 60 * 1000);
+    (referenceTime.getTime() - lastSeenDate.getTime() < 120 * 1000); // 120s window (accounts for 30s DB flush delay)
 
   // Persistent defective check
   const isCurrentlyDefective = (() => {
@@ -120,21 +122,23 @@ export function DeviceCard({ device, serverTime }: DeviceCardProps) {
             </div>
           </div>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-              <button className="p-1.5 hover:bg-muted rounded text-muted-foreground/40 transition-colors">
-                <MoreVertical size={14} />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-white border border-border rounded-lg p-1 shadow-lg">
-              <DropdownMenuItem onClick={handleRenamePC} className="gap-2 text-[10px] font-bold uppercase p-2 rounded-md">
-                <Edit2 size={12} className="text-primary" /> Rename
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleDeletePC} className="gap-2 text-red-600 text-[10px] font-bold uppercase p-2 rounded-md">
-                <Trash2 size={12} /> Reset Slot
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {user?.role === 'ADMIN' && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                <button className="p-1.5 hover:bg-muted rounded text-muted-foreground/40 transition-colors">
+                  <MoreVertical size={14} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-card border border-border rounded-xl p-1.5 shadow-2xl backdrop-blur-xl">
+                <DropdownMenuItem onClick={handleRenamePC} className="gap-2 text-[10px] font-bold uppercase p-2.5 rounded-lg transition-all focus:bg-primary focus:text-black">
+                  <Edit2 size={12} className="text-primary group-focus:text-black" /> Rename
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleDeletePC} className="gap-2 text-red-500 text-[10px] font-bold uppercase p-2.5 rounded-lg transition-all focus:bg-red-500 focus:text-white">
+                  <Trash2 size={12} /> Reset Slot
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
 
         {/* Technical Telemetry Graph */}
@@ -148,14 +152,26 @@ export function DeviceCard({ device, serverTime }: DeviceCardProps) {
           </div>
         </div>
 
-        {/* Compute & Info Grid */}
-          <div className="bg-background border border-border p-2 rounded-lg flex flex-col justify-between col-span-2">
+        {/* Stats Grid */}
+        <div className="grid grid-cols-2 gap-2">
+          <div className="bg-background border border-border p-2.5 rounded-lg flex flex-col justify-between group-hover:border-primary/20 transition-all">
+            <div className="flex items-center gap-1 mb-1 opacity-60">
+              <Timer size={10} className="text-primary" />
+              <span className="text-[8px] font-bold uppercase text-white/70 tracking-tight">Today Usage</span>
+            </div>
+            <p className="text-sm font-black text-white/90">
+              {Math.floor((device.runtime_minutes || 0) / 60)}h {Math.floor((device.runtime_minutes || 0) % 60)}m
+            </p>
+          </div>
+
+          <div className="bg-background border border-border p-2.5 rounded-lg flex flex-col justify-between group-hover:border-primary/20 transition-all">
             <div className="flex items-center gap-1 mb-1 opacity-60">
               <MapPin size={10} className="text-secondary" />
               <span className="text-[8px] font-bold uppercase text-white/70 tracking-tight">Location Node</span>
             </div>
             <p className="text-xs font-bold text-white/90 truncate uppercase">{device.city || 'N/A'}</p>
           </div>
+        </div>
 
 
         {/* Status Bar */}

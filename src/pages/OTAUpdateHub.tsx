@@ -1,3 +1,17 @@
+/**
+ * ----------------------------------------------------------------------------------
+ * @file OTAUpdateHub.tsx
+ * @description Central command center for Over-The-Air (OTA) binary updates for the agent fleet.
+ *
+ * @architecture
+ * - Handles secure binary uploads to Supabase Storage (`agent-releases` bucket).
+ * - Implements cryptographic safety by calculating SHA-256 hashes in the browser before upload.
+ * - Broadcasts updates by updating the `ota_releases` table and syncing `global_configs`.
+ * - Includes a 'Rollback' mechanism to instantly revert the entire fleet to a known stable version.
+ * - Security: Protected by a high-level admin PIN gate and JWT role-based checks.
+ * ----------------------------------------------------------------------------------
+ */
+
 import { useState, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -25,14 +39,6 @@ interface OtaRelease {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-async function sha256Browser(file: File): Promise<string> {
-  const buffer = await file.arrayBuffer();
-  const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
-  return Array.from(new Uint8Array(hashBuffer))
-    .map(b => b.hexFormat(16).padStart(2, '0'))
-    .join('');
-}
-
 // Fix: proper hex method
 async function computeSHA256(file: File): Promise<string> {
   const buffer = await file.arrayBuffer();
@@ -311,8 +317,8 @@ function OTAHubContent() {
       // 5. Update global_configs (what the Flask server reads)
       await supabase.from('global_configs').upsert([
         { key: 'agent_version', value: version },
-        { key: 'agent_hash',    value: computedHash },
-        { key: 'update_url',    value: publicUrl },
+        { key: 'agent_hash', value: computedHash },
+        { key: 'update_url', value: publicUrl },
       ], { onConflict: 'key' });
 
       setUploadProgress(100);
@@ -339,8 +345,8 @@ function OTAHubContent() {
       // Update global_configs
       await supabase.from('global_configs').upsert([
         { key: 'agent_version', value: release.version },
-        { key: 'agent_hash',    value: release.sha256_hash },
-        { key: 'update_url',    value: release.public_url },
+        { key: 'agent_hash', value: release.sha256_hash },
+        { key: 'update_url', value: release.public_url },
       ], { onConflict: 'key' });
     },
     onSuccess: () => {
@@ -362,8 +368,8 @@ function OTAHubContent() {
             <Rocket className="w-6 h-6 text-violet-400" />
             OTA Update Hub
           </h1>
-          <p className="text-slate-500 text-xs mt-1 tracking-wide">
-            Release management for Lab Guardian Pro — provincial fleet of 10,000 PCs
+          <p className="text-slate-500 text-xs mt-1 tracPCsking-wide">
+            Release management for Lab Guardian Pro
           </p>
         </div>
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
@@ -375,21 +381,21 @@ function OTAHubContent() {
       {/* ── Live Config Banner ─────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {[
-          { label: 'Active Version', value: currentConfig?.agent_version || '—', icon: Package, color: 'violet' },
-          { label: 'SHA-256 Hash', value: currentConfig?.agent_hash ? `${currentConfig.agent_hash.slice(0, 12)}...` : '—', icon: Hash, color: 'blue' },
-          { label: 'Fleet Status', value: '10,000 PCs Polling', icon: Zap, color: 'emerald' },
+          { label: 'Active Version', value: activeRelease?.version || '—', icon: Package, color: 'violet' },
+          { label: 'SHA-256 Hash', value: activeRelease?.sha256_hash ? `${activeRelease.sha256_hash.slice(0, 12)}...` : '—', icon: Hash, color: 'blue' },
+          { label: 'Fleet Status', value: 'PCs Polling', icon: Zap, color: 'emerald' },
         ].map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="bg-[#0d1117]/80 border border-white/8 rounded-xl p-4 flex items-center gap-3">
             <div className={cn(
               "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
               color === 'violet' && "bg-violet-600/20 border border-violet-500/20",
-              color === 'blue'   && "bg-blue-600/20 border border-blue-500/20",
+              color === 'blue' && "bg-blue-600/20 border border-blue-500/20",
               color === 'emerald' && "bg-emerald-600/20 border border-emerald-500/20",
             )}>
               <Icon className={cn(
                 "w-5 h-5",
                 color === 'violet' && "text-violet-400",
-                color === 'blue'   && "text-blue-400",
+                color === 'blue' && "text-blue-400",
                 color === 'emerald' && "text-emerald-400",
               )} />
             </div>
@@ -532,7 +538,7 @@ function OTAHubContent() {
           <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
             <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
             <p className="text-emerald-400 text-xs font-bold">
-              ✓ Fleet rollout initiated — 10,000 PCs will update within 30 seconds.
+              ✓ Fleet rollout initiated.
             </p>
           </div>
         )}
@@ -551,7 +557,7 @@ function OTAHubContent() {
           {deployMutation.isPending ? (
             <><Loader2 className="w-4 h-4 animate-spin" /> Deploying to Fleet…</>
           ) : (
-            <><Rocket className="w-4 h-4" /> Deploy to 10,000 PCs</>
+            <><Rocket className="w-4 h-4" /> Deploy</>
           )}
         </button>
       </div>
@@ -686,14 +692,14 @@ function OTAHubContent() {
             <div className={cn(
               "w-8 h-8 rounded-lg flex items-center justify-center mb-3",
               color === 'emerald' && "bg-emerald-600/15 border border-emerald-500/20",
-              color === 'blue'    && "bg-blue-600/15 border border-blue-500/20",
-              color === 'amber'   && "bg-amber-600/15 border border-amber-500/20",
+              color === 'blue' && "bg-blue-600/15 border border-blue-500/20",
+              color === 'amber' && "bg-amber-600/15 border border-amber-500/20",
             )}>
               <Icon className={cn(
                 "w-4 h-4",
                 color === 'emerald' && "text-emerald-400",
-                color === 'blue'    && "text-blue-400",
-                color === 'amber'   && "text-amber-400",
+                color === 'blue' && "text-blue-400",
+                color === 'amber' && "text-amber-400",
               )} />
             </div>
             <p className="text-white text-xs font-bold mb-1">{title}</p>

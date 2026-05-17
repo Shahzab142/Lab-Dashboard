@@ -96,16 +96,16 @@ export default function UtilizationPage() {
                 tehsil: labDevices[0].tehsil,
                 total: totalInLab,
                 online: onlineCount,
-                avgCpu: onlineCount > 0
-                    ? onlinePCs.reduce((acc, pc) => acc + (pc.cpu_score || 0), 0) / onlineCount
+                avgRuntime: onlineCount > 0
+                    ? onlinePCs.reduce((acc, pc) => acc + (pc.runtime_minutes || 0), 0) / onlineCount
                     : 0
             };
 
             // ⚖️ RIGOROUS LOGIC: Matching the audit criteria exactly
             if (onlineCount > 0) {
-                // If any system is actually processing (>10%) or the average load is noticeable (>5%), it's being "Used".
+                // If average runtime is noticeable (>5m), it's being "Used".
                 // Otherwise, it was just turned on for "Formality" (Idle).
-                const isWorking = onlinePCs.some(pc => (pc.cpu_score || 0) > 10) || labInfo.avgCpu > 5;
+                const isWorking = labInfo.avgRuntime > 5;
 
                 if (isWorking) {
                     metrics.usedLabs.push(labInfo);
@@ -345,7 +345,7 @@ export default function UtilizationPage() {
                                 <tr className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground text-left bg-muted/50 border-b border-border">
                                     <th className="px-8 py-5">Facility Identification</th>
                                     <th className="px-8 py-5">Fleet Status</th>
-                                    <th className="px-8 py-5">Compute Load</th>
+                                    <th className="px-8 py-5">Session Runtime</th>
                                     <th className="px-8 py-5">Audit Conclusion</th>
                                     <th className="px-8 py-5 text-right">Actions</th>
                                 </tr>
@@ -399,9 +399,9 @@ export default function UtilizationPage() {
                                                 <div className="flex items-baseline gap-2">
                                                     <span className={cn(
                                                         "text-base font-bold",
-                                                        lab.avgCpu > 10 ? "text-emerald-400" : "text-white/40"
+                                                        lab.avgRuntime > 5 ? "text-emerald-400" : "text-white/40"
                                                     )}>
-                                                        {lab.avgCpu.toFixed(1)}%
+                                                        {lab.avgRuntime.toFixed(0)}m
                                                     </span>
                                                     <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Avg</span>
                                                 </div>

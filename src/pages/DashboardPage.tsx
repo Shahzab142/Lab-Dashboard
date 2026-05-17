@@ -1,3 +1,16 @@
+/**
+ * ----------------------------------------------------------------------------------
+ * @file DashboardPage.tsx
+ * @description In-depth analytical dashboard displaying aggregated metrics across all managed PCs.
+ *
+ * @architecture
+ * - Fetches telemetry from `/stats/labs/all`.
+ * - Groups and pivots data across multiple dimensions (City -> Tehsil -> Lab -> PC).
+ * - Implements complex data visualizations (Recharts) to show bandwidth, uptime, and app usage.
+ * - Performance optimized using `useMemo` hooks to prevent recalculation of heavily aggregated data.
+ * ----------------------------------------------------------------------------------
+ */
+
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
@@ -43,37 +56,92 @@ interface SearchSuggestion {
     tehsil?: string;
 }
 
-const ActiveDetailCard = ({ data, viewMode }: { data: ChartEntry | null, viewMode: string }) => {
+const ActiveDetailCard = ({ data, viewMode, activeFilter }: { data: ChartEntry | null, viewMode: string, activeFilter: SearchSuggestion | null }) => {
     if (!data) return null;
 
     let label = "Units";
-    if (viewMode === 'district') label = "Total Tehsils";
-    else if (viewMode === 'tehsil') label = "Total Labs";
-    else if (viewMode === 'labs') label = "Total Labs";
-    else if (viewMode === 'pc') label = "Total PCs";
+    let subLabel = "";
+    let description = "";
+
+    // Global View Modes
+    if (!activeFilter) {
+        if (viewMode === 'district') {
+            label = "Tehsils";
+            description = "Sub-administrative divisions";
+        }
+        else if (viewMode === 'tehsil') {
+            label = "Labs";
+            description = "Active monitoring sites";
+        }
+        else if (viewMode === 'labs') {
+            label = "Labs";
+            description = `Labs with ${data.name} status`;
+        }
+        else if (viewMode === 'pc') {
+            label = "PCs";
+            description = `Units with ${data.name} status`;
+        }
+    } else {
+        // Filtered (Drill-down) Modes
+        if (activeFilter.type === 'district') {
+            label = "Labs";
+            subLabel = `in ${data.name}`;
+            description = "Labs in this tehsil";
+        } else if (activeFilter.type === 'tehsil') {
+            label = "PCs";
+            subLabel = `in ${data.name}`;
+            description = "Total deployed hardware";
+        } else if (activeFilter.type === 'lab') {
+            label = "PCs";
+            subLabel = `${data.name}`;
+            description = "Hardware status breakdown";
+        }
+    }
 
     const accentColor = data.color.startsWith('url') ? (data.name === 'Online' ? '#10B981' : '#f43f5e') : data.color;
 
     return (
-        <div className="absolute -top-12 -right-48 p-6 bg-[#1a1b3a]/90 backdrop-blur-2xl border border-white/20 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.5)] animate-in slide-in-from-top-4 fade-in duration-500 min-w-[220px] z-50 overflow-hidden group">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 blur-3xl -mr-16 -mt-16 rounded-full" />
-            <div className="relative z-10 flex flex-col gap-5">
-                <div className="flex items-center gap-3 border-b border-white/10 pb-4">
-                    <div
-                        className="w-3 h-3 rounded-full shadow-[0_0_20px_currentColor] animate-pulse"
-                        style={{ color: accentColor, backgroundColor: accentColor }}
-                    />
-                    <span className="text-[12px] font-black text-white uppercase tracking-[0.2em] italic truncate max-w-[160px]">
-                        {data.name}
-                    </span>
-                </div>
-                <div className="flex flex-col">
-                    <span className="text-[9px] font-black text-white/40 uppercase tracking-[0.4em] mb-2 ml-1">
-                        {label}
-                    </span>
-                    <p className="text-5xl font-black text-white leading-none tracking-tighter italic drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">
-                        {data.value}
-                    </p>
+        <div
+            className="w-[240px] shrink-0 p-1 rounded-[2.5rem] bg-gradient-to-br from-white/10 to-transparent backdrop-blur-3xl border border-white/20 shadow-[0_30px_70px_rgba(0,0,0,0.8)] animate-in fade-in zoom-in-95 duration-500 pointer-events-none"
+        >
+            <div className="bg-[#0f1128]/90 rounded-[2.3rem] p-6 h-full relative overflow-hidden group">
+                {/* Decorative Elements */}
+                <div 
+                    className="absolute -top-10 -right-10 w-24 h-24 blur-[40px] rounded-full opacity-40 group-hover:opacity-60 transition-opacity"
+                    style={{ backgroundColor: accentColor }}
+                />
+                
+                <div className="relative z-10 flex flex-col gap-6">
+                    <div className="flex items-center gap-3">
+                        <div
+                            className="w-2.5 h-2.5 rounded-full shadow-[0_0_15px_currentcolor]"
+                            style={{ color: accentColor, backgroundColor: accentColor }}
+                        />
+                        <span className="text-[10px] font-black text-white/60 uppercase tracking-[0.2em] truncate">
+                            {data.name}
+                        </span>
+                    </div>
+
+                    <div className="space-y-1">
+                        <div className="flex items-baseline gap-2">
+                            <p className="text-6xl font-black text-white leading-none tracking-tighter italic" 
+                               style={{ filter: `drop-shadow(0 0 15px ${accentColor}40)` }}>
+                                {data.value}
+                            </p>
+                            <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">{label}</span>
+                        </div>
+                        {subLabel && (
+                            <p className="text-[9px] font-bold text-primary uppercase tracking-[0.15em] opacity-80">
+                                {subLabel}
+                            </p>
+                        )}
+                    </div>
+
+                    <div className="pt-4 border-t border-white/5">
+                        <p className="text-[8px] font-bold text-white/30 uppercase tracking-[0.2em] leading-relaxed">
+                            {description}
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -333,7 +401,7 @@ export default function DashboardPage() {
     if (isLoading) return <div className="h-full w-full p-10"><Loader2 className="w-8 h-8 text-primary animate-spin" /></div>;
 
     return (
-        <div className="h-[90vh] w-full p-4 md:p-8 flex flex-col items-center justify-start relative overflow-y-auto custom-scrollbar">
+        <div className="h-full w-full p-4 md:p-8 flex flex-col items-center justify-start relative overflow-y-auto custom-scrollbar">
             {/* Ambient Background Glows */}
             <div className="absolute -top-20 left-1/4 -translate-x-1/2 w-[600px] h-[500px] blur-[120px] rounded-full pointer-events-none bg-[#7c4dff]/10" />
             <div className="absolute -top-20 right-1/4 translate-x-1/2 w-[600px] h-[500px] blur-[120px] rounded-full pointer-events-none bg-[#2979ff]/10" />
@@ -414,7 +482,7 @@ export default function DashboardPage() {
                 </div>
             </div>
 
-            <div className="relative z-10 w-full max-w-[1100px] mt-24 flex flex-col xl:flex-row items-center justify-center gap-12 xl:gap-24 min-h-[60vh] pb-20">
+            <div className="relative z-10 w-full max-w-[1200px] mt-[15vh] mb-auto flex flex-col xl:flex-row items-center justify-center gap-8 xl:gap-8 min-h-[60vh] pb-10">
 
                 {/* --- LEFT: Buttons (District Controls) --- */}
                 <div className="flex flex-col items-center xl:items-start gap-5 w-full max-w-[260px]">
@@ -471,23 +539,26 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
+                {/* --- MIDDLE: Hover Detail Card --- */}
+                <div className="w-[240px] shrink-0 flex items-center justify-center min-h-[220px]">
+                    {hoveredData ? (
+                        <ActiveDetailCard data={hoveredData} viewMode={centerViewMode} activeFilter={selectedFilter} />
+                    ) : (
+                        <div className="w-full h-full" />
+                    )}
+                </div>
+
                 {/* --- RIGHT: District Distribution Circle --- */}
-                <div className="flex flex-col items-center gap-8 w-full max-w-[450px] animate-in zoom-in-95 duration-1000">
+                <div className="flex flex-col items-center gap-4 w-full max-w-[420px] animate-in zoom-in-95 duration-1000">
                     <div className="text-center space-y-1">
-                        <h2 className="text-xl md:text-2xl font-black uppercase tracking-[0.3em] text-white/90 drop-shadow-[0_0_20px_rgba(255,255,255,0.1)]">
+                        <h2 className="text-xl md:text-2xl font-black uppercase tracking-[0.3em] text-white/90">
                             {selectedFilter ? selectedFilter.name : `Total ${centerDisplayLabel}`}
                         </h2>
                         <div className="h-0.5 w-16 bg-gradient-to-r from-transparent via-primary/30 to-transparent mx-auto rounded-full" />
                     </div>
-                    
-                    <div className="relative w-full aspect-square group shrink-0 flex items-center justify-center transition-all duration-700" style={{ minHeight: '260px' }}>
-                        
-                        {/* Hover Detail Card fixed in space - back inside the square as requested */}
-                        <ActiveDetailCard data={hoveredData} viewMode={centerViewMode} />
 
-                        {/* Elegant background glows */}
+                    <div className="relative w-full aspect-square shrink-0 flex items-center justify-center" style={{ minHeight: '280px' }}>
                         <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-violet-600/5 to-indigo-600/5 blur-[50px]" />
-                        <div className="absolute inset-0 rounded-full border border-white/5 scale-[0.98]" />
 
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
@@ -495,43 +566,40 @@ export default function DashboardPage() {
                                     data={safeCityChartData}
                                     cx="50%"
                                     cy="50%"
-                                    innerRadius="70%"
-                                    outerRadius="88%"
+                                    innerRadius="68%"
+                                    outerRadius="86%"
                                     paddingAngle={0}
                                     dataKey="value"
                                     stroke="none"
                                     startAngle={90}
                                     endAngle={-270}
                                     onClick={(data: ChartEntry) => handleCenterChartClick(data)}
-                                    onMouseEnter={(_, index) => {
-                                        if (safeCityChartData[index]?.name !== "No Data") {
-                                            setHoveredData(safeCityChartData[index]);
+                                    onMouseEnter={(data) => {
+                                        if (data && data.name !== "No Data") {
+                                            setHoveredData(data as ChartEntry);
                                         }
                                     }}
                                     onMouseLeave={() => setHoveredData(null)}
                                 >
                                     {safeCityChartData.map((entry, index) => {
-                                        const fillColor = entry.name === 'Online' ? '#00a629' : 
-                                                         entry.name === 'Offline' ? '#7c3aed' : 
+                                        const fillColor = entry.name === 'Online' ? '#00a629' :
+                                                         entry.name === 'Offline' ? '#7c3aed' :
                                                          entry.color;
-                                        
                                         return (
                                             <Cell
                                                 key={`cell-c-${index}`}
                                                 fill={fillColor}
-                                                className="transition-all duration-500 hover:brightness-110 cursor-pointer"
-                                                style={{ 
-                                                    filter: `drop-shadow(0px 0px 10px ${fillColor}40)`,
-                                                }}
+                                                className="cursor-pointer"
+                                                style={{ filter: `drop-shadow(0px 0px 8px ${fillColor}50)` }}
                                             />
                                         );
                                     })}
                                 </Pie>
                             </PieChart>
                         </ResponsiveContainer>
-                        
-                        <div 
-                            className="absolute inset-0 flex flex-col items-center justify-center pointer-events-auto cursor-pointer group/center"
+
+                        <div
+                            className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer group/center"
                             onClick={() => {
                                 if (selectedFilter) {
                                     if (selectedFilter.type === 'district') navigate(`/dashboard/labs?city=${encodeURIComponent(selectedFilter.name)}`);
@@ -539,16 +607,16 @@ export default function DashboardPage() {
                                     else if (selectedFilter.type === 'lab') navigate(`/dashboard/lab-summary/${encodeURIComponent(selectedFilter.district)}/${encodeURIComponent(selectedFilter.name)}`);
                                 } else {
                                     if (centerViewMode === 'district') navigate(`/dashboard/cities`);
-                                    else if (centerViewMode === 'tehsil') navigate(`/dashboard/cities`); // Redirect to Tehsilwise Lab list instead of broken Tehsils view
+                                    else if (centerViewMode === 'tehsil') navigate(`/dashboard/cities`);
                                     else if (centerViewMode === 'labs') navigate(`/dashboard/labs`);
                                     else if (centerViewMode === 'pc') navigate(`/dashboard/devices`);
                                 }
                             }}
                         >
-                            <span className="text-7xl font-black text-white tracking-tighter italic drop-shadow-[0_0_30px_rgba(255,255,255,0.4)] animate-in zoom-in duration-1000 group-hover/center:text-primary transition-colors">
+                            <span className="text-7xl font-black text-white tracking-tighter italic drop-shadow-[0_0_30px_rgba(255,255,255,0.4)] group-hover/center:text-primary transition-colors">
                                 {centerDisplayTotal}
                             </span>
-                            <span className="text-[10px] font-black text-primary uppercase tracking-[0.4em] -mt-2 opacity-80 drop-shadow-[0_0_10px_rgba(249,154,29,0.5)] group-hover/center:opacity-100">
+                            <span className="text-[10px] font-black text-primary uppercase tracking-[0.4em] -mt-2 opacity-80 group-hover/center:opacity-100">
                                 {centerDisplayLabel}
                             </span>
                         </div>

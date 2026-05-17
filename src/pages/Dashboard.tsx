@@ -20,7 +20,7 @@ export default function Dashboard() {
   }, []);
 
   return (
-    <div className="min-h-screen flex w-full bg-background text-foreground relative overflow-hidden cyber-grid">
+    <div className="fixed inset-0 flex w-full bg-background text-foreground overflow-hidden cyber-grid">
       {/* Global Background Glows */}
       <div className="fixed top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[150px] pointer-events-none" />
       <div className="fixed bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-secondary/5 rounded-full blur-[150px] pointer-events-none" />

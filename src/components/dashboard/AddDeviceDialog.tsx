@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Loader2, Cpu, Activity, Trash2, Terminal, Play, Save, CheckCircle2 } from "lucide-react";
+import { PlusCircle, Loader2, Cpu, Activity, Trash2, Play, Save, CheckCircle2 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -186,7 +186,7 @@ export function AddDeviceDialog({ defaultCity, defaultTehsil, defaultLab, onSucc
 
                     {/* LEFT SIDE: BUTTONS */}
                     <div className="w-full md:w-[220px] bg-slate-900 border-r border-slate-800 p-5 flex flex-col items-center pt-8">
-                        <Terminal size={24} className="text-blue-500 mb-2" />
+                        <Activity size={24} className="text-blue-500 mb-2" />
                         <h2 className="text-sm font-bold text-white mb-6 uppercase">PC Controls</h2>
 
                         <div className="flex flex-col gap-3 w-full">

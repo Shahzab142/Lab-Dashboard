@@ -1,9 +1,31 @@
+/**
+ * ----------------------------------------------------------------------------------
+ * @file App.tsx
+ * @description Root application component and routing configuration for the Lab Dashboard.
+ *
+ * @architecture
+ * - Uses React Router for declarative routing.
+ * - Wraps the entire application in global providers (TanStack Query, Auth, Tooltips, Toasts).
+ * - Implements Role-Based Access Control (RBAC) via the `<ProtectedRoute>` and `<AdminRoute>` wrappers.
+ *
+ * @routing_flow
+ * 1. Root ("/") redirects to "/dashboard".
+ * 2. Unauthenticated users are sent to the "/login" page.
+ * 3. Authenticated users pass through `<ProtectedRoute>`.
+ * 4. The `DashboardIndex` component dynamically routes users to their correct landing page
+ *    based on their `scope_type` (e.g., DISTRICT, TEHSIL, LAB admins see different default views).
+ * 5. Special tools (e.g., OTAUpdateHub, AssignLabs) are protected by `<AdminRoute>` ensuring
+ *    only top-level admins can access them.
+ * ----------------------------------------------------------------------------------
+ */
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { AdminRoute } from "@/components/AdminRoute";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider } from "@/hooks/useAuth";
+import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
@@ -21,15 +43,28 @@ import Dashboard5 from "./pages/Dashboard5";
 import TehsilsPage from "./pages/TehsilsPage";
 import TehsilPerformancePage from "./pages/TehsilPerformancePage";
 import UtilizationPage from "./pages/UtilizationPage";
-import TerminalCommandCenter from "./pages/TerminalCommandCenter";
-import MaintenanceHub from "./pages/MaintenanceHub";
+
 import LabHeatmap from "./pages/LabHeatmap";
 import OTAUpdateHub from "./pages/OTAUpdateHub";
+import AssignLabs from "./pages/AssignLabs";
 
 import NotFound from "./pages/NotFound";
 import { GlobalFailsafe } from "@/components/GlobalFailsafe";
 
 const queryClient = new QueryClient();
+
+const DashboardIndex = () => {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  
+  if (user.role === 'SUB_ADMIN') {
+    if (user.scope_type === 'DISTRICT') return <Navigate to="overview" replace />;
+    if (user.scope_type === 'TEHSIL') return <Navigate to="cities" replace />;
+    if (user.scope_type === 'LAB') return <Navigate to="labs" replace />;
+  }
+  
+  return <Navigate to="analytics" replace />;
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -50,7 +85,7 @@ const App = () => (
                 </ProtectedRoute>
               }
             >
-              <Route index element={<Navigate to="analytics" replace />} />
+              <Route index element={<DashboardIndex />} />
               <Route path="analytics" element={<DashboardPage />} />
               <Route path="dashboard_4" element={<Dashboard4 />} />
               <Route path="dashboard_5" element={<Dashboard5 />} />
@@ -61,10 +96,12 @@ const App = () => (
               <Route path="labs" element={<LabsPage />} />
               <Route path="devices" element={<DevicesPage />} />
               <Route path="overview" element={<DashboardOverview />} />
-              <Route path="terminal" element={<TerminalCommandCenter />} />
-              <Route path="maintenance" element={<MaintenanceHub />} />
+              
+              {/* --- SECURE ADMIN-ONLY TOOLS --- */}
+              <Route path="ota" element={<AdminRoute><OTAUpdateHub /></AdminRoute>} />
+              <Route path="assign-labs" element={<AdminRoute><AssignLabs /></AdminRoute>} />
+              
               <Route path="heatmap" element={<LabHeatmap />} />
-              <Route path="ota" element={<OTAUpdateHub />} />
 
               <Route path="lab-summary/:city/:lab" element={<LabSummaryPage />} />
               <Route path="pc/:id" element={<PCDetailPage />} />

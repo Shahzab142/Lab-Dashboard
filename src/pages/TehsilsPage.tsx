@@ -19,7 +19,8 @@ export default function TehsilsPage() {
     const { data: statsData, isLoading } = useQuery({
         queryKey: ['global-lab-stats'],
         queryFn: () => apiFetch('/stats/labs/all'),
-        refetchInterval: 10000,
+        refetchInterval: 15000,
+        staleTime: 10000,
     });
 
     const tehsils = useMemo(() => {

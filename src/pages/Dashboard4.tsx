@@ -19,9 +19,10 @@ export default function Dashboard4() {
     const [sortBy, setSortBy] = useState<'pcs' | 'labs'>('pcs');
 
     const { data, isLoading } = useQuery({
-        queryKey: ["global-lab-stats-d4"],
+        queryKey: ["global-lab-stats"],
         queryFn: () => apiFetch("/stats/labs/all"),
-        refetchInterval: 10000,
+        refetchInterval: 15000,
+        staleTime: 10000,
     });
 
     const labs = Array.isArray(data?.labs) ? data.labs : [];

@@ -1,3 +1,17 @@
+/**
+ * ----------------------------------------------------------------------------------
+ * @file DashboardOverview.tsx
+ * @description The main overview dashboard for District-level or Super Admin users.
+ *
+ * @architecture
+ * - Fetches real-time telemetry from the backend (`/stats/labs/all`).
+ * - Uses `useQuery` for performant data fetching and caching.
+ * - Integrates RBAC: Data is filtered server-side based on the logged-in user's `scope_type` and `scope_values`.
+ * - Aggregates data to calculate fleet health (Live vs Offline PCs), bandwidth usage,
+ *   and geographical breakdowns (by District/Tehsil).
+ * ----------------------------------------------------------------------------------
+ */
+
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
