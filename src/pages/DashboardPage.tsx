@@ -116,42 +116,100 @@ const ActiveDetailCard = ({ data, viewMode, activeFilter }: { data: ChartEntry |
 
     return (
         <div
-            className="w-[180px] shrink-0 p-[2px] rounded-3xl bg-gradient-to-br from-white/10 to-transparent backdrop-blur-3xl border border-white/20 shadow-[0_30px_70px_rgba(0,0,0,0.8)] animate-in fade-in zoom-in-95 duration-500 pointer-events-none"
+            className="w-[220px] shrink-0 p-[2px] rounded-3xl bg-gradient-to-br from-white/15 to-transparent border border-white/20 shadow-[0_30px_70px_rgba(0,0,0,0.85)] animate-in fade-in zoom-in-95 duration-500 pointer-events-none"
         >
-            <div className="bg-[#0f1128]/90 rounded-[1.4rem] p-5 h-full relative overflow-hidden group">
-                {/* Decorative Elements */}
+            <div className="bg-[#0b0c1e] rounded-[1.4rem] p-5 h-full relative overflow-hidden group">
+                {/* Decorative glow */}
                 <div 
-                    className="absolute -top-10 -right-10 w-24 h-24 blur-[40px] rounded-full opacity-40 group-hover:opacity-60 transition-opacity"
+                    className="absolute -top-10 -right-10 w-28 h-28 blur-[40px] rounded-full opacity-40 transition-opacity"
                     style={{ backgroundColor: accentColor }}
                 />
                 
-                <div className="relative z-10 flex flex-col gap-6">
-                    <div className="flex items-center gap-3">
+                <div className="relative z-10 flex flex-col gap-5">
+                    {/* Header: Segment Name & Indicator */}
+                    <div className="flex items-center gap-3 border-b border-white/5 pb-2">
                         <div
-                            className="w-2.5 h-2.5 rounded-full shadow-[0_0_15px_currentcolor]"
+                            className="w-3 h-3 rounded-full shadow-[0_0_15px_currentcolor]"
                             style={{ color: accentColor, backgroundColor: accentColor }}
                         />
-                        <span className="text-[10px] font-black text-white/60 uppercase tracking-[0.2em] truncate">
+                        <span className="text-[10px] font-black text-white/80 uppercase tracking-[0.2em] truncate">
                             {data.name}
                         </span>
                     </div>
 
+                    {/* Numeric Value section */}
                     <div className="space-y-1">
                         <div className="flex items-baseline gap-2">
-                            <p className="text-6xl font-black text-white leading-none tracking-tighter italic" 
-                               style={{ filter: `drop-shadow(0 0 15px ${accentColor}40)` }}>
+                            <p className="text-5xl font-black text-white leading-none tracking-tighter italic" 
+                               style={{ filter: `drop-shadow(0 0 15px ${accentColor}30)` }}>
                                 {data.value}
                             </p>
-                            <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">{label}</span>
+                            <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">{label}</span>
                         </div>
                         {subLabel && (
-                            <p className="text-[9px] font-bold text-primary uppercase tracking-[0.15em] opacity-80">
+                            <p className="text-[9px] font-bold text-primary uppercase tracking-[0.15em] opacity-80 truncate">
                                 {subLabel}
                             </p>
                         )}
                     </div>
 
-                    <div className="pt-4 border-t border-white/5">
+                    {/* Highly Premium Merged Stats Section */}
+                    {(data.tehsilsCount !== undefined || data.labsCount !== undefined || data.onlinePCs !== undefined || data.activeRatio !== undefined || data.healthStatus) && (
+                        <div className="flex flex-col gap-2 pt-3 mt-1 border-t border-white/5 text-[10px]">
+                            {data.tehsilsCount !== undefined && (
+                                <div className="flex justify-between items-center py-0.5">
+                                    <span className="text-white/40 font-bold uppercase tracking-wider text-[8px]">Tehsils</span>
+                                    <span className="text-white font-black">{data.tehsilsCount}</span>
+                                </div>
+                            )}
+                            {data.labsCount !== undefined && (
+                                <div className="flex justify-between items-center py-0.5">
+                                    <span className="text-white/40 font-bold uppercase tracking-wider text-[8px]">Total Labs</span>
+                                    <span className="text-white font-black">{data.labsCount}</span>
+                                </div>
+                            )}
+                            {data.onlinePCs !== undefined && data.totalPCs !== undefined && (
+                                <div className="flex flex-col gap-1 py-1">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-white/40 font-bold uppercase tracking-wider text-[8px]">PCs Online</span>
+                                        <span className="text-white font-black">{data.onlinePCs} / {data.totalPCs}</span>
+                                    </div>
+                                    <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden mt-0.5">
+                                        <div 
+                                            className="h-full bg-emerald-500 rounded-full" 
+                                            style={{ width: `${Math.min(100, (data.onlinePCs / Math.max(1, data.totalPCs)) * 100)}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                            {data.activeRatio !== undefined && (
+                                <div className="flex justify-between items-center py-0.5">
+                                    <span className="text-white/40 font-bold uppercase tracking-wider text-[8px]">Active Ratio</span>
+                                    <span className="text-emerald-400 font-black">{data.activeRatio}%</span>
+                                </div>
+                            )}
+                            {data.healthStatus && (
+                                <div className="flex justify-between items-center pt-1 mt-1 border-t border-white/5">
+                                    <span className="text-white/40 font-bold uppercase tracking-wider text-[8px]">Node Status</span>
+                                    <div className="flex items-center gap-1.5">
+                                        {data.healthStatus === 'healthy' && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}
+                                        {data.healthStatus === 'warning' && <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />}
+                                        {data.healthStatus === 'critical' && <XCircle className="w-3.5 h-3.5 text-rose-400" />}
+                                        <span className={cn(
+                                            "font-black uppercase text-[8px] tracking-widest",
+                                            data.healthStatus === 'healthy' ? "text-emerald-400" :
+                                            data.healthStatus === 'warning' ? "text-amber-400" : "text-rose-400"
+                                        )}>
+                                            {data.healthStatus}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Bottom Subtext */}
+                    <div className="pt-3 border-t border-white/5">
                         <p className="text-[8px] font-bold text-white/30 uppercase tracking-[0.2em] leading-relaxed">
                             {description}
                         </p>
@@ -685,7 +743,6 @@ export default function DashboardPage() {
 
                         <ResponsiveContainer width="100%" height="100%" className="pointer-events-none">
                             <PieChart style={{ pointerEvents: 'auto' }}>
-                                <Tooltip content={<CustomTooltip />} cursor={false} wrapperStyle={{ pointerEvents: 'none' }} />
                                 <Pie
                                     data={safeCityChartData}
                                     cx="50%"
@@ -733,11 +790,19 @@ export default function DashboardPage() {
                 </div>
 
                 {/* --- RIGHT MOST: Hover Detail Card --- */}
-                <div className="w-[180px] shrink-0 flex items-center justify-center min-h-[200px]">
+                <div className="w-[220px] shrink-0 flex items-center justify-center min-h-[200px]">
                     {hoveredData ? (
                         <ActiveDetailCard data={hoveredData} viewMode={centerViewMode} activeFilter={selectedFilter} />
                     ) : (
-                        <div className="w-full h-full" />
+                        <div className="w-[220px] shrink-0 p-[2px] rounded-3xl bg-gradient-to-br from-white/5 to-transparent border border-white/10 shadow-[0_30px_70px_rgba(0,0,0,0.8)] animate-in fade-in duration-500">
+                            <div className="bg-[#0b0c1e] rounded-[1.4rem] p-5 h-full flex flex-col justify-center items-center text-center gap-3 min-h-[220px]">
+                                <Activity className="w-8 h-8 text-white/20 animate-pulse" />
+                                <span className="text-[10px] font-black text-white/40 uppercase tracking-[0.25em]">Fleet Analysis</span>
+                                <p className="text-[9px] font-bold text-white/30 uppercase tracking-widest leading-relaxed">
+                                    Hover any segment of the graph to display detailed node telemetry and health metrics.
+                                </p>
+                            </div>
+                        </div>
                     )}
                 </div>
 
