@@ -448,18 +448,17 @@ export default function PCDetailPage() {
                   <p className="text-[8px] text-muted-foreground uppercase font-bold tracking-widest opacity-60">System Boot</p>
                   <p className="font-bold text-lg text-primary leading-tight">
                     {(() => {
-                      const todayStr = new Date().toISOString().split('T')[0];
-                      const historyLog = history?.find((h: any) => (h.history_date || (h.start_time && h.start_time.split('T')[0])) === todayStr);
-                      const bootTimeStr = historyLog?.start_time || (isSeenToday ? device.today_start_time : null);
+                      const bootTimeRaw = history?.[0]?.start_time || device.today_start_time;
+                      if (!bootTimeRaw) return 'N/A';
                       
-                      if (!bootTimeStr) return 'N/A';
+                      const getLocalTime = (utcString: string) => {
+                        const normalized = utcString.includes('Z') || utcString.includes('+')
+                          ? utcString
+                          : utcString.trim().replace(' ', 'T') + 'Z';
+                        return new Date(normalized).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+                      };
                       
-                      const bootDate = new Date(bootTimeStr);
-                      const today = new Date();
-                      
-                      // Only show if it's actually from today to avoid showing yesterday's boot time, unless we matched from today's history log
-                      if (bootDate.toDateString() !== today.toDateString() && !historyLog) return 'Pending...';
-                      return bootDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                      return getLocalTime(bootTimeRaw);
                     })()}
                   </p>
 
@@ -589,7 +588,11 @@ export default function PCDetailPage() {
                     <tbody>
                       {/* INJECT TODAY'S LIVE SESSION - ONLY IF NOT ALREADY IN HISTORY */}
                       {(() => {
-                        const today = new Date().toISOString().split('T')[0];
+                        const today = (() => {
+                          const d = new Date();
+                          const offset = d.getTimezoneOffset();
+                          return new Date(d.getTime() - (offset * 60 * 1000)).toISOString().split('T')[0];
+                        })();
                         const historyHasToday = history.some((h: any) => h.history_date === today || h.start_time?.startsWith(today));
 
 

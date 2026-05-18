@@ -66,14 +66,19 @@ export default function PCHistoryDetailPage() {
     );
 
     const { device, history } = detail;
-    const isToday = date === new Date().toISOString().split('T')[0];
+    const isToday = date === (() => {
+        const d = new Date();
+        const offset = d.getTimezoneOffset();
+        return new Date(d.getTime() - (offset * 60 * 1000)).toISOString().split('T')[0];
+    })();
 
     // Helper: Get previous date YYYY-MM-DD
     const getPreviousDate = (dateStr: string | undefined) => {
         if (!dateStr) return '';
         const d = new Date(dateStr);
         d.setDate(d.getDate() - 1);
-        return d.toISOString().split('T')[0];
+        const offset = d.getTimezoneOffset();
+        return new Date(d.getTime() - (offset * 60 * 1000)).toISOString().split('T')[0];
     };
 
     // Find the log for the requested date

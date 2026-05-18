@@ -245,7 +245,12 @@ export default function LabsPage() {
                                 const toastId = toast.loading(`Synthesizing ${city} infrastructure audit...`);
                                 try {
                                     const { generateDynamicReport } = await import('@/lib/pdf-generator');
-                                    await generateDynamicReport('CITY', { labs, city }, city!);
+                                    const reportLabs = (labs || []).map((l: any) => ({
+                                        lab_name: l.lab_name || l.lab || 'Unknown Lab',
+                                        total_pcs: l.total_pcs || 0,
+                                        online: l.online || 0
+                                    }));
+                                    await generateDynamicReport('CITY', { labs: reportLabs, city }, city!);
                                     toast.success("PowerPoint Report Generated", { id: toastId });
                                 } catch (e) {
                                     console.error(e);
