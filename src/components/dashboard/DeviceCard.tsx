@@ -65,9 +65,7 @@ export function DeviceCard({ device, serverTime }: DeviceCardProps) {
 
   const lastSeenDate = device.last_seen ? new Date(device.last_seen) : null;
   const referenceTime = serverTime ? new Date(serverTime) : new Date();
-  const isOnline = device.status === 'online' &&
-    lastSeenDate &&
-    (referenceTime.getTime() - lastSeenDate.getTime() < 120 * 1000); // 120s window (accounts for 30s DB flush delay)
+  const isOnline = lastSeenDate && (referenceTime.getTime() - lastSeenDate.getTime() < 120 * 1000); // 120s window (accounts for 30s DB flush delay)
 
   // Persistent defective check
   const isCurrentlyDefective = (() => {

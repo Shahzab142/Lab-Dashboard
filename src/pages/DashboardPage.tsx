@@ -16,10 +16,10 @@ import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
-import { Loader2, Search, X, MapPin, Building2, Layout, Landmark } from "lucide-react";
+import { PieChart, Pie, Cell, ResponsiveContainer, Sector, Tooltip } from "recharts";
+import { Loader2, Search, X, MapPin, Building2, Layout, Landmark, Activity, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useCallback } from "react";
 
 const COLORS = [
     "#f99a1d", // Golden Amber
@@ -34,6 +34,14 @@ const COLORS = [
     "#0EA5E9", // Sky Blue
 ];
 
+const getStableColor = (name: string) => {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+        hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return COLORS[Math.abs(hash) % COLORS.length];
+};
+
 interface Lab {
     city: string;
     tehsil: string;
@@ -47,6 +55,12 @@ interface ChartEntry {
     value: number;
     color: string;
     fullData?: Lab;
+    tehsilsCount?: number;
+    labsCount?: number;
+    onlinePCs?: number;
+    totalPCs?: number;
+    activeRatio?: number;
+    healthStatus?: 'healthy' | 'warning' | 'critical';
 }
 
 interface SearchSuggestion {
@@ -102,9 +116,9 @@ const ActiveDetailCard = ({ data, viewMode, activeFilter }: { data: ChartEntry |
 
     return (
         <div
-            className="w-[240px] shrink-0 p-1 rounded-[2.5rem] bg-gradient-to-br from-white/10 to-transparent backdrop-blur-3xl border border-white/20 shadow-[0_30px_70px_rgba(0,0,0,0.8)] animate-in fade-in zoom-in-95 duration-500 pointer-events-none"
+            className="w-[180px] shrink-0 p-[2px] rounded-3xl bg-gradient-to-br from-white/10 to-transparent backdrop-blur-3xl border border-white/20 shadow-[0_30px_70px_rgba(0,0,0,0.8)] animate-in fade-in zoom-in-95 duration-500 pointer-events-none"
         >
-            <div className="bg-[#0f1128]/90 rounded-[2.3rem] p-6 h-full relative overflow-hidden group">
+            <div className="bg-[#0f1128]/90 rounded-[1.4rem] p-5 h-full relative overflow-hidden group">
                 {/* Decorative Elements */}
                 <div 
                     className="absolute -top-10 -right-10 w-24 h-24 blur-[40px] rounded-full opacity-40 group-hover:opacity-60 transition-opacity"
@@ -148,10 +162,88 @@ const ActiveDetailCard = ({ data, viewMode, activeFilter }: { data: ChartEntry |
     );
 };
 
+const renderActiveShape = (props: any) => {
+    const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props;
+
+    return (
+        <g>
+            <Sector
+                cx={cx}
+                cy={cy}
+                innerRadius={innerRadius}
+                outerRadius={outerRadius + 6}
+                startAngle={startAngle}
+                endAngle={endAngle}
+                fill={fill}
+                className="transition-all duration-300"
+                style={{ filter: `drop-shadow(0px 0px 15px ${fill}90)` }}
+            />
+        </g>
+    );
+};
+
+const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+        const data = payload[0].payload as ChartEntry;
+        
+        return (
+            <div className="bg-[#0f1428] border border-white/10 rounded-[14px] p-4 shadow-[0_15px_40px_rgba(0,0,0,0.8)] pointer-events-none z-50 min-w-[220px]"
+                 style={{ borderColor: `${data.color}50`, boxShadow: `0 0 20px ${data.color}20` }}>
+                <div className="flex items-center gap-2 mb-3 border-b border-white/5 pb-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: data.color, boxShadow: `0 0 10px ${data.color}` }} />
+                    <span className="text-white font-bold tracking-wider uppercase text-sm">{data.name}</span>
+                </div>
+                
+                <div className="space-y-1.5 text-xs">
+                    {data.tehsilsCount !== undefined && (
+                        <div className="flex justify-between text-white/70">
+                            <span>Tehsils:</span> <span className="text-white font-medium">{data.tehsilsCount}</span>
+                        </div>
+                    )}
+                    {data.labsCount !== undefined && (
+                        <div className="flex justify-between text-white/70">
+                            <span>Labs:</span> <span className="text-white font-medium">{data.labsCount}</span>
+                        </div>
+                    )}
+                    {data.onlinePCs !== undefined && data.totalPCs !== undefined && (
+                        <div className="flex justify-between text-white/70">
+                            <span>PCs Online:</span> <span className="text-white font-medium">{data.onlinePCs} / {data.totalPCs}</span>
+                        </div>
+                    )}
+                    {data.activeRatio !== undefined && (
+                        <div className="flex justify-between text-white/70">
+                            <span>Active Ratio:</span> <span className="text-white font-medium">{data.activeRatio}%</span>
+                        </div>
+                    )}
+                    
+                    {data.healthStatus && (
+                        <div className="mt-3 pt-2 border-t border-white/5">
+                            <div className="flex items-center gap-1.5">
+                                {data.healthStatus === 'healthy' && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
+                                {data.healthStatus === 'warning' && <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />}
+                                {data.healthStatus === 'critical' && <XCircle className="w-3.5 h-3.5 text-rose-500" />}
+                                <span className={cn(
+                                    "font-bold uppercase text-[10px] tracking-widest",
+                                    data.healthStatus === 'healthy' ? "text-emerald-500" :
+                                    data.healthStatus === 'warning' ? "text-amber-500" : "text-rose-500"
+                                )}>
+                                    {data.healthStatus} STATUS
+                                </span>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }
+    return null;
+};
+
 export default function DashboardPage() {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const [hoveredData, setHoveredData] = useState<ChartEntry | null>(null);
+    const [activeIndex, setActiveIndex] = useState<number | undefined>();
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedFilter, setSelectedFilter] = useState<SearchSuggestion | null>(null);
     const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -229,7 +321,7 @@ export default function DashboardPage() {
 
     // --- DISTRIBUTION (Center/Right circle) ---
     const { statsMap, totalCities, totalTehsils, totalLabs } = useMemo(() => {
-        const stats = new Map<string, { labCount: number, pcCount: number, tehsilSet: Set<string> }>();
+        const stats = new Map<string, { labCount: number, pcCount: number, onlinePcCount: number, tehsilSet: Set<string> }>();
         const tehsils = new Set<string>();
         const cities = new Map<string, boolean>();
 
@@ -240,11 +332,12 @@ export default function DashboardPage() {
             cities.set(city, true);
 
             const groupKey = centerViewMode === 'tehsil' ? tehsil : city;
-            const current = stats.get(groupKey) || { labCount: 0, pcCount: 0, tehsilSet: new Set<string>() };
+            const current = stats.get(groupKey) || { labCount: 0, pcCount: 0, onlinePcCount: 0, tehsilSet: new Set<string>() };
             current.tehsilSet.add(tehsil);
             stats.set(groupKey, {
                 labCount: current.labCount + 1,
                 pcCount: current.pcCount + Number(l.total_pcs || 0),
+                onlinePcCount: current.onlinePcCount + Number(l.online || 0),
                 tehsilSet: current.tehsilSet
             });
         });
@@ -266,21 +359,24 @@ export default function DashboardPage() {
                     const t = l.tehsil || 'Unknown';
                     tehsilMap.set(t, (tehsilMap.get(t) || 0) + 1);
                 });
-                return Array.from(tehsilMap.entries()).map(([name, value], index) => ({
+                return Array.from(tehsilMap.entries()).map(([name, value]) => ({
                     name,
                     value,
-                    color: COLORS[index % COLORS.length]
+                    color: getStableColor(name)
                 }));
             }
 
             if (selectedFilter.type === 'tehsil') {
                 const tehsilLabs = labs.filter((l) => l.tehsil === selectedFilter.name);
-                return tehsilLabs.map((l, index) => ({
-                    name: l.lab_name || 'Unknown Lab',
-                    value: Number(l.total_pcs || 1),
-                    color: COLORS[index % COLORS.length],
-                    fullData: l
-                }));
+                return tehsilLabs.map((l) => {
+                    const name = l.lab_name || 'Unknown Lab';
+                    return {
+                        name,
+                        value: Number(l.total_pcs || 1),
+                        color: getStableColor(name),
+                        fullData: l
+                    };
+                });
             }
 
             if (selectedFilter.type === 'lab') {
@@ -316,12 +412,21 @@ export default function DashboardPage() {
             ].filter(d => d.value > 0);
         }
 
-        return Array.from(statsMap.entries()).map(([name, stats], index) => {
+        return Array.from(statsMap.entries()).map(([name, stats]) => {
             const val = centerViewMode === 'district' ? stats.tehsilSet.size : stats.labCount;
+            const activeRatio = stats.pcCount > 0 ? Math.round((stats.onlinePcCount / stats.pcCount) * 100) : 0;
+            const healthStatus = activeRatio >= 80 ? 'healthy' : activeRatio >= 50 ? 'warning' : 'critical';
+
             return {
                 name,
                 value: val,
-                color: COLORS[index % COLORS.length]
+                color: getStableColor(name),
+                tehsilsCount: stats.tehsilSet.size,
+                labsCount: stats.labCount,
+                onlinePCs: stats.onlinePcCount,
+                totalPCs: stats.pcCount,
+                activeRatio,
+                healthStatus
             };
         });
     }, [centerViewMode, statsMap, labs, selectedFilter]);
@@ -482,7 +587,7 @@ export default function DashboardPage() {
                 </div>
             </div>
 
-            <div className="relative z-10 w-full max-w-[1200px] mt-[15vh] mb-auto flex flex-col xl:flex-row items-center justify-center gap-8 xl:gap-8 min-h-[60vh] pb-10">
+            <div className="relative z-10 w-full max-w-[1200px] mt-[15vh] mb-auto flex flex-col xl:flex-row items-center justify-center gap-8 xl:gap-24 min-h-[60vh] pb-10">
 
                 {/* --- LEFT: Buttons (District Controls) --- */}
                 <div className="flex flex-col items-center xl:items-start gap-5 w-full max-w-[260px]">
@@ -539,14 +644,7 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
-                {/* --- MIDDLE: Hover Detail Card --- */}
-                <div className="w-[240px] shrink-0 flex items-center justify-center min-h-[220px]">
-                    {hoveredData ? (
-                        <ActiveDetailCard data={hoveredData} viewMode={centerViewMode} activeFilter={selectedFilter} />
-                    ) : (
-                        <div className="w-full h-full" />
-                    )}
-                </div>
+
 
                 {/* --- RIGHT: District Distribution Circle --- */}
                 <div className="flex flex-col items-center gap-4 w-full max-w-[420px] animate-in zoom-in-95 duration-1000">
@@ -560,8 +658,34 @@ export default function DashboardPage() {
                     <div className="relative w-full aspect-square shrink-0 flex items-center justify-center" style={{ minHeight: '280px' }}>
                         <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-violet-600/5 to-indigo-600/5 blur-[50px]" />
 
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none group/center">
+                            <div 
+                                className="pointer-events-auto cursor-pointer flex flex-col items-center justify-center rounded-full p-4"
+                                onClick={() => {
+                                    if (selectedFilter) {
+                                        if (selectedFilter.type === 'district') navigate(`/dashboard/labs?city=${encodeURIComponent(selectedFilter.name)}`);
+                                        else if (selectedFilter.type === 'tehsil') navigate(`/dashboard/labs?tehsil=${encodeURIComponent(selectedFilter.name)}`);
+                                        else if (selectedFilter.type === 'lab') navigate(`/dashboard/lab-summary/${encodeURIComponent(selectedFilter.district)}/${encodeURIComponent(selectedFilter.name)}`);
+                                    } else {
+                                        if (centerViewMode === 'district') navigate(`/dashboard/cities`);
+                                        else if (centerViewMode === 'tehsil') navigate(`/dashboard/cities`);
+                                        else if (centerViewMode === 'labs') navigate(`/dashboard/labs`);
+                                        else if (centerViewMode === 'pc') navigate(`/dashboard/devices`);
+                                    }
+                                }}
+                            >
+                                <span className="text-7xl font-black text-white tracking-tighter italic drop-shadow-[0_0_30px_rgba(255,255,255,0.4)] group-hover/center:text-primary transition-colors">
+                                    {centerDisplayTotal}
+                                </span>
+                                <span className="text-[10px] font-black text-primary uppercase tracking-[0.4em] -mt-2 opacity-80 group-hover/center:opacity-100">
+                                    {centerDisplayLabel}
+                                </span>
+                            </div>
+                        </div>
+
+                        <ResponsiveContainer width="100%" height="100%" className="pointer-events-none">
+                            <PieChart style={{ pointerEvents: 'auto' }}>
+                                <Tooltip content={<CustomTooltip />} cursor={false} wrapperStyle={{ pointerEvents: 'none' }} />
                                 <Pie
                                     data={safeCityChartData}
                                     cx="50%"
@@ -573,13 +697,19 @@ export default function DashboardPage() {
                                     stroke="none"
                                     startAngle={90}
                                     endAngle={-270}
+                                    activeIndex={activeIndex}
+                                    activeShape={renderActiveShape}
                                     onClick={(data: ChartEntry) => handleCenterChartClick(data)}
-                                    onMouseEnter={(data) => {
+                                    onMouseEnter={(data, index) => {
                                         if (data && data.name !== "No Data") {
                                             setHoveredData(data as ChartEntry);
+                                            setActiveIndex(index);
                                         }
                                     }}
-                                    onMouseLeave={() => setHoveredData(null)}
+                                    onMouseLeave={() => {
+                                        setHoveredData(null);
+                                        setActiveIndex(undefined);
+                                    }}
                                 >
                                     {safeCityChartData.map((entry, index) => {
                                         const fillColor = entry.name === 'Online' ? '#00a629' :
@@ -598,29 +728,17 @@ export default function DashboardPage() {
                             </PieChart>
                         </ResponsiveContainer>
 
-                        <div
-                            className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer group/center"
-                            onClick={() => {
-                                if (selectedFilter) {
-                                    if (selectedFilter.type === 'district') navigate(`/dashboard/labs?city=${encodeURIComponent(selectedFilter.name)}`);
-                                    else if (selectedFilter.type === 'tehsil') navigate(`/dashboard/labs?tehsil=${encodeURIComponent(selectedFilter.name)}`);
-                                    else if (selectedFilter.type === 'lab') navigate(`/dashboard/lab-summary/${encodeURIComponent(selectedFilter.district)}/${encodeURIComponent(selectedFilter.name)}`);
-                                } else {
-                                    if (centerViewMode === 'district') navigate(`/dashboard/cities`);
-                                    else if (centerViewMode === 'tehsil') navigate(`/dashboard/cities`);
-                                    else if (centerViewMode === 'labs') navigate(`/dashboard/labs`);
-                                    else if (centerViewMode === 'pc') navigate(`/dashboard/devices`);
-                                }
-                            }}
-                        >
-                            <span className="text-7xl font-black text-white tracking-tighter italic drop-shadow-[0_0_30px_rgba(255,255,255,0.4)] group-hover/center:text-primary transition-colors">
-                                {centerDisplayTotal}
-                            </span>
-                            <span className="text-[10px] font-black text-primary uppercase tracking-[0.4em] -mt-2 opacity-80 group-hover/center:opacity-100">
-                                {centerDisplayLabel}
-                            </span>
-                        </div>
+
                     </div>
+                </div>
+
+                {/* --- RIGHT MOST: Hover Detail Card --- */}
+                <div className="w-[180px] shrink-0 flex items-center justify-center min-h-[200px]">
+                    {hoveredData ? (
+                        <ActiveDetailCard data={hoveredData} viewMode={centerViewMode} activeFilter={selectedFilter} />
+                    ) : (
+                        <div className="w-full h-full" />
+                    )}
                 </div>
 
             </div>

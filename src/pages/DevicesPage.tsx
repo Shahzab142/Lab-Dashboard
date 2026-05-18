@@ -39,7 +39,12 @@ export default function DevicesPage() {
       if (cityParam) params.append('city', cityParam);
       if (labParam) params.append('lab', labParam);
       if (tehsilParam) params.append('tehsil', tehsilParam);
-      if (statusFilter && statusFilter !== 'all') params.append('status', statusFilter);
+      
+      // We handle 'online' and 'offline' entirely on the frontend using real-time last_seen
+      if (statusFilter && !['all', 'online', 'offline'].includes(statusFilter)) {
+        params.append('status', statusFilter);
+      }
+      
       if (search) params.append('search', search);
 
       return apiFetch(`/devices?${params.toString()}`);
@@ -65,15 +70,33 @@ export default function DevicesPage() {
       is_defective: d.is_defective || defectiveDevices.includes(d.system_id)
     }));
 
-    if (statusFilter === 'offline_7d' || statusFilter === 'offline_30d') {
-      const now = response?.server_time ? new Date(response.server_time) : new Date();
+    const now = response?.server_time ? new Date(response.server_time) : new Date();
+
+    if (statusFilter === 'online') {
+      devices = devices.filter((device: any) => {
+        if (device.is_defective) return false;
+        if (!device.last_seen) return false;
+        const lastSeen = new Date(device.last_seen);
+        return now.getTime() - lastSeen.getTime() < 120 * 1000;
+      });
+    } else if (statusFilter === 'offline') {
+      devices = devices.filter((device: any) => {
+        if (device.is_defective) return false;
+        if (!device.last_seen) return true;
+        const lastSeen = new Date(device.last_seen);
+        return now.getTime() - lastSeen.getTime() >= 120 * 1000;
+      });
+    } else if (statusFilter === 'offline_7d' || statusFilter === 'offline_30d') {
       const daysThreshold = statusFilter === 'offline_7d' ? 7 : 30;
 
       devices = devices.filter((device: any) => {
         if (device.is_defective) return false; // Show in defective category instead
-        if (device.status !== 'offline') return false;
         if (!device.last_seen) return true;
+        
         const lastSeen = new Date(device.last_seen);
+        // Ensure it is actually offline first
+        if (now.getTime() - lastSeen.getTime() < 120 * 1000) return false;
+
         const diffTime = Math.abs(now.getTime() - lastSeen.getTime());
         const diffDays = diffTime / (1000 * 60 * 60 * 24);
         return diffDays >= daysThreshold;
