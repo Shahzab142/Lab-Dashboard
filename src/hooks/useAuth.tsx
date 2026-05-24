@@ -44,7 +44,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
-      const res = await fetch('https://labmonitoringservergo-1f69d6677862.herokuapp.com/api/admin/login', {
+      const baseUrl = import.meta.env.VITE_API_URL || "https://labmonitoringservergo-1f69d6677862.herokuapp.com/api";
+      const res = await fetch(`${baseUrl}/admin/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
